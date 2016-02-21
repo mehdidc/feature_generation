@@ -4,6 +4,13 @@ import theano.tensor as T
 import theano
 from lasagne import layers as L
 import numpy as np
+import sys
+import logging
+
+logger = logging.getLogger(__name__)
+handler = logging.StreamHandler(stream=sys.stdout)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 
 def show_filters(capsule, data, layers, w, h, c, **kw):
@@ -79,7 +86,6 @@ def generative(capsule, data, layers, w, h, c, layer_name="wta_spatial", **kw):
 def neuronviz(capsule, data, layers, w, h, c, layer_name="wta_spatial", **kw):
     from lasagnekit.misc.plot_weights import tile_raster_images
     name = layer_name
-
     xgen = T.tensor4()
     y = L.get_output(layers[name], xgen)
 
@@ -109,21 +115,51 @@ def neuronviz(capsule, data, layers, w, h, c, layer_name="wta_spatial", **kw):
 
 
 def genetic(capsule, data, layers, w, h, c,
-            layer_name="wta_spatial", nb_iter=100,
-            just_get_function=False,
-            out="out.png",
-            params=None,
-            **kw):
-    x = T.tensor4()
-    if layer_name in layers:
-        name = layer_name
-    elif "wta_channel" in layers:
-        name = "wta_channel"
-    elif "wta_spatial" in layers:
-        name = "wta_spatial"
-    else:
-        name = "wta"
+            **params):
+    print(layers.keys())
 
+    allowed_params = set([
+        "layer_name",
+        "nb_iter",
+        "out",
+        "just_get_function",
+        "nearest_neighbors",
+        "tradeoff",
+        "fitness_name",
+        "arch",
+        "modelfile",
+        "category",
+        "nb_initial",
+        "initial_source",
+        "nbchildren",
+        "nbsurvive",
+        "strategy",
+        "temperature",
+        "born_perc",
+        "dead_perc",
+        "dead_perc",
+        "mutationval",
+        "tsne",
+        "tsnecentroids",
+        "tsnefile",
+        "groupshow",
+        "save_all",
+        "save_all_folder",
+        "seed",
+        "n_clusters"
+    ])
+    for p in params.keys():
+        assert p in allowed_params, "'{}' not recognizable parameter".format(p)
+  
+    layer_name = params.get("layer_name", "wta_spatial")
+    name = layer_name
+    nb_iter = params.get("nb_iter", 100)
+    just_get_function = params.get("just_get_function", False)
+    out = params.get("out", "out.png")
+  
+    x = T.tensor4()
+  
+    logger.info("Compiling functions...")
     x = T.tensor4()
     g = theano.function(
         [x],
@@ -159,14 +195,14 @@ def genetic(capsule, data, layers, w, h, c,
         A = A.astype(np.float32)
         return A
 
-    def smarter_mutation(A, born_perc=0.1, dead_perc=0.1, nbtimes=1, nb=100):
+    def smarter_mutation(A, born_perc=0.1, dead_perc=0.1, nbtimes=1, val=10, nb=100):
         # val = A.max()
         perc = born_perc + dead_perc
         nb_filters = A.shape[1]
         size = int(perc * nb_filters)
         for i in range(nbtimes):
             for a in A:
-                indices = np.random.choice(np.arange(len(A)),
+                indices = np.random.choice(np.arange(len(a)),
                                            size=size, replace=True)
                 nb_born = int(born_perc*nb_filters)
                 born_indices = indices[0:nb_born]
@@ -177,7 +213,6 @@ def genetic(capsule, data, layers, w, h, c,
                     x, y = np.random.randint(a.shape[1]), np.random.randint(a.shape[2])
                     # val = np.random.choice((0.01, 0.1, 1, 10))
                     #val = np.random.uniform()
-                    val = 10
                     a[idx, x, y] = val
         return A
 
@@ -206,91 +241,644 @@ def genetic(capsule, data, layers, w, h, c,
             S[i] = s
         return S.astype(np.float32)
 
-    def diversity(X):
+    def vect(F):
+        F = F.max(axis=(2, 3))
+        F = F.reshape((F.shape[0], -1))
+        return F
+    """
+    in all the following fitness functions, the smaller the value
+    the better
+    """
+    def nearestneighbours_distance(X, orig=None, feat=None, orig_feat=None):
+        assert feat is not None
         from sklearn.neighbors import NearestNeighbors
-        K = params.get("nearest_neighbors", 10)
-        X_ = X.reshape((X.shape[0], -1))
-        nbrs = NearestNeighbors(n_neighbors=K, algorithm='ball_tree').fit(X_)
-        distances, _ = nbrs.kneighbors(X_)
-        nb = params.get("nb", 100)
-        if distances.shape[1] > nb:
-            D = distances[:, nb:]
+        K = params.get("nearest_neighbors", 8)
+        X_ = vect(feat)
+        if orig_feat is not None:
+            O_ = vect(orig_feat)
+            S = np.concatenate((X_, O_), axis=0)
+        else:
+            S = X_
+        nbrs = NearestNeighbors(n_neighbors=K, algorithm='ball_tree').fit(S)
+        distances, _ = nbrs.kneighbors(S)
+        if orig is not None:
+            D = distances[0:len(X_), :]
         else:
             D = distances
         return D.mean(axis=1)
 
-    def reconstruction(X):
+    def diversity(X, orig=None, feat=None, orig_feat=None):
+        return -nearestneighbours_distance(
+                X, orig=orig,
+                feat=feat,
+                orig_feat=orig_feat)
+
+    rec_model = None
+    rec_class = None
+
+    def recognizability(X, feat=None, orig=None, orig_feat=None):
+        # maximize prediction of some category
+        X_ = X.reshape((X.shape[0], -1))
+        if rec_class == 'any':
+            pred = rec_model.predict_proba(X_).max(axis=1)
+            return 1 - pred
+        else:
+            pred = rec_model.predict_proba(X_)[:, rec_class]
+            return 1. - pred
+
+    def reconstruction(X, feat=None, orig=None, orig_feat=None):
         return ((X - capsule.reconstruct(X)) ** 2).sum(axis=(1, 2, 3))
 
-    def reconstruction_and_diversity(X):
-        return reconstruction(X) + 0.1 * diversity(X)
+    def reconstruction_and_diversity(X, feat=None, orig=None, orig_feat=None):
+        diversity = nearestneighbours_distance(X, feat=feat, orig=orig,
+                                               orig_feat=orig_feat)
+        # minimize reconstruction and maximize  diversity
+        return reconstruction(X, orig=orig) - params.get("tradeoff", 0.01) * diversity
+
+    def pngsize(X, feat=None, orig=None, orig_feat=None):
+        from cStringIO import StringIO
+        import png
+        mode = 'L' if c == 1 else 'RGB'
+        sizes = []
+        X_ = X.transpose((0, 2, 3, 1))
+        for x in X_:
+            stream = StringIO()
+            png.from_array((x*255.).astype(np.int16), mode=mode).save(stream)
+            size = len(stream.getvalue())
+            sizes.append(size)
+        return np.array(sizes)
+
+    # Choose and init fitness
+    logger.info("Init fitness...")
+    
+    fitness_name = params.get("fitness_name", "reconstruction")
+    fitness = {
+        "reconstruction": reconstruction,
+        "reconstruction_and_diversity": reconstruction_and_diversity,
+        "recognizability": recognizability,
+        "diversity": diversity,
+        "pngsize": pngsize
+    }
+    compute_fitness = fitness[fitness_name]
+
+    if compute_fitness == recognizability:
+        from keras.models import model_from_json
+        logger.info("Load recognizability model...")
+        arch = params.get("arch", "models/mnist.json")
+        modelfile = params.get("modelfile", "models/mnist.hdf5")
+        rec_model = model_from_json(open(arch).read())
+        rec_model.load_weights(modelfile)
+        rec_class = params.get("category", "any")
 
     def perform():
-        # X = data.X
-        # X = X.reshape((X.shape[0], c, w, h))
-        X = np.random.uniform(size=(data.X.shape[0], c, w, h))
+
+        # Init data
+        nb_initial = params.get("nb_initial", data.X.shape[0])
+        initial_source = params.get("initial_source", "random")
+    
+        # nb_initial = 10       
+        if initial_source == "dataset":
+            X = data.X.reshape((data.X.shape[0], c, w, h))
+            X = X[0:nb_initial]
+        elif initial_source == "random":
+            X = np.random.uniform(size=(data.X.shape[0], c, w, h))
+            X = X[0:nb_initial]
+        elif initial_source == "centroids":
+            categories = list(set(data.y))
+            print(categories)
+            centroid = np.zeros((len(categories), c, w, h))
+            centroid_size = [0] * len(categories)
+            for i in range(10):
+                data.load()
+                X = data.X.reshape((data.X.shape[0], c, w, h))
+                for idx, cat in enumerate(categories):
+                    S = X[data.y==cat]
+                    centroid[idx] += S.sum(axis=0)
+                    centroid_size[idx] += len(S)
+
+            for ctroid, ctroidsz in zip(centroid, centroid_size):
+                print(ctroidsz, ctroid.max())
+                ctroid /= ctroidsz
+
+            X = np.array(centroid).astype(np.float32)
+            nb_initial = X.shape[0]
+        else:
+            raise Exception("bad initial")
+
         X = X.astype(np.float32)
-        nb = params.get("nb", 100)
-        survive = params.get("nb", 20)
-        compute_fitness = reconstruction
-        # compute_fitness = reconstruction_and_diversity
+
+        # genetic params
+        nb = params.get("nbchildren", 100)  # nb of children per iteration
+        survive = params.get("nbsurvive", 20)
+
+        # Init genetic
+        logger.info("Compute fitness of initial population...")
         feat = g(X)
-        evals = compute_fitness(X)
+        evals = compute_fitness(X, feat=feat)
         indices = np.argsort(evals)
         X, evals, feat = X[indices], evals[indices], feat[indices]
-        print(evals)
+        print(evals[0:10])
 
+        archive_px = X.copy()  # all generated images in pixel space
+        archive_feat = feat.copy()  # all generated images in feature space
+        archive_evals = evals.copy()  # all evaluations of genereted images
+        archive_popul_indices = indices  # current indices on archive of the population
+        centroids = []
+        logger.info("Start evolution")
+        # Evolution loop
+        strategy = params.get("strategy", "deterministic")
         for i in range(nb_iter):
-            #N = 4
-            #dvrsty = -diversity(feat[0:survive*N].max(axis=(2, 3)))
-            #indices = np.argsort(dvrsty)
-            #indices = indices[0:survive]
 
-            indices = np.arange(0, survive) 
+            # take best "survive" nb of elements from current population
+            if strategy == "deterministic":#just take the best "survive"
+                indices = np.arange(0, min(survive, len(X)))
+            elif strategy == "stochastic":#take "survive" in a stochastic way
+                indices = np.arange(0, len(X))
+                choose_nb = min(survive, len(X))
+                temp = params.get("temperature", 1)
+                prob = np.exp(-evals*temp)/np.exp(-evals*temp).sum()
+                indices = np.random.choice(indices, size=choose_nb, replace=False, p=prob)
+            elif strategy == "diversity": # take the best but make individuals only compete with individuals that are similar to them
+                from sklearn.cluster import KMeans
+                choose_nb = min(survive, len(X))
+                n_clusters = params.get("n_clusters", 3)
+                assert choose_nb % n_clusters == 0
+                take_per_cluster = choose_nb / n_clusters                
+                clus = KMeans(n_clusters=n_clusters)
+                F = vect(feat)
+                clus.fit(F)
+                clusid = clus.predict(F)
+                all_indices = np.arange(0, len(X))
+                indices = []
+                for i in range(n_clusters):
+                    indclus = all_indices[clusid==i]
+                    indclus = sorted(indclus, key=lambda ind:evals[ind])
+                    indclus = indclus[0:take_per_cluster]
+                    indices.extend(indclus)
+                indices = np.array(indices)
+            else:
+                raise Exception("Unknown strategy : {}".format(strategy))
             best = X[indices]
             best_evals = evals[indices]
             best_feat = g(best)
+            archive_best_indices = archive_popul_indices[indices] # update best indices in archive
 
+            # generate children
             children_feat = crossover(best_feat, nb=nb)
             children_feat = switcher(children_feat)
             children_feat = smarter_mutation(
                     best_feat,
-                    born_perc=0.1,
-                    dead_perc=0.1,
-                    nbtimes=1
+                    born_perc=params.get("born_perc", 0.1),
+                    dead_perc=params.get("dead_perc", 0.1),
+                    nbtimes=params.get("nbtimes", 1),
+                    val=params.get("mutationval", 10)
             )
+            centroids.append(vect(children_feat).mean(axis=0).tolist())
             children_px = f(children_feat)
-            children_evals = compute_fitness(children_px)
-
+            children_evals = compute_fitness(children_px,
+                                             feat=children_feat,
+                                             orig=best,
+                                             orig_feat=best_feat)
+            # update archive with children
+            archive_px = np.concatenate((archive_px, children_px), axis=0)
+            archive_feat = np.concatenate((archive_feat, children_feat), axis=0)
+            archive_evals = np.concatenate((archive_evals, children_evals), axis=0)
+            a = len(archive_px) - len(children_px)
+            # children indices on archive are added
+            archive_children_indices = np.arange(a, a + len(children_px))
+            # Now The current population = best + children, sort it according to eval
             evals = np.concatenate((best_evals, children_evals), axis=0)
             X = np.concatenate((best, children_px), axis=0)
             feat = np.concatenate((best_feat, children_feat), axis=0)
+            archive_popul_indices = np.concatenate((archive_best_indices, archive_children_indices), axis=0)
             indices = np.argsort(evals)
             X, evals, feat = X[indices], evals[indices], feat[indices]
-            print("Population mean Fitness : {}".format(evals.mean()))
+            archive_popul_indices = archive_popul_indices[indices]
+            logger.info("Population mean Fitness : {}".format(evals.mean()))
 
-        # indices = np.argsort(-diversity(feat[0:len(feat)/2].max(axis=(2, 3))))
-        # return X[indices][0:nb]
-        print(evals[0])
-        return X[0:1]
+        print(evals[0:10])
+        # t-sne
+        t_sne = params.get("tsne", False)
+        if t_sne:
+            logger.info("t-sne all the generated samples...")
+            from sklearn.manifold import TSNE
+            sne = TSNE()
+            if params.get("tsnecentroids", True):
+                F = vect(archive_feat)
+                F = np.concatenate((centroids, F[0:nb_initial].mean(axis=0, keepdims=True), F[archive_popul_indices]), axis=0)
+                first, last = 0, len(centroids)
+                inter = np.arange(first, last)
+                first = last
+                last += 1
+                initial = np.arange(first, last)
+                first = last
+                last += len(archive_popul_indices)
+                final = np.arange(first, last)
+            else:
+                F = vect(archive_feat)
+                inter = np.arange(0, len(F))
+                initial = np.arange(0, nb_initial)
+                final = archive_popul_indices
+            F_ = sne.fit_transform(F)
+            fig = plt.figure()
+            plt.scatter(F_[inter, 0], F_[inter, 1],
+                        c=np.arange(len(inter)),
+                        cmap='YlGn', label="intermediary")
+            plt.scatter(F_[initial, 0], F_[initial, 1], c='yellow', label="initial population")
+            plt.scatter(F_[final, 0], F_[final, 1], c='red', label="final population")
+            plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
+                       fancybox=True, shadow=True, ncol=5)
+            plt.savefig(params.get("tsnefile", "tsne.png"))
+            plt.close(fig)
+        return X, feat, evals
 
     if just_get_function:
         return perform
     else:
         from lasagnekit.misc.plot_weights import grid_plot
-        y = perform()
+        y, feat, evals = perform()
+
+        logger.info("Group plotting...")
         fig = plt.figure()
-        grid_plot(y[:, 0],
-                  imshow_options={"cmap": "gray"},
+        if y.shape[1] == 1:
+            opt = {"cmap": "gray"}
+            y = y[:, 0]
+        else:
+            opt = {}
+            y = y.transpose((0, 2, 3, 1))
+        grid_plot(y[0:params.get("groupshow", 100)],
+                  imshow_options=opt,
                   fig=fig)
         plt.savefig(out)
+        save_all = params.get("save_all", False)
+        folder = params.get("save_all_folder", "out")
+        if save_all:
+            logger.info("Save all individual images...")
+            from skimage.io import imsave
+            import pandas as pd
+            import json
+            for idx, sample in enumerate(y):
+                sample -= sample.min()
+                sample /= sample.max()
+                filename = "{}/{}.png".format(folder, idx)
+                logger.info("saving {}...".format(filename))
+                imsave(filename, sample)
+            logger.info("Save evals...")
+            pd.Series(evals).to_csv("{}/evals.csv".format(folder))
+            logger.info("Save params...")
+            json.dump(params, open("{}/params.json".format(folder), "w"))
+            logger.info("Save representations...")
+            np.savez(open("{}/repr_{}.pkl".format(folder, layer_name), "w"), feat=feat)
+
+"""
+def multigenetic(capsule, data, layers, w, h, c,
+                 **params):
+    print(layers.keys())
+    layer_names = params.get("layer_names", "wta_spatial")
+    names = layer_names
+    layerval = {name: T.tensor4() for name in names}
+    layervalordered = [layerval[name] for name in names]
+
+    nb_iter = params.get("nb_iter", 100)
+    just_get_function = params.get("just_get_function", False)
+    out = params.get("out", "out.png")
+    
+    logger.info("Compiling functions...")
+    x = T.tensor4()
+    g = theano.function(
+        [x],
+        [L.get_output(layers[name], x) for name in names]
+    )
+    recons = theano.function(
+        layervalordered,
+        L.get_output(layers["output"], {layers[name]: layerval[name] for name in names}))
+
+    # A is a set of examples (population), the operation
+    # should transform it into a new population (not necessarily the same
+    # number)
+    def identity(A, **kwargs):
+        return A
+
+    def random(A, nb=100, k=2):
+        shape = (nb,) + A.shape[1:]
+        HID = np.zeros(shape).astype(np.float32)
+        for a in range(k):
+            H = np.random.uniform(size=shape)
+            H *= (H == H.max(axis=(1, 2, 3), keepdims=True)) * 100
+            H = H.astype(np.float32)
+            HID += H
+        return HID
+
+    def mutation(A, nb=100, a=0.8, b=0.9999):
+        shape = (nb,) + A.shape[1:]
+        mask = np.random.uniform(size=shape) <= a
+        mask2 = np.random.uniform(size=shape) > b
+        s = np.random.randint(0, A.shape[0], size=nb)
+        A = A[s]
+        A = A * mask + mask2 * 100
+        A = A.astype(np.float32)
+        return A
+
+    def smarter_mutation(A, born_perc=0.1, dead_perc=0.1, nbtimes=1, val=10, nb=100):
+        # val = A.max()
+        perc = born_perc + dead_perc
+        nb_filters = A.shape[1]
+        size = int(perc * nb_filters)
+        for i in range(nbtimes):
+            for a in A:
+                indices = np.random.choice(np.arange(a.shape[1]),#was a  bug in the old genetic
+                                           size=size, replace=True)
+                nb_born = int(born_perc*nb_filters)
+                born_indices = indices[0:nb_born]
+                dead_indices = indices[nb_born:]
+                a[dead_indices] = 0
+                for idx in born_indices:
+                    a[idx] = 0
+                    x, y = np.random.randint(a.shape[1]), np.random.randint(a.shape[2])
+                    # val = np.random.choice((0.01, 0.1, 1, 10))
+                    #val = np.random.uniform()
+                    a[idx, x, y] = val
+        return A
+
+    def switcher(A, nbtimes=1, size=2, nb=100):
+        for _ in range(nbtimes):
+            for a in A:
+                indices = np.random.choice(len(a), size=size, replace=True)
+                indices_shuffled = indices.copy()
+                np.random.shuffle(indices_shuffled)
+                for i, j in zip(indices, indices_shuffled):
+                    xi, yi = np.unravel_index(a[i].argmax(), a[i].shape)
+                    xj, yj = np.unravel_index(a[j].argmax(), a[j].shape)
+                    a[i, xi, yi], a[i, xj, yj] = a[i, xj, yj], a[i, xi, yi]
+                    a[j, xi, yi], a[j, xj, yj] = a[j, xj, yj], a[j, xi, yi]
+        return A
+
+    def crossover(A, nb=100):
+        S = np.zeros((nb,) + A.shape[1:])
+        for i in range(nb):
+            ind1, ind2 = np.random.randint(0, A.shape[0], size=2)
+            s1, s2 = A[ind1], A[ind2]
+            s = np.zeros_like(s1)
+            c = np.random.randint(0, 2, size=A.shape[1])
+            s[c == 0] = s1[c == 0]
+            s[c == 1] = s2[c == 1]
+            S[i] = s
+        return S.astype(np.float32)
+
+    def vect(F):
+        F = [f.max(axis=(2, 3)).reshape((f.shape[0], -1)) for f in F]
+        return np.concatenate(F, axis=1)
+      
+    def nearestneighbours_distance(X, orig=None, feat=None, orig_feat=None):
+        assert feat is not None
+        from sklearn.neighbors import NearestNeighbors
+        K = params.get("nearest_neighbors", 8)
+        X_ = vect(feat)
+        if orig_feat is not None:
+            O_ = vect(orig_feat)
+            S = np.concatenate((X_, O_), axis=0)
+        else:
+            S = X_
+        nbrs = NearestNeighbors(n_neighbors=K, algorithm='ball_tree').fit(S)
+        distances, _ = nbrs.kneighbors(S)
+        if orig is not None:
+            D = distances[0:len(X_), :]
+        else:
+            D = distances
+        return D.mean(axis=1)
+
+    def diversity(X, orig=None, feat=None, orig_feat=None):
+        return -nearestneighbours_distance(
+                X, orig=orig,
+                feat=feat,
+                orig_feat=orig_feat)
+
+    rec_model = None
+    rec_class = None
+
+    def recognizability(X, feat=None, orig=None, orig_feat=None):
+        # maximize prediction of some category
+        pred = rec_model.predict_proba(X)[:, rec_class]
+        return 1. - pred
+
+    def reconstruction(X, feat=None, orig=None, orig_feat=None):
+        return ((X - capsule.reconstruct(X)) ** 2).sum(axis=(1, 2, 3))
+
+    def reconstruction_and_diversity(X, feat=None, orig=None, orig_feat=None):
+        diversity = nearestneighbours_distance(X, feat=feat, orig=orig,
+                                               orig_feat=orig_feat)
+        # minimize reconstruction and maximize  diversity
+        return reconstruction(X, orig=orig) - params.get("tradeoff", 0.01) * diversity
+    # Choose and init fitness
+    logger.info("Init fitness...")
+    
+    fitness_name = params.get("fitness_name", "reconstruction")
+    fitness = {
+        "reconstruction": reconstruction,
+        "reconstruction_and_diversity": reconstruction_and_diversity,
+        "recognizability": recognizability,
+        "diversity": diversity
+    }
+    compute_fitness = fitness[fitness_name]
+
+    if compute_fitness == recognizability:
+        from keras.models import model_from_json
+        arch = params.get("arch", "models/mnist.json")
+        modelfile = params.get("modelfile", "models/mnist.hdf5")
+        rec_model = model_from_json(open(arch).read())
+        rec_model.load_weights(modelfile)
+        rec_class = params.get("category", 3)
+
+    def perform():
+
+        # Init data
+        nb_initial = params.get("nb_initial", data.X.shape[0])
+        initial_source = params.get("initial_source", "random")
+    
+        # nb_initial = 10       
+        if initial_source == "dataset":
+            X = data.X.reshape((data.X.shape[0], c, w, h))
+            X = X[0:nb_initial]
+        elif initial_source == "random":
+            X = np.random.uniform(size=(data.X.shape[0], c, w, h))
+            X = X[0:nb_initial]
+        elif initial_source == "centroids":
+            categories = list(set(data.y))
+            print(categories)
+            centroid = np.zeros((len(categories), c, w, h))
+            centroid_size = [0] * len(categories)
+            for i in range(10):
+                data.load()
+                X = data.X.reshape((data.X.shape[0], c, w, h))
+                for idx, cat in enumerate(categories):
+                    S = X[data.y==cat]
+                    centroid[idx] += S.sum(axis=0)
+                    centroid_size[idx] += len(S)
+
+            for ctroid, ctroidsz in zip(centroid, centroid_size):
+                print(ctroidsz, ctroid.max())
+                ctroid /= ctroidsz
+
+            X = np.array(centroid).astype(np.float32)
+            nb_initial = X.shape[0]
+        else:
+            raise Exception("bad initial")
+
+        X = X.astype(np.float32)
+
+        # genetic params
+        nb = params.get("nbchildren", 100)  # nb of children per iteration
+        survive = params.get("nbsurvive", 20)
+
+        # Init genetic
+        logger.info("Compute fitness of initial population...")
+        feat = g(X)
+        evals = compute_fitness(X, feat=feat)
+        indices = np.argsort(evals)
+        X, evals, feat = X[indices], evals[indices], [f[indices] for f in feat]
+        print(evals[0:10])
+
+        archive_px = X.copy()  # all generated images in pixel space
+        archive_feat = [f.copy() for f in feat]  # all generated images in feature space
+        archive_evals = evals.copy()  # all evaluations of genereted images
+        archive_popul_indices = indices  # current indices on archive of the population
+        centroids = []
+        logger.info("Start evolution")
+        # Evolution loop
+        strategy = params.get("strategy", "deterministic")
+        for i in range(nb_iter):
+
+            # take best "survive" nb of elements from current population
+            if strategy == "deterministic":
+                indices = np.arange(0, min(survive, len(X)))
+            elif strategy == "stochastic":
+                indices = np.arange(0, len(X))
+                choose_nb = min(survive, len(X))
+                temp = params.get("temperature", 1)
+                prob = np.exp(-evals*temp)/np.exp(-evals*temp).sum()
+                indices = np.random.choice(indices, size=choose_nb, replace=False, p=prob)
+            else:
+                raise Exception("Unknown strategy : {}".format(strategy))
+            best = X[indices]
+            best_evals = evals[indices]
+            best_feat = g(best)
+            archive_best_indices = archive_popul_indices[indices] # update best indices in archive
+
+            # generate children
+            children_feat = [crossover(f, nb=nb) for f in best_feat]
+            children_feat = [switcher(f) for f in children_feat]
+
+            children_feat = [smarter_mutation(
+                    f,
+                    born_perc=params.get("born_perc", 0.1),
+                    dead_perc=params.get("dead_perc", 0.1),
+                    nbtimes=params.get("mutationnbtimes", 1),
+                    val=params.get("mutationval", 10)
+            ) for f in children_feat]
+            centroids.append(vect(children_feat).mean(axis=0).tolist())
+            children_px = recons(*children_feat)
+            children_evals = compute_fitness(children_px,
+                                             feat=children_feat,
+                                             orig=best,
+                                             orig_feat=best_feat)
+            # update archive with children
+            archive_px = np.concatenate((archive_px, children_px), axis=0)
+            archive_feat = [np.concatenate((ar, ch), axis=0) for ar, ch in zip(archive_feat, children_feat)]
+            archive_evals = np.concatenate((archive_evals, children_evals), axis=0)
+            a = len(archive_px) - len(children_px)
+            # children indices on archive are added
+            archive_children_indices = np.arange(a, a + len(children_px))
+            # Now The current population = best + children, sort it according to eval
+            evals = np.concatenate((best_evals, children_evals), axis=0)
+            X = np.concatenate((best, children_px), axis=0)
+            feat = [np.concatenate((bst, ch), axis=0) for ch, bst in zip(children_feat, best_feat)]
+            archive_popul_indices = np.concatenate((archive_best_indices, archive_children_indices), axis=0)
+            indices = np.argsort(evals)
+            X, evals, feat = X[indices], evals[indices], [f[indices] for f in feat]
+            archive_popul_indices = archive_popul_indices[indices]
+            logger.info("Population mean Fitness : {}".format(evals.mean()))
+
+        print(evals[0:10])
+        # t-sne
+        t_sne = params.get("tsne", False)
+        if t_sne:
+            logger.info("t-sne all the generated samples...")
+            from sklearn.manifold import TSNE
+            sne = TSNE()
+            if params.get("tsnecentroids", True):
+                F = vect(archive_feat)
+                F = np.concatenate((centroids, F[0:nb_initial].mean(axis=0, keepdims=True), F[archive_popul_indices]), axis=0)
+                first, last = 0, len(centroids)
+                inter = np.arange(first, last)
+                first = last
+                last += 1
+                initial = np.arange(first, last)
+                first = last
+                last += len(archive_popul_indices)
+                final = np.arange(first, last)
+            else:
+                F = vect(archive_feat)
+                inter = np.arange(0, len(F))
+                initial = np.arange(0, nb_initial)
+                final = archive_popul_indices
+            F_ = sne.fit_transform(F)
+            fig = plt.figure()
+            plt.scatter(F_[inter, 0], F_[inter, 1],
+                        c=np.arange(len(inter)),
+                        cmap='YlGn', label="intermediary")
+            plt.scatter(F_[initial, 0], F_[initial, 1], c='yellow', label="initial population")
+            plt.scatter(F_[final, 0], F_[final, 1], c='red', label="final population")
+            plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
+                       fancybox=True, shadow=True, ncol=5)
+            plt.savefig(params.get("tsnefile", "tsne.png"))
+            plt.close(fig)
+        return X, feat, evals
+
+    if just_get_function:
+        return perform
+    else:
+        from lasagnekit.misc.plot_weights import grid_plot
+        y, feat, evals = perform()
+
+        logger.info("Group plotting...")
+        fig = plt.figure()
+        if y.shape[1] == 1:
+            opt = {"cmap": "gray"}
+            y = y[:, 0]
+        else:
+            opt = {}
+            y = y.transpose((0, 2, 3, 1))
+        grid_plot(y[0:params.get("groupshow", 100)],
+                  imshow_options=opt,
+                  fig=fig)
+        plt.savefig(out)
+        save_all = params.get("save_all", False)
+        folder = params.get("save_all_folder", "out")
+        if save_all:
+            logger.info("Save all individual images...")
+            from skimage.io import imsave
+            import pandas as pd
+            import json
+            for idx, sample in enumerate(y):
+                sample -= sample.min()
+                sample /= sample.max()
+                filename = "{}/{}.png".format(folder, idx)
+                logger.info("saving {}...".format(filename))
+                imsave(filename, sample)
+            logger.info("Save evals...")
+            pd.Series(evals).to_csv("{}/evals.csv".format(folder))
+            logger.info("Save params...")
+            json.dump(params, open("{}/params.json".format(folder), "w"))
+            logger.info("Save representations...")
+            for ft, layer_name in zip(feat, layer_names):
+                np.savez(open("{}/repr_{}.pkl".format(folder, layer_name), "w"), feat=ft)
+"""
 
 
 def recons(capsule, data, layers, w, h, c,
            layer_name="wta_spatial",
            **kw):
- 
-    from lasagnekit.misc.plot_weights import tile_raster_images, grid_plot
+    from lasagnekit.misc.plot_weights import grid_plot
     name = layer_name
     x = T.tensor4()
     g = theano.function(
@@ -313,17 +901,27 @@ def recons(capsule, data, layers, w, h, c,
     plt.show()
 
 
-def recons_from_features(capsule, data, layers, w, h, c, layer_name="wta_spatial", **kw):
-    from lasagnekit.misc.plot_weights import tile_raster_images, grid_plot
+def recons_from_features(capsule, data, layers, w, h, c,
+                         layer_name="wta_spatial", out="out.png", **kw):
+    from lasagnekit.misc.plot_weights import grid_plot
     from scipy.optimize import fmin_l_bfgs_b
+    print(layers)
     name = layer_name
+    logger.info("Compiling functions...")
     x = T.tensor4()
-    recons = L.get_output(layers["output"], {layers[name]: x})
+    CST = 15
+    recons = L.get_output(layers["output"], {layers[name]: x * CST})
+    get_layer = theano.function(
+        [x],
+        L.get_output(layers[name], x)
+    )
     get_recons = theano.function(
         [x],
         recons
     )
-    loss = ((recons - L.get_output(layers["output"], recons)) ** 2).sum(axis=(1, 2, 3)).mean()
+    recons_error = ((recons - L.get_output(layers["output"], recons)) ** 2).sum(axis=(1, 2, 3)).mean()
+    # norm = (x**2).sum()
+    loss = recons_error # - 0.001 * norm
     get_loss = theano.function(
             [x],
             loss
@@ -333,6 +931,7 @@ def recons_from_features(capsule, data, layers, w, h, c, layer_name="wta_spatial
     get_grad = theano.function([x], theano.grad(loss, x))
 
     nb_examples = 100
+    shape_inp = (nb_examples,) + (c, w, h)
     shape = (nb_examples,) + layers[name].output_shape[1:]
 
     def eval_loss(x0):
@@ -344,18 +943,31 @@ def recons_from_features(capsule, data, layers, w, h, c, layer_name="wta_spatial
         x0_ = x0.reshape(shape).astype(np.float32)
         g = np.array(get_grad(x0_)).flatten().astype(np.float64)
         return g
-
-    x = np.random.uniform(size=shape).astype(np.float32)
-    for i in range(500):
+    logger.info("Setting initial population...")
+    x = get_layer(np.random.uniform(size=shape_inp).astype(np.float32))
+    x = x.astype(np.float32)
+    shape = x.shape
+    logger.info("Start gradient descent!")
+    for i in range(15):
+        x, _, _ = fmin_l_bfgs_b(eval_loss, x.flatten(), fprime=eval_grad, maxfun=40)
+        x = x.reshape(shape)
+        x = x.astype(np.float32)
         #g = get_grad(x)
-        #x -= alpha * np.array(g)
-        fmin_l_bfgs_b(eval_loss, x.flatten(), fprime=eval_grad, maxfun=40)
+        #x -= 0.5 * np.array(g)
         print(get_loss(x))
         if i % 10 == 0:
             y = get_recons(x)
-            grid_plot(y[:, 0], imshow_options={"cmap": "gray"})
-            plt.savefig("out.png")
-            plt.show()
+            fig = plt.figure()
+            if y.shape[1] == 1:
+                opt = {"cmap": "gray"}
+                y = y[:, 0]
+            else:
+                opt = {}
+                y = y.transpose((0, 2, 3, 1))
+            grid_plot(y,
+                      imshow_options=opt,
+                      fig=fig)
+            plt.savefig(out)
 
 
 def activate(capsule, data, layers, w, h, c, layer_name="wta_spatial", **kw):
@@ -523,6 +1135,10 @@ def gui(capsule, data, layers, w, h, c, layer_name="wta_spatial", **kw):
 def ipython(capsule, data, layers, w, h, c, **kw):
     from IPython import embed
     embed()
+
+
+def notebook(capsule, data, layers, w, h, c, **kw):
+    return capsule, data, layers, w, h, c
 
 
 def beauty(capsule, data, layers, w, h, c, layer_name="wta_spatial", **kw):

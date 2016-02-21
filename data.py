@@ -3,7 +3,7 @@ import os
 from skimage.io import imread
 
 
-def load_data(dataset="digits"):
+def load_data(dataset="digits", w=None, h=None):
     nbl, nbc = 10, 10
     batch_size = 128
 
@@ -18,6 +18,23 @@ def load_data(dataset="digits"):
         data.load()
         w, h = data.img_dim
         data = SubSampled(data, batch_size)
+    if dataset == "olivetti":
+        from sklearn.datasets import fetch_olivetti_faces
+        from lasagnekit.datasets.manual import Manual
+        from lasagnekit.datasets.rescaled import Rescaled
+        from lasagnekit.datasets.subsampled import SubSampled
+        if w is None and h is None:
+            w, h = 64, 64
+        c = 1
+        data = fetch_olivetti_faces()
+        X = data['images']
+        X = X.astype(np.float32)
+        X = 1 - X
+        data = Manual(X.reshape((X.shape[0], -1)), y=data['target'])
+        data.img_dim = (w, h)
+        data = Rescaled(data, (w, h))
+        data = SubSampled(data, batch_size)
+
     if dataset == "notdigits":
         from lasagnekit.datasets.notmnist import NotMNIST
         from lasagnekit.datasets.subsampled import SubSampled
@@ -32,7 +49,8 @@ def load_data(dataset="digits"):
     elif dataset == "flaticon":
         from lasagnekit.datasets.flaticon import FlatIcon
         from lasagnekit.datasets.transformed import Transformed
-        w, h = 64, 64
+        if w is None and h is None:
+            w, h = 64, 64
         c = 1
         data = FlatIcon(size=(w, h), nb=batch_size)
         data.load()
@@ -50,12 +68,13 @@ def load_data(dataset="digits"):
         from lasagnekit.datasets.subsampled import SubSampled
         from lasagnekit.datasets.rescaled import Rescaled
         from lasagnekit.datasets.helpers import load_once
-        w, h = 64, 64
+        if w is None and h is None:
+            w, h = 64, 64
         c = 1
         data = load_once(Fonts)(kind='all_64')
         data.load()
         data = SubSampled(data, batch_size)
-        # data = Rescaled(data, (w, h))
+        data = Rescaled(data, (w, h))
         data.load()
     elif dataset == "svhn":
         from lasagnekit.datasets.svhn import SVHN
@@ -77,9 +96,11 @@ def load_data(dataset="digits"):
     elif dataset == 'stl':
         from lasagnekit.datasets.rescaled import Rescaled
         from lasagnekit.datasets.subsampled import SubSampled
+        from lasagnekit.datasets.transformed import Transformed
         from lasagnekit.datasets.stl import STL
         from lasagnekit.datasets.helpers import load_once
-        w, h = 32, 32
+        if w is None and h is None:
+            w, h = 64, 64
         c = 3
         data = load_once(STL)('unlabeled')
         data.load()
@@ -87,6 +108,7 @@ def load_data(dataset="digits"):
 
         def preprocess(X):
             shape = (X.shape[0],) + (w, h, c)
+            X = X / 255.
             X = X.reshape(shape)
             X = X.transpose((0, 3, 1, 2))
             X = X.reshape((X.shape[0], -1))
@@ -99,7 +121,9 @@ def load_data(dataset="digits"):
 
     elif dataset == 'chairs':
         from lasagnekit.datasets.chairs import Chairs
-        w, h = 32, 32
+        from lasagnekit.datasets.transformed import Transformed
+        if w is None and h is None:
+            w, h = 64, 64
         c = 3
         data = Chairs(size=(w, h), nb=batch_size)
         data.load()
@@ -115,14 +139,14 @@ def load_data(dataset="digits"):
     elif dataset == 'icons':
         from lasagnekit.datasets.imagecollection import ImageCollection
         from lasagnekit.datasets.transformed import Transformed
-
-        w, h = 32, 32
+        if w is None and h is None:
+            w, h = 32, 32
         c = 3
         folder = "{}/icons".format(os.getenv("DATA_PATH"))
         data = ImageCollection(size=(w, h), nb=batch_size, folder=folder)
         data.load()
         print(data.X.shape)
-        
+
         def preprocess(X):
             X = X.transpose((0, 3, 1, 2))
             X = X.reshape((X.shape[0], -1))
@@ -132,8 +156,10 @@ def load_data(dataset="digits"):
     elif dataset == 'lfw':
         from lasagnekit.datasets.skimagecollection import ImageCollection
         from skimage.io import imread_collection
+        from lasagnekit.datasets.transformed import Transformed
         from lasagnekit.datasets.rescaled import Rescaled
-        w, h = 32, 32
+        if w is None and h is None:
+            w, h = 64, 64
         c = 3
         folder = "{}/lfw/img/**/*.jpg".format(os.getenv("DATA_PATH"))
         collection = imread_collection(folder)
@@ -158,9 +184,11 @@ def load_data(dataset="digits"):
 
     elif dataset == 'lfwgrayscale':
         from lasagnekit.datasets.skimagecollection import ImageCollection
+        from lasagnekit.datasets.transformed import Transformed
         from skimage.io import imread_collection
         from lasagnekit.datasets.rescaled import Rescaled
-        w, h = 64, 64
+        if w is None and h is None:
+            w, h = 64, 64
         c = 1
         folder = "{}/lfw/img/**/*.jpg".format(os.getenv("DATA_PATH"))
         collection = imread_collection(folder)
@@ -180,6 +208,39 @@ def load_data(dataset="digits"):
             X = X.reshape((X.shape[0], -1))
             X = X / 255.
             X = 1 - X
+            return X
+        data = Transformed(data, preprocess, per_example=False)
+        data.load()
+        print(data.X.shape)
+
+    elif dataset == 'kanji':
+        from lasagnekit.datasets.skimagecollection import ImageCollection
+        from skimage.io import imread_collection
+        from lasagnekit.datasets.transformed import Transformed
+        from lasagnekit.datasets.rescaled import Rescaled
+        if w is None and h is None:
+            w, h = 64, 64
+        c = 1
+        name = "cleanpngsmall"
+        folder = "{}/kanji/{}/*.png".format(os.getenv("DATA_PATH"), name)
+        collection = imread_collection(folder)
+        indices = np.arange(len(collection))
+        np.random.shuffle(indices)
+        data = ImageCollection(collection,
+                               indices=indices,
+                               batch_size=batch_size)
+        data.load()
+        print(data.X.shape)
+        data = Rescaled(data, (w, h))
+        data.load()
+        print(data.X.shape)
+
+        def preprocess(X):
+            X = X.reshape((X.shape[0],  w, h, 4))
+            X = X[:, :, :, 0]
+            X = X / 255.
+            X = 1 - X
+            X = X.reshape((X.shape[0], -1))
             return X
         data = Transformed(data, preprocess, per_example=False)
         data.load()

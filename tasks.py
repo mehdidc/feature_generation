@@ -22,32 +22,64 @@ from lasagnekit.misc.plot_weights import grid_plot, dispims_color
 from lasagnekit.easy import get_stat
 import numpy as np
 from data import load_data
+from model import *  # for dill
+import logging
 
 sys.setrecursionlimit(10000)
 
 
+logger = logging.getLogger(__name__)
+handler = logging.StreamHandler(stream=sys.stdout)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+
+
 @task
-def train(dataset="digits", prefix="", model_name="model8"):
+def train(dataset="digits", prefix="", model_name="model8", force_w=None, force_h=None):
+    if force_w is not None:
+        w = force_w
+    else:
+        w = None
+
+    if force_h is not None:
+        h = force_h
+    else:
+        h = None
     state = 2
     np.random.seed(state)
-    data, w, h, c, nbl, nbc = load_data(dataset=dataset)
+    logger.info("Loading data...")
+    data, w, h, c, nbl, nbc = load_data(dataset=dataset, w=w, h=h)
     # nbl and nbc are just used to show couple of nblxnbc reconstructed
     # vs true samples
 
-    nb_filters = 128
+    nb_filters = 64
     kw_builder = dict(
         nb_filters=nb_filters,
         w=w, h=h, c=c
     )
-    if model_name in ("model18",):
+    if model_name in ("model18", "model20"):
         u = dict(
             nb_layers=2,
             size_filters=6
         )
         kw_builder.update(u)
+    elif model_name in ("model19", "model21",):
+        u = dict(
+            nb_layers=2,
+            size_filters=5
+        )
+        kw_builder.update(u)
+    elif model_name in ("model24", "model25", "model26", "model27", "model28", "model29", "model30"):
+        u = dict(
+            nb_layers=3,
+            size_filters=2**3+2
+        )
+        kw_builder.update(u)
+
     builder = getattr(model, model_name)
 
     # build the model and return layers dictionary
+    logger.info("Building the architecture..")
     layers = builder(**kw_builder)
 
     def report_event(status):
@@ -55,9 +87,11 @@ def train(dataset="digits", prefix="", model_name="model8"):
         print("Saving the model...")
         save_(layers, builder, kw_builder, "{}/model.pkl".format(prefix))
 
+    logger.info("Compiling the model...")
     capsule = build_capsule_(layers, data, nbl, nbc,
                              report_event, prefix=prefix)
     dummy = np.zeros((1, c, w, h)).astype(np.float32)
+    logger.info("Start training!")
     try:
         capsule.fit(X=dummy)
     except KeyboardInterrupt:
@@ -68,7 +102,10 @@ def train(dataset="digits", prefix="", model_name="model8"):
     capsule.report(capsule.batch_optimizer.stats[-1])
 
 
-def build_capsule_(layers, data, nbl, nbc, report_event=None, prefix=""):
+def build_capsule_(layers, data, nbl, nbc,
+                   report_event=None,
+                   prefix="",
+                   compile_="all"):  # all/functions only/none
     if report_event is None:
         def report_event(s):
             pass
@@ -186,7 +223,6 @@ def build_capsule_(layers, data, nbl, nbc, report_event=None, prefix=""):
     # called each epoch for monitoring
     def update_status(self, status):
         t = status["epoch"]
-
         cur_lr = lr.get_value()
 
         if lr_decay_method == "exp":
@@ -222,17 +258,16 @@ def build_capsule_(layers, data, nbl, nbc, report_event=None, prefix=""):
 
     # Initialize the optimization algorithm
     lr_decay_method = "none"
-    # initial_lr = 0.0035
     initial_lr = 0.1
-    lr_decay = 0.00000001
+    lr_decay = 0
     lr = theano.shared(np.array(initial_lr, dtype=np.float32))
-    momentum = 0.9
     # algo = updates.momentum
     algo = updates.adadelta
     # algo = updates.adam
     params = {"learning_rate": lr}
 
     if algo in (updates.momentum, updates.nesterov_momentum):
+        momentum = 0.9
         params["momentum"] = momentum
     if algo == updates.adam:
         params["beta1"] = 0.9
@@ -277,7 +312,12 @@ def build_capsule_(layers, data, nbl, nbc, report_event=None, prefix=""):
     capsule.layers = layers
     capsule.preprocess = preprocess
     dummy = np.zeros((1, c, w, h)).astype(np.float32)
-    capsule._build({"X": dummy})
+    if compile_ == "all":
+        capsule._build({"X": dummy})
+    elif compile_ == "functions_only":
+        capsule._build_functions()
+    elif compile__ == "none":
+        pass
     capsule.report = report
     return capsule
 
@@ -285,35 +325,50 @@ def build_capsule_(layers, data, nbl, nbc, report_event=None, prefix=""):
 @task
 def check(filename="out.pkl",
           what="filters",
-          params=None,
-          out="out.png",
-          layer_name="wta_channel",
           dataset="fonts",
           prefix="",
-          nb_iter=1,
-          just_get_function=False):
+          force_w=None,
+          force_h=None,
+          params=None):
     import json
     import analyze
-    data, w, h, c, nbl, nbc = load_data(dataset=dataset)
-    layers = load_(filename, w=w, h=h)
-    capsule = build_capsule_(layers, data, nbl, nbc, prefix=prefix)
-
-    if params is None:
-        params = {}
+    logger.info("Loading data...")
+    if force_w is not None:
+        w = force_w
     else:
-        params = json.load(params)
+        w = None
+    if force_h is not None:
+        h = force_h
+    else:
+        h = None
+    data, w, h, c, nbl, nbc = load_data(dataset=dataset, w=w, h=h)
+    logger.info("Loading the model...")
+    layers = load_(filename, w=w, h=h)
+    logger.info("Compiling the model...")
+    capsule = build_capsule_(
+            layers, data, nbl, nbc,
+            prefix=prefix,
+            compile_="functions_only")
+    if type(params) == list:
+        pass
+    else:    
+        if params is None:
+            params = [{}]
+        else:
+            params = [json.load(open(params))]
 
     assert hasattr(analyze, what)
     func = getattr(analyze, what)
 
-    return func(
-         capsule, data, layers, w, h, c,
-         params=params,
-         out=out,
-         layer_name=layer_name,
-         nb_iter=nb_iter,
-         just_get_function=just_get_function)
-
+    for p in params:
+        #try:
+        state = p.get("seed", 2)
+        np.random.seed(state)
+        p["seed"] = state
+        ret=func(capsule, data, layers, w, h, c, **p)
+        #except Exception as e:
+        #    print(str(e))
+    return ret
 
 def save_(layers, builder, kw_builder, filename):
     with open(filename, "w") as fd:
