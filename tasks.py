@@ -19,7 +19,7 @@ from lasagnekit.easy import (
 from lasagne import layers as L
 from lasagnekit.nnet.capsule import Capsule, make_function
 from lasagnekit.misc.plot_weights import grid_plot, dispims_color
-from lasagnekit.easy import get_stat
+from lasagnekit.easy import get_stat, iterate_minibatches
 import numpy as np
 from data import load_data
 from model import *  # for dill
@@ -48,7 +48,7 @@ def train(dataset="digits", prefix="", model_name="model8", force_w=None, force_
     state = 2
     np.random.seed(state)
     logger.info("Loading data...")
-    data, w, h, c, nbl, nbc = load_data(dataset=dataset, w=w, h=h)
+    data, w, h, c, nbl, nbc = load_data(dataset=dataset, w=w, h=h, include_test=True)
     # nbl and nbc are just used to show couple of nblxnbc reconstructed
     # vs true samples
 
@@ -91,9 +91,14 @@ def train(dataset="digits", prefix="", model_name="model8", force_w=None, force_
     capsule = build_capsule_(layers, data, nbl, nbc,
                              report_event, prefix=prefix)
     dummy = np.zeros((1, c, w, h)).astype(np.float32)
+    
+    V = {"X": dummy}
+    if "y" in layers:
+        dummy_y = np.zeros((1,)).astype(np.int32)
+        V.update({"y": dummy_y})
     logger.info("Start training!")
     try:
-        capsule.fit(X=dummy)
+        capsule.fit(**V)
     except KeyboardInterrupt:
         print("keyboard interrupt.")
         pass
@@ -109,17 +114,25 @@ def build_capsule_(layers, data, nbl, nbc,
     if report_event is None:
         def report_event(s):
             pass
+    is_predictive = True if "y" in layers else False
     # we only have inputs (X) : no labels
     input_variables = OrderedDict()
     input_variables["X"] = dict(tensor_type=T.tensor4)
+
+    if is_predictive:
+        input_variables["y"] = dict(tensor_type=T.ivector)
+
     # build the convnet layers and the model
     model = InputOutputMapping([layers["input"]], [layers["output"]])
 
     c, w, h = layers["input"].output_shape[1:]
 
     def reconstruct(model, X):
-        y, = model.get_output(X)
-        return y
+        X_rec, = model.get_output(X)
+        return X_rec
+
+    def predict(model, X):
+        return L.get_output(layers["y"], X)
 
     def is_conv_layer(name):
         return name.startswith("conv1")
@@ -137,6 +150,10 @@ def build_capsule_(layers, data, nbl, nbc,
         "reconstruct": make_function(func=reconstruct, params=["X"]),
         "get_conv_layers": make_function(func=get_conv, params=["X"])
     }
+    if is_predictive:
+        functions.update({
+            "predict": make_function(func=predict, params=["X"])})
+
 
     def report(status):
         ep = status["epoch"]
@@ -209,6 +226,9 @@ def build_capsule_(layers, data, nbl, nbc,
         loss = get_stat("loss_train", stats)
         pd.Series(avg_loss).to_csv("{}/out/avg_loss.csv".format(prefix))
         pd.Series(loss).to_csv("{}/out/loss.csv".format(prefix))
+        if is_predictive:
+            acc = [s["acc_test"] for s in stats if "acc_test" in s]
+            pd.Series(acc).to_csv("{}/out/acc.sv".format(prefix))
         fig = plt.figure()
         plt.plot(epoch, avg_loss, label="avg_loss")
         plt.plot(epoch, loss, label="loss")
@@ -248,6 +268,15 @@ def build_capsule_(layers, data, nbl, nbc,
         fix = 1 - B ** (1 + t)
         status["avg_loss_train_fix"] = status["avg_loss_train"] / fix
 
+        N = 200
+        if is_predictive and hasattr(data, "test") and t % N == 0:
+            preds = []
+            for batch in iterate_minibatches(data.test.X.shape[0], batchsize=1000):
+                pred = capsule.predict(capsule.preprocess(data.test.X[batch])).argmax(axis=1) == data.test.y[batch]
+                preds.append(pred)
+            acc = (np.concatenate(preds, axis=0)).mean()
+            status["acc_test"] = acc
+
         N = 1000
         # each N epochs save reconstructions
         # and how features look like
@@ -284,15 +313,24 @@ def build_capsule_(layers, data, nbl, nbc,
         verbose=1)
     batch_optimizer.lr = lr
 
-    def loss_function(model, tensors):
+    def loss_function(model, tensors, lambda_=10.):
         X = tensors["X"]
         X_pred = reconstruct(model, X)
-        return ((X - X_pred) ** 2).sum(axis=(1, 2, 3)).mean()
+        recons = ((X - X_pred) ** 2).sum(axis=(1, 2, 3)).mean()
+
+        if is_predictive:
+            y_pred = predict(model, X)
+            classif = -T.log(y_pred[T.arange(y_pred.shape[0]), tensors["y"]]).mean()
+            return recons + lambda_ * classif
+        else:
+            return recons
 
     def transform(batch_index, batch_slice, tensors):
         data.load()
         t = OrderedDict()
         t["X"] = preprocess(data.X)
+        if is_predictive:
+            t["y"] = data.y
         return t
 
     def preprocess(X):
@@ -313,7 +351,10 @@ def build_capsule_(layers, data, nbl, nbc,
     capsule.preprocess = preprocess
     dummy = np.zeros((1, c, w, h)).astype(np.float32)
     if compile_ == "all":
-        capsule._build({"X": dummy})
+        dummyvars = {"X": dummy}
+        if is_predictive:
+            dummyvars.update({"y": dummy})
+        capsule._build(dummyvars)
     elif compile_ == "functions_only":
         capsule._build_functions()
     elif compile__ == "none":
@@ -331,6 +372,7 @@ def check(filename="out.pkl",
           force_h=None,
           params=None):
     import json
+    import traceback
     import analyze
     logger.info("Loading data...")
     if force_w is not None:
@@ -361,13 +403,16 @@ def check(filename="out.pkl",
     func = getattr(analyze, what)
 
     for p in params:
-        #try:
-        state = p.get("seed", 2)
-        np.random.seed(state)
-        p["seed"] = state
-        ret=func(capsule, data, layers, w, h, c, **p)
-        #except Exception as e:
-        #    print(str(e))
+        try:
+            state = p.get("seed", 2)
+            np.random.seed(state)
+            p["seed"] = state
+            ret = func(capsule, data, layers, w, h, c, **p)
+        except Exception as e:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            #traceback.print_tb(exc_traceback, limit=4, file=sys.stdout)
+            traceback.print_exception(exc_type, exc_value, exc_traceback,
+                                      limit=4, file=sys.stdout)
     return ret
 
 def save_(layers, builder, kw_builder, filename):

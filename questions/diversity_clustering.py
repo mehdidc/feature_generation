@@ -14,14 +14,12 @@ if __name__ == "__main__":
 	import os
 	from itertools import product
 	all_params = []
-	tradeoff_range = (0.001, 0.005, 0.01, 0.1, 0.5, 1, 5, 10, 20)
-	nearest_neighbors_range = (3, 5, 8, 10)
-	
 	layer_name_range = ("conv1", "conv2", "conv3", "wta_spatial", "wta_channel")
-
-	for nearest_neighbors, layer_name, tradeoff in product(nearest_neighbors_range, layer_name_range, tradeoff_range):		
-		name = "exp{}_{}_{}".format(tradeoff, nearest_neighbors, layer_name)
-		folder = "answers/tradeoff_reconstruction_diversity/{}".format(name)		
+	val_range = (0.01, 0.1, 0.5, 1, 5, 10, 50, 100, 200,)
+	n_clusters_range = (1, 2, 4, 10)
+	for n_clusters, val, layer_name in product(n_clusters_range, val_range, layer_name_range):		
+		name = "exp{}_{}_{}".format(n_clusters, val, layer_name, layer_name)
+		folder = "answers/diversity_clustering/{}".format(name)		
 		mkdir_path(folder)
 		params = {
 			"save_all": True,
@@ -33,18 +31,17 @@ if __name__ == "__main__":
 
 			"layer_name": layer_name,
 			"nb_iter": 100,
-			"fitness_name": "reconstruction_and_diversity",
-			"tradeoff": tradeoff, #tradeoff reconstruction/diversity if fitness_name is reconstruction_and_diversity
-			"nearest_neighbors": nearest_neighbors,#diversity nearest neighbors
+			"fitness_name": "reconstruction",
 			"initial_source": "random",
 			"nb_initial": 100,
 
 			"nbchildren": 100,
-			"survive": 20,
-			"strategy": "deterministic",
+			"nbsurvive": 20,
+			"strategy": "diversity",
+			"n_clusters": n_clusters,
 			"born_perc": 0.1,
 			"dead_perc": 0.1,
-			"mutationval": 10,
+			"mutationval": val,
 			"nbtimes": 1,
 		}
 		all_params.append(params)

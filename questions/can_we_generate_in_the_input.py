@@ -16,8 +16,8 @@ if __name__ == "__main__":
 	all_params = []
 	born_perc_range = (0.001, 0.01, 0.1, 0.2, 0.5, 0.7, 0.9)
 	dead_perc_range = (0.001, 0.01, 0.1, 0.2, 0.5, 0.7, 0.9)
-	val_range = (0.01, 0.1, 0.5, 1, 5, 10, 20, 30, 50, 80, 100, 200,)
-
+	#val_range = (0.01, 0.1, 0.5, 1, 5, 10, 20, 30, 50, 80, 100, 200,)
+	val_range = (1, 5, 10, 20, 30, 50, 100)
 	for born_perc, dead_perc, val in product(born_perc_range, dead_perc_range, val_range):
 		name = "exp{}_{}_{}".format(born_perc, dead_perc, val)
 		folder = "answers/geninput/{}".format(name)		
@@ -35,12 +35,14 @@ if __name__ == "__main__":
 			"fitness_name": "reconstruction",
 
 			"nbchildren": 100,
-			"survive": 20,
+			"nbsurvive": 20,
 			"strategy": "deterministic",
 			"born_perc": born_perc,
 			"dead_perc": dead_perc,
 			"mutationval": val,
 			"nbtimes": 1,
+			"recons": True,
+			"flatten": True
 		}
 		all_params.append(params)
 	check(filename="models/model_E.pkl",

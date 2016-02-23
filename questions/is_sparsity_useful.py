@@ -10,9 +10,15 @@ if __name__ == "__main__":
 	import random
 	import uuid
 	import os
+	from itertools import product
 	all_params = []
-	for i in range(10):
-		folder = "answers/is_sparsity_useful/{}".format(str(uuid.uuid4()))
+	layer_name_range = ("conv1", "conv2", "conv3")
+	initial_source_range = ("random", "dataset")
+	val_range = (0.01, 0.1, 0.5, 1, 5, 10, 20, 30, 50, 80, 100, 200,)
+
+	for layer_name, initial_source, val in product(layer_name_range, initial_source_range, val_range):
+		name = "exp{}_{}_{}".format(layer_name, initial_source, val)
+		folder = "answers/is_sparsity_useful/{}".format(name)
 		mkdir_path(folder)
 		params = {
 			"save_all": True,
@@ -22,22 +28,22 @@ if __name__ == "__main__":
 			"tsnefile": "{}/tsne.png".format(folder),
 			"out": "{}/out.png".format(folder),
 
-			"layer_name": random.choice(("unconv0",)),
+			"layer_name": layer_name,
 			"nb_iter": 100,
 			"fitness_name": "reconstruction",
-			"initial_source": random.choice(("random", "dataset")),
+			"initial_source": initial_source,
 			"nb_initial": 100,
 
 			"nbchildren": 100,
-			"survive": 20,
+			"nbsurvive": 20,
 			"strategy": "deterministic",
 			"born_perc": 0.1,
 			"dead_perc": 0.1,
-			"mutationval": random.choice((0.001, 0.01, 0.05, 0.1, 0.5, 1, 5, 10)),
+			"mutationval": val,
 			"nbtimes": 1,
 		}
 		all_params.append(params)
-	check(filename="models/18mnist.pkl",
+	check(filename="training/31mnist/model.pkl",
           what="genetic",
           dataset="digits",
           params=all_params)

@@ -3,7 +3,7 @@ import os
 from skimage.io import imread
 
 
-def load_data(dataset="digits", w=None, h=None):
+def load_data(dataset="digits", w=None, h=None, include_test=False):
     nbl, nbc = 10, 10
     batch_size = 128
 
@@ -14,10 +14,18 @@ def load_data(dataset="digits", w=None, h=None):
         from lasagnekit.datasets.rescaled import Rescaled
         w, h = 28, 28
         c = 1
-        data = load_once(MNIST)()
+        if include_test:
+            which = 'train'
+        else:
+            which = 'all'
+        data = load_once(MNIST)(which=which)
         data.load()
         w, h = data.img_dim
         data = SubSampled(data, batch_size)
+        if include_test:
+            data.test = MNIST(which='test')
+            data.test.load()
+
     if dataset == "olivetti":
         from sklearn.datasets import fetch_olivetti_faces
         from lasagnekit.datasets.manual import Manual

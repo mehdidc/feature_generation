@@ -113,6 +113,102 @@ def neuronviz(capsule, data, layers, w, h, c, layer_name="wta_spatial", **kw):
             plt.savefig("out.png")
             plt.show()
 
+def simple_genetic(capsule, data, layers, w, h, c, **params):
+    op_params = params.get("op_params", [{"nb": 100}])
+    op_names = params.get("op_names", ["mutation"])
+    flatten  = params.get("flatten", False)
+    assert len(op_names) == len(op_params)
+
+    ops = {
+        "mutation": mutation,
+        "crossover": crossover,
+        "switcher": switcher,
+    }
+
+    def apply_op(f):
+        for op_name, op_param in zip(op_names, op_params):
+            logger.info("Applying {}...".format(op_name))
+            op_func = ops[op_name]
+            f = op_func(f, **op_param)
+        return f
+
+    layer_name = params.get("layer_name", "conv3")
+
+    out = params.get("out", "out.png")
+  
+    x = T.tensor4()
+  
+    logger.info("Compiling functions...")
+    x = T.tensor4()
+    px_to_code = theano.function(
+        [x],
+        L.get_output(layers[layer_name], x)
+    )
+    code_to_px = theano.function(
+        [x],
+        L.get_output(layers["output"], {layers[layer_name]: x}))
+
+    logger.info("Applying genetic op:")
+
+    
+    initial = params.get("initial_source", "dataset")
+    initial_size = params.get("initial_size", 1)
+
+    if initial == "dataset":
+        px_batch = []
+        for i in range(initial_size):
+            data.load()
+            shape = (data.X.shape[0], c, w, h)
+            px_batch.append(data.X.reshape(shape))
+        px = np.concatenate(px_batch, axis=0)
+    elif initial == "random":
+        shape = (data.X.shape[0] * initial_size, c, w, h)
+        px = np.random.uniform(size=shape)
+        px = px.astype(np.float32)
+
+    
+    code = px_to_code(px)
+
+    if flatten:
+        shape = code.shape[1:]
+        code = code.reshape((code.shape[0], -1))
+        new_code = apply_op(code)
+        new_code = new_code.reshape((new_code.shape[0],) + shape)
+        code = code.reshape((code.shape[0],) + shape)
+    else:
+        new_code = apply_op(code)
+
+    if layer_name == "input":
+        new_px = new_code
+    else:
+        new_px = code_to_px(new_code)
+
+    if params.get("filter", False):
+        from sklearn.svm import OneClassSVM
+        m = OneClassSVM(verbose=1, nu=0.9)
+        new_code = px_to_code(new_px)
+        D = np.concatenate((new_code, code), axis=0)
+        D = D.reshape((D.shape[0], -1))
+        m.fit(D)
+        is_novel = (m.predict(D) == 1)
+        is_novel = is_novel[0:len(new_code)]
+        logger.info("Ratio of novel : {}".format(is_novel.sum()/float(len(is_novel))))
+        new_px = new_px[is_novel]
+
+    logger.info("Saving image...")
+
+    if c == 1:
+        from lasagnekit.misc.plot_weights import tile_raster_images
+        from skimage.io import imsave
+        new_px = new_px[:, 0, :, :]
+        nb_samples = new_px.shape[0]
+        size = int(np.sqrt(nb_samples))
+        img = tile_raster_images(new_px, img_shape=(w, h), tile_shape=(size, size))
+        imsave(out, img)
+    else:
+        pass # next time
+
+
 
 def genetic(capsule, data, layers, w, h, c,
             **params):
@@ -138,15 +234,21 @@ def genetic(capsule, data, layers, w, h, c,
         "born_perc",
         "dead_perc",
         "dead_perc",
+        "nbtimes",
         "mutationval",
         "tsne",
         "tsnecentroids",
+        'tsneparams',
         "tsnefile",
         "groupshow",
         "save_all",
         "save_all_folder",
         "seed",
-        "n_clusters"
+        "n_clusters",
+        "image_scatter",
+        "image_scatter_out",
+        "flatten",
+        "recons"
     ])
     for p in params.keys():
         assert p in allowed_params, "'{}' not recognizable parameter".format(p)
@@ -169,80 +271,11 @@ def genetic(capsule, data, layers, w, h, c,
         [x],
         L.get_output(layers["output"], {layers[name]: x}))
 
-    # A is a set of examples (population), the operation
-    # should transform it into a new population (not necessarily the same
-    # number)
-    def identity(A, **kwargs):
-        return A
+   
 
-    def random(A, nb=100, k=2):
-        shape = (nb,) + A.shape[1:]
-        HID = np.zeros(shape).astype(np.float32)
-        for a in range(k):
-            H = np.random.uniform(size=shape)
-            H *= (H == H.max(axis=(1, 2, 3), keepdims=True)) * 100
-            H = H.astype(np.float32)
-            HID += H
-        return HID
-
-    def mutation(A, nb=100, a=0.8, b=0.9999):
-        shape = (nb,) + A.shape[1:]
-        mask = np.random.uniform(size=shape) <= a
-        mask2 = np.random.uniform(size=shape) > b
-        s = np.random.randint(0, A.shape[0], size=nb)
-        A = A[s]
-        A = A * mask + mask2 * 100
-        A = A.astype(np.float32)
-        return A
-
-    def smarter_mutation(A, born_perc=0.1, dead_perc=0.1, nbtimes=1, val=10, nb=100):
-        # val = A.max()
-        perc = born_perc + dead_perc
-        nb_filters = A.shape[1]
-        size = int(perc * nb_filters)
-        for i in range(nbtimes):
-            for a in A:
-                indices = np.random.choice(np.arange(len(a)),
-                                           size=size, replace=True)
-                nb_born = int(born_perc*nb_filters)
-                born_indices = indices[0:nb_born]
-                dead_indices = indices[nb_born:]
-                a[dead_indices] = 0
-                for idx in born_indices:
-                    a[idx] = 0
-                    x, y = np.random.randint(a.shape[1]), np.random.randint(a.shape[2])
-                    # val = np.random.choice((0.01, 0.1, 1, 10))
-                    #val = np.random.uniform()
-                    a[idx, x, y] = val
-        return A
-
-    def switcher(A, nbtimes=1, size=2, nb=100):
-        for _ in range(nbtimes):
-            for a in A:
-                indices = np.random.choice(len(a), size=size, replace=True)
-                indices_shuffled = indices.copy()
-                np.random.shuffle(indices_shuffled)
-                for i, j in zip(indices, indices_shuffled):
-                    xi, yi = np.unravel_index(a[i].argmax(), a[i].shape)
-                    xj, yj = np.unravel_index(a[j].argmax(), a[j].shape)
-                    a[i, xi, yi], a[i, xj, yj] = a[i, xj, yj], a[i, xi, yi]
-                    a[j, xi, yi], a[j, xj, yj] = a[j, xj, yj], a[j, xi, yi]
-        return A
-
-    def crossover(A, nb=100):
-        S = np.zeros((nb,) + A.shape[1:])
-        for i in range(nb):
-            ind1, ind2 = np.random.randint(0, A.shape[0], size=2)
-            s1, s2 = A[ind1], A[ind2]
-            s = np.zeros_like(s1)
-            c = np.random.randint(0, 2, size=A.shape[1])
-            s[c == 0] = s1[c == 0]
-            s[c == 1] = s2[c == 1]
-            S[i] = s
-        return S.astype(np.float32)
-
-    def vect(F):
-        F = F.max(axis=(2, 3))
+    def vect(F, only_max=True):
+        if only_max:
+            F = F.max(axis=(2, 3))
         F = F.reshape((F.shape[0], -1))
         return F
     """
@@ -278,7 +311,8 @@ def genetic(capsule, data, layers, w, h, c,
 
     def recognizability(X, feat=None, orig=None, orig_feat=None):
         # maximize prediction of some category
-        X_ = X.reshape((X.shape[0], -1))
+        #X_ = X.reshape((X.shape[0], -1))
+        X_ = X
         if rec_class == 'any':
             pred = rec_model.predict_proba(X_).max(axis=1)
             return 1 - pred
@@ -308,6 +342,18 @@ def genetic(capsule, data, layers, w, h, c,
             sizes.append(size)
         return np.array(sizes)
 
+    def apply_genetic(best_feat, nb=100):            
+        children_feat = crossover(best_feat, nb=nb)
+        children_feat = switcher(children_feat)
+        children_feat = mutation(
+                best_feat,
+                born_perc=params.get("born_perc", 0.1),
+                dead_perc=params.get("dead_perc", 0.1),
+                nbtimes=params.get("nbtimes", 1),
+                val=params.get("mutationval", 10)
+        )
+        return children_feat
+
     # Choose and init fitness
     logger.info("Init fitness...")
     
@@ -322,13 +368,15 @@ def genetic(capsule, data, layers, w, h, c,
     compute_fitness = fitness[fitness_name]
 
     if compute_fitness == recognizability:
-        from keras.models import model_from_json
-        logger.info("Load recognizability model...")
-        arch = params.get("arch", "models/mnist.json")
-        modelfile = params.get("modelfile", "models/mnist.hdf5")
-        rec_model = model_from_json(open(arch).read())
-        rec_model.load_weights(modelfile)
+        rec_model = capsule
         rec_class = params.get("category", "any")
+        #from keras.models import model_from_json
+        #logger.info("Load recognizability model...")
+        #arch = params.get("arch", "models/mnist.json")
+        #modelfile = params.get("modelfile", "models/mnist.hdf5")
+        #rec_model = model_from_json(open(arch).read())
+        #rec_model.load_weights(modelfile)
+        #rec_class = params.get("category", "any")
 
     def perform():
 
@@ -384,6 +432,7 @@ def genetic(capsule, data, layers, w, h, c,
         archive_evals = evals.copy()  # all evaluations of genereted images
         archive_popul_indices = indices  # current indices on archive of the population
         centroids = []
+        centroids_px = []
         logger.info("Start evolution")
         # Evolution loop
         strategy = params.get("strategy", "deterministic")
@@ -402,9 +451,9 @@ def genetic(capsule, data, layers, w, h, c,
                 from sklearn.cluster import KMeans
                 choose_nb = min(survive, len(X))
                 n_clusters = params.get("n_clusters", 3)
-                assert choose_nb % n_clusters == 0
+                assert choose_nb % n_clusters == 0, "{} is not divisible by {}".format(choose_nb, n_clusters)
                 take_per_cluster = choose_nb / n_clusters                
-                clus = KMeans(n_clusters=n_clusters)
+                clus = KMeans(n_clusters=n_clusters, n_init=50)
                 F = vect(feat)
                 clus.fit(F)
                 clusid = clus.predict(F)
@@ -424,21 +473,33 @@ def genetic(capsule, data, layers, w, h, c,
             archive_best_indices = archive_popul_indices[indices] # update best indices in archive
 
             # generate children
-            children_feat = crossover(best_feat, nb=nb)
-            children_feat = switcher(children_feat)
-            children_feat = smarter_mutation(
-                    best_feat,
-                    born_perc=params.get("born_perc", 0.1),
-                    dead_perc=params.get("dead_perc", 0.1),
-                    nbtimes=params.get("nbtimes", 1),
-                    val=params.get("mutationval", 10)
-            )
-            centroids.append(vect(children_feat).mean(axis=0).tolist())
-            children_px = f(children_feat)
+            if params.get("flatten", False):
+                shape = best_feat.shape[1:]
+                best_feat_flat = best_feat.reshape((best_feat.shape[0], -1))
+                children_feat_flat = apply_genetic(best_feat_flat, nb=nb)
+                children_feat = children_feat_flat.reshape((children_feat_flat.shape[0],) + shape)
+            else:
+                children_feat = apply_genetic(best_feat, nb=nb)
+
+            # Evaluate children
+            if layer_name == "input":
+                if params.get("recons", False) == False:
+                    children_px = children_feat
+                else:
+                    children_px = f(children_feat)
+            else:
+                children_px = f(children_feat)
             children_evals = compute_fitness(children_px,
                                              feat=children_feat,
                                              orig=best,
                                              orig_feat=best_feat)
+            # add centroid of children
+            C = children_feat.mean(axis=0)[None, :, :, :]
+            centroids.append(C)
+            
+            C_px = f(C)
+            centroids_px.append(C_px)
+
             # update archive with children
             archive_px = np.concatenate((archive_px, children_px), axis=0)
             archive_feat = np.concatenate((archive_feat, children_feat), axis=0)
@@ -462,11 +523,13 @@ def genetic(capsule, data, layers, w, h, c,
         if t_sne:
             logger.info("t-sne all the generated samples...")
             from sklearn.manifold import TSNE
-            sne = TSNE()
+            sne = TSNE(verbose=1, n_components=2, **params.get("tsneparams", {}))
             if params.get("tsnecentroids", True):
+                centroids_ = vect(np.concatenate(centroids, axis=0))
+
                 F = vect(archive_feat)
-                F = np.concatenate((centroids, F[0:nb_initial].mean(axis=0, keepdims=True), F[archive_popul_indices]), axis=0)
-                first, last = 0, len(centroids)
+                F = np.concatenate((centroids_, F[0:nb_initial].mean(axis=0, keepdims=True), F[archive_popul_indices]), axis=0)
+                first, last = 0, len(centroids_)
                 inter = np.arange(first, last)
                 first = last
                 last += 1
@@ -490,6 +553,63 @@ def genetic(capsule, data, layers, w, h, c,
                        fancybox=True, shadow=True, ncol=5)
             plt.savefig(params.get("tsnefile", "tsne.png"))
             plt.close(fig)
+        
+        # image scatter
+        image_scatter = params.get("image_scatter", False)
+        if image_scatter:
+            logger.info("Scattering all images")
+            from sklearn.manifold import TSNE
+            from image_scatter import image_scatter
+            from skimage.io import imsave
+            import seaborn as sns
+            
+            if params.get("tsnecentroids", True):
+                print(centroids[0].shape)
+
+                initial = np.arange(0, nb_initial)
+                initial_feat = vect(archive_feat[initial])
+                initial_px = archive_px[initial]
+
+                centroids_feat = vect(np.concatenate(centroids, axis=0))
+
+                F = np.concatenate((initial_feat, centroids_feat), axis=0)
+                px = np.concatenate((initial_px,) + tuple(centroids_px), axis=0)
+            else:
+                F = vect(archive_feat, only_max=True)
+                px = archive_px
+            #time = np.arange(len(F)).astype(np.float32) / len(F)
+            #F = np.concatenate((F, time[:, None]), axis=1)
+
+            from sklearn.decomposition import PCA
+            #sne = TSNE(verbose=1, n_components=2, **params.get("tsneparams", {}))
+            sne = PCA(n_components=2)
+            F_ = sne.fit_transform(F)
+
+            inter = np.arange(0, len(F))
+            initial = np.arange(0, nb_initial)
+            final = archive_popul_indices
+            if c == 1:
+                
+                border = 0
+                nbcols = len(px)
+                gradient = np.array(sns.color_palette("hot", nbcols))
+
+                shape = (px.shape[0], w + border, h, 3)
+                px_ = np.zeros(shape).astype(np.float32)
+                px_[:, :, :, :] = gradient[:, None, None, :]
+                px_[:, 0:w, :] *= px[:, 0, :, :].reshape((px.shape[0], w, h, 1))  
+                px_[:, w:, :, :] = gradient[:, None, None, :]
+                img_res = w * 3
+            else:
+                px_ = px.transpose((0, 2, 3, 1))
+                img_res = w * 3
+            img = image_scatter(F_, px_, img_res=img_res)
+            #fig = plt.figure()
+            #plt.imshow(img)
+            #plt.axis('off')
+            #plt.savefig(params.get("image_scatter_out", "image_scatter.png"))
+            #plt.close(fig)
+            imsave(params.get("image_scatter_out", "image_scatter.png"), img)
         return X, feat, evals
 
     if just_get_function:
@@ -529,6 +649,91 @@ def genetic(capsule, data, layers, w, h, c,
             json.dump(params, open("{}/params.json".format(folder), "w"))
             logger.info("Save representations...")
             np.savez(open("{}/repr_{}.pkl".format(folder, layer_name), "w"), feat=feat)
+
+ # A is a set of examples (population), the operation
+# should transform it into a new population (not necessarily the same
+# number)
+def identity(A, **kwargs):
+    return A
+
+def random(A, nb=100, k=2):
+    shape = (nb,) + A.shape[1:]
+    HID = np.zeros(shape).astype(np.float32)
+    for a in range(k):
+        H = np.random.uniform(size=shape)
+        H *= (H == H.max(axis=(1, 2, 3), keepdims=True)) * 100
+        H = H.astype(np.float32)
+        HID += H
+    return HID
+
+def mutation(A, born_perc=0.1, dead_perc=0.1, nbtimes=1, val=10, inplace=True, nb=100):
+    perc = born_perc + dead_perc
+    nb_filters = A.shape[1]
+    size = int(perc * nb_filters)
+
+    if inplace:
+        A_new = A
+    else:
+        replace = True if nb > A.shape[0] else False
+        indices = np.random.choice(range(len(A)), size=nb, replace=replace)
+        A_new = A[indices].copy()
+    for i in range(nbtimes):
+        for a in A_new:
+            indices = np.random.choice(np.arange(len(a)),
+                                       size=size, replace=True)
+            nb_born = int(born_perc*nb_filters)
+            born_indices = indices[0:nb_born]
+            dead_indices = indices[nb_born:]
+            a[dead_indices] = 0
+            for idx in born_indices:
+                a[idx] = 0
+                if len(a.shape) == 3:
+                    x, y = np.random.randint(a.shape[1]), np.random.randint(a.shape[2])
+                    a[idx, x, y] = val
+                elif len(a.shape) == 2:
+                    x = np.random.randint(a.shape[1])
+                    a[idx, x] = val
+                elif len(a.shape) == 1:
+                    a[idx] = val
+                else:
+                    raise Exception("WTF are you giving here?")
+    return A_new
+
+def switcher(A, nbtimes=1, size=2, nb=100, inplace=True):
+    
+    if len(A.shape) <= 2:
+        return A
+
+    if inplace:
+        A_new = A
+    else:
+        replace = True if nb > A.shape[0] else False
+        indices = np.random.choice(range(len(A)), size=nb, replace=replace)
+        A_new = A[indices].copy()
+
+    for _ in range(nbtimes):
+        for a in A_new:
+            indices = np.random.choice(len(a), size=size, replace=True)
+            indices_shuffled = indices.copy()
+            np.random.shuffle(indices_shuffled)
+            for i, j in zip(indices, indices_shuffled):
+                xi, yi = np.unravel_index(a[i].argmax(), a[i].shape)
+                xj, yj = np.unravel_index(a[j].argmax(), a[j].shape)
+                a[i, xi, yi], a[i, xj, yj] = a[i, xj, yj], a[i, xi, yi]
+                a[j, xi, yi], a[j, xj, yj] = a[j, xj, yj], a[j, xi, yi]
+    return A_new
+
+def crossover(A, nb=100):
+    S = np.zeros((nb,) + A.shape[1:])
+    for i in range(nb):
+        ind1, ind2 = np.random.randint(0, A.shape[0], size=2)
+        s1, s2 = A[ind1], A[ind2]
+        s = np.zeros_like(s1)
+        c = np.random.randint(0, 2, size=A.shape[1])
+        s[c == 0] = s1[c == 0]
+        s[c == 1] = s2[c == 1]
+        S[i] = s
+    return S.astype(np.float32)
 
 """
 def multigenetic(capsule, data, layers, w, h, c,
@@ -900,6 +1105,29 @@ def recons(capsule, data, layers, w, h, c,
     plt.savefig("out.png")
     plt.show()
 
+def denoising(capsule, data, layers, w, h, c,
+              **params):
+    from lasagnekit.misc.plot_weights import grid_plot
+
+    save_each = params.get("save_each", 10)
+
+    x = T.tensor4()
+    nb_examples = params.get("nb_examples", 100)
+    shape = (nb_examples,) + layers["input"].output_shape[1:]
+    x = np.random.uniform(size=shape).astype(np.float32)
+    prob = params.get("prob", 0.1)
+    logger.info("Starting:")
+    for i in range(params.get("nb_iter", 10)):
+        logger.info("Iteration {}..".format(i))
+        x *= (np.random.uniform(size=x.shape) <= prob)
+        x = capsule.reconstruct(x)
+
+        if i % save_each == 0:
+            fig = plt.figure()
+            grid_plot(x[:, 0], imshow_options={"cmap": "gray"})
+            plt.savefig(params.get("out", "out.png"))
+            plt.savefig("out.png")
+            plt.close(fig)
 
 def recons_from_features(capsule, data, layers, w, h, c,
                          layer_name="wta_spatial", out="out.png", **kw):

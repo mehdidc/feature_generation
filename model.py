@@ -1,7 +1,7 @@
 from lasagne import layers, init
 from lasagnekit.easy import layers_from_list_to_dict
 from lasagne.nonlinearities import (
-        linear, sigmoid, rectify, very_leaky_rectify)
+        linear, sigmoid, rectify, very_leaky_rectify, softmax)
 from lasagnekit.layers import Deconv2DLayer, Depool2DLayer
 from helpers import wta_spatial, wta_lifetime, wta_channel, wta_channel_strided
 import theano.tensor as T
@@ -1741,6 +1741,101 @@ def model30(w=32, h=32, c=1,
     all_layers = [l_in] + l_convs + sparse_layers + l_unconvs + [l_out]
     return layers_from_list_to_dict(all_layers)
 
+def model31(nb_filters=64, w=32, h=32, c=1, sparsity=True):
+    """
+    model8 without sparsity
+    """
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_convs = []
+    l_conv = layers.Conv2DLayer(
+            l_in,
+            num_filters=nb_filters,
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            name="conv1")
+    l_convs.append(l_conv)
+    l_conv = layers.Conv2DLayer(
+            l_conv,
+            num_filters=nb_filters,
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            name="conv2")
+    l_convs.append(l_conv)
+    l_conv = layers.Conv2DLayer(
+            l_conv,
+            num_filters=nb_filters,
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            name="conv3")
+    l_convs.append(l_conv)
+    l_unconv = layers.Conv2DLayer(
+            l_conv,
+            num_filters=c,
+            filter_size=(13, 13),
+            nonlinearity=linear,
+            W=init.GlorotUniform(),
+            pad='full',
+            name='unconv')
+    l_out = layers.NonlinearityLayer(
+            l_unconv,
+            sigmoid, name="output")
+    print(l_out.output_shape)
+    return layers_from_list_to_dict([l_in] + l_convs + [l_unconv, l_out])
+
+def model32(nb_filters=64, w=32, h=32, c=1, sparsity=True, nb_classes=10):
+    """
+    predictive version of model8
+    """
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_convs = []
+    l_conv = layers.Conv2DLayer(
+            l_in,
+            num_filters=nb_filters,
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            name="conv1")
+    l_convs.append(l_conv)
+    l_conv = layers.Conv2DLayer(
+            l_conv,
+            num_filters=nb_filters,
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            name="conv2")
+    l_convs.append(l_conv)
+    l_conv = layers.Conv2DLayer(
+            l_conv,
+            num_filters=nb_filters,
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            name="conv3")
+    l_convs.append(l_conv)
+    
+
+    l_pre_y = layers.DenseLayer(layers.ExpressionLayer(l_conv, lambda x:x.max(axis=(2, 3), keepdims=True), output_shape='auto'),
+                                nb_classes, nonlinearity=linear, name="pre_y")
+    l_y = layers.NonlinearityLayer(l_pre_y, nonlinearity=softmax, name="y")
+
+    l_wta1 = layers.NonlinearityLayer(l_conv, wta_spatial, name="wta_spatial")
+    l_wta2 = layers.NonlinearityLayer(l_wta1, wta_channel_strided(stride=4), name="wta_channel")
+    l_unconv = layers.Conv2DLayer(
+            l_wta2,
+            num_filters=c,
+            filter_size=(13, 13),
+            nonlinearity=linear,
+            W=init.GlorotUniform(),
+            pad='full',
+            name='unconv')
+    l_out = layers.NonlinearityLayer(
+            l_unconv,
+            sigmoid, name="output")
+    print(l_out.output_shape)
+    return layers_from_list_to_dict([l_in] + l_convs + [l_wta1, l_wta2, l_unconv, l_out] + [l_pre_y, l_y])
 
 
 build_convnet_simple = model1

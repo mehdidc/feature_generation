@@ -14,17 +14,19 @@ if __name__ == "__main__":
 	import os
 	from itertools import product
 	all_params = []
-	nb_initial_range = (10, 20, 40, 60, 100, 120, 200, 300)
-	layer_name_range = ("conv3", "wta_spatial", "wta_channel")
+	nb_initial_range = (10, 20, 40)
+	layer_name_range = ("conv1", "conv2", "conv3", "wta_spatial", "wta_channel")
 	initial_source_range = ("dataset", "random", "centroids")
+	val_range = (0.01, 0.1, 0.5, 1, 5, 10, 50, 100, 200,)
+
 	already = set()
-	for nb_initial, initial_source, layer_name in product(nb_initial_range, initial_source_range, layer_name_range):		
+	for nb_initial, initial_source, layer_name, val in product(nb_initial_range, initial_source_range, layer_name_range, val_range):		
 		if initial_source == "centroids":
 			if layer_name in already:
 				continue
 			else:
 				already.add(layer_name)
-		name = "exp{}_{}_{}".format(nb_initial, initial_source, layer_name)
+		name = "exp{}_{}_{}_{}".format(nb_initial, initial_source, layer_name, val)
 		folder = "answers/effect_of_initial/{}".format(name)		
 		mkdir_path(folder)
 		params = {
@@ -42,11 +44,11 @@ if __name__ == "__main__":
 			"nb_initial": nb_initial,
 
 			"nbchildren": 100,
-			"survive": 20,
+			"nbsurvive": 20,
 			"strategy": "deterministic",
 			"born_perc": 0.1,
 			"dead_perc": 0.1,
-			"mutationval": 10,
+			"mutationval": val,
 			"nbtimes": 1,
 		}
 		all_params.append(params)
