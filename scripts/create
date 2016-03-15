@@ -1,0 +1,2 @@
+#!/bin/sh
+cd training/; mkdir $1; cd $1; mkdir features recons out; cd ../..
