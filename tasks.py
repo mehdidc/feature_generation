@@ -18,12 +18,13 @@ from lasagnekit.easy import (
     build_batch_iterator)
 from lasagne import layers as L
 from lasagnekit.nnet.capsule import Capsule, make_function
-from lasagnekit.misc.plot_weights import grid_plot, dispims_color
+from lasagnekit.misc.plot_weights import grid_plot, dispims_color, tile_raster_images
 from lasagnekit.easy import get_stat, iterate_minibatches
 import numpy as np
 from data import load_data
 from model import *  # for dill
 import logging
+from helpers import cross_correlation, salt_and_pepper
 
 sys.setrecursionlimit(10000)
 
@@ -35,7 +36,7 @@ logger.setLevel(logging.INFO)
 
 
 @task
-def train(dataset="digits", prefix="", model_name="model8", force_w=None, force_h=None):
+def train(dataset="digits", prefix="", model_name="model8", force_w=None, force_h=None, denoise=None, autoencoding_loss="squared_error"):
     if force_w is not None:
         w = force_w
     else:
@@ -48,7 +49,7 @@ def train(dataset="digits", prefix="", model_name="model8", force_w=None, force_
     state = 2
     np.random.seed(state)
     logger.info("Loading data...")
-    data, w, h, c, nbl, nbc = load_data(dataset=dataset, w=w, h=h, include_test=True)
+    data, w, h, c, nbl, nbc = load_data(dataset=dataset, w=w, h=h, include_test=True, batch_size=128)
     # nbl and nbc are just used to show couple of nblxnbc reconstructed
     # vs true samples
 
@@ -69,12 +70,16 @@ def train(dataset="digits", prefix="", model_name="model8", force_w=None, force_
             size_filters=5
         )
         kw_builder.update(u)
-    elif model_name in ("model24", "model25", "model26", "model27", "model28", "model29", "model30"):
+    elif model_name in ("model24", "model25", "model26", "model27", "model28", "model29", "model30", "model33"):
         u = dict(
             nb_layers=3,
             size_filters=2**3+2
         )
         kw_builder.update(u)
+    elif model_name in ("model34", "model35", "model36", "model37", "model38"):
+        u = dict(nb_layers=3, size_filters=2**3+2)
+        kw_builder.update(u)
+        kw_builder["nb_filters"] = 128
 
     builder = getattr(model, model_name)
 
@@ -85,13 +90,19 @@ def train(dataset="digits", prefix="", model_name="model8", force_w=None, force_
     def report_event(status):
         #  periodically save the model
         print("Saving the model...")
-        save_(layers, builder, kw_builder, "{}/model.pkl".format(prefix))
+        info = {
+            "denoise": denoise,
+            "autoencoding_loss": autoencoding_loss,
+        }
+        save_(layers, builder, kw_builder, "{}/model.pkl".format(prefix), info=info)
 
     logger.info("Compiling the model...")
     capsule = build_capsule_(layers, data, nbl, nbc,
-                             report_event, prefix=prefix)
+                             report_event, prefix=prefix,
+                             denoise=denoise,
+                             autoencoding_loss=autoencoding_loss)
     dummy = np.zeros((1, c, w, h)).astype(np.float32)
-    
+
     V = {"X": dummy}
     if "y" in layers:
         dummy_y = np.zeros((1,)).astype(np.int32)
@@ -110,11 +121,21 @@ def train(dataset="digits", prefix="", model_name="model8", force_w=None, force_
 def build_capsule_(layers, data, nbl, nbc,
                    report_event=None,
                    prefix="",
-                   compile_="all"):  # all/functions only/none
+                   compile_="all",
+                   denoise=None,
+                   autoencoding_loss="squared_error"):
+
+    if denoise is not None:
+        from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
+        theano_rng = RandomStreams(seed=np.random.randint(0, 999999))
+    else:
+        theano_rng = None
+
     if report_event is None:
         def report_event(s):
             pass
     is_predictive = True if "y" in layers else False
+    has_factors = True if "factors" in layers else False
     # we only have inputs (X) : no labels
     input_variables = OrderedDict()
     input_variables["X"] = dict(tensor_type=T.tensor4)
@@ -156,14 +177,15 @@ def build_capsule_(layers, data, nbl, nbc,
 
 
     def report(status):
+        c, w, h = layers["input"].output_shape[1:]
         ep = status["epoch"]
         X_pred = capsule.reconstruct(preprocess(data.X))
         # save reconstructions
         k = 1
         idx = 0
         fig = plt.figure()
-        for l in range(nbl):
-            for c in range(nbc):
+        for row in range(nbl):
+            for col in range(nbc):
                 plt.subplot(nbl, nbc * 2, k)
                 plt.axis('off')
                 if idx >= len(data.X):
@@ -199,6 +221,12 @@ def build_capsule_(layers, data, nbl, nbc,
             if not hasattr(layers[layer_name], "W"):
                 continue
             W = layers[layer_name].W.get_value().copy()
+            if len(W.shape) == 2:
+                if W.shape[0] == c * w * h:
+                    W = W.T
+                if W.shape[1] == c * w * h:
+                    W = W.reshape((W.shape[0], c, w , h))
+                print(W.shape)
             if 3 in W.shape[0:2]:
                 if W.shape[0] == 3:
                     W = W.transpose((1, 2, 3, 0))  # F w h col
@@ -208,11 +236,16 @@ def build_capsule_(layers, data, nbl, nbc,
                 plt.axis('off')
                 plt.imshow(img, interpolation='none')
             elif 1 in W.shape[0:2]:
-                W = layers[layer_name].W.get_value().copy()
                 W = W.reshape((W.shape[0] * W.shape[1],
                                W.shape[2], W.shape[3]))
-                opt = dict(cmap='gray', interpolation='none')
-                grid_plot(W, imshow_options=opt, fig=fig)
+                if W.shape[0] > 256:
+                    sz = int(np.sqrt(W.shape[0]))
+                    img = tile_raster_images(W, (w, h), (sz, sz))
+                    plt.axis('off')
+                    plt.imshow(img, cmap='gray', interpolation='none')
+                else:
+                    opt = dict(cmap='gray', interpolation='none')
+                    grid_plot(W, imshow_options=opt, fig=fig)
             else:
                 continue
             plt.savefig("{}/features/{}-{}.png".format(prefix, ep, layer_name),
@@ -287,7 +320,7 @@ def build_capsule_(layers, data, nbl, nbc,
 
     # Initialize the optimization algorithm
     lr_decay_method = "none"
-    initial_lr = 0.1
+    initial_lr = 0.01
     lr_decay = 0
     lr = theano.shared(np.array(initial_lr, dtype=np.float32))
     # algo = updates.momentum
@@ -313,17 +346,33 @@ def build_capsule_(layers, data, nbl, nbc,
         verbose=1)
     batch_optimizer.lr = lr
 
-    def loss_function(model, tensors, lambda_=10.):
+    def loss_function(model, tensors, lambda_=10., mu=10.):
         X = tensors["X"]
-        X_pred = reconstruct(model, X)
-        recons = ((X - X_pred) ** 2).sum(axis=(1, 2, 3)).mean()
+        if denoise is not None:
+            Xtilde = salt_and_pepper(X, corruption_level=float(denoise), rng=theano_rng, backend='theano')
+            X_pred = reconstruct(model, Xtilde)
+            updates =  [(v, u) for v, u, _, _ in theano_rng.updates()]
+        else:
+            X_pred = reconstruct(model, X)
+            updates = []
+
+        if autoencoding_loss == "squared_error":
+            recons = ((X - X_pred) ** 2).sum(axis=(1, 2, 3)).mean()
+        elif autoencoding_loss == "cross_entropy":
+            recons = -(X * T.log(X_pred) + (1 - X) * T.log(1 - X_pred)).sum(axis=(1, 2, 3)).mean()
+        loss = recons
 
         if is_predictive:
             y_pred = predict(model, X)
             classif = -T.log(y_pred[T.arange(y_pred.shape[0]), tensors["y"]]).mean()
-            return recons + lambda_ * classif
-        else:
-            return recons
+            loss += lambda_ * classif
+        if has_factors:
+            assert is_predictive
+            y_pred = predict(model, X)
+            for layer_name, layer in layers.items():
+                if layer_name.startswith("factor") and type(layer) == L.DenseLayer:
+                    loss += mu * cross_correlation(L.get_output(layer, X), y_pred)
+        return loss, updates
 
     def transform(batch_index, batch_slice, tensors):
         data.load()
@@ -345,7 +394,8 @@ def build_capsule_(layers, data, nbl, nbc,
         loss_function,
         functions=functions,
         batch_optimizer=batch_optimizer,
-        batch_iterator=batch_iterator
+        batch_iterator=batch_iterator,
+        rng=theano_rng
     )
     capsule.layers = layers
     capsule.preprocess = preprocess
@@ -370,7 +420,9 @@ def check(filename="out.pkl",
           prefix="",
           force_w=None,
           force_h=None,
-          params=None):
+          params=None,
+          batch_size=128,
+          kw_load_data=None):
     import json
     import traceback
     import analyze
@@ -383,7 +435,9 @@ def check(filename="out.pkl",
         h = force_h
     else:
         h = None
-    data, w, h, c, nbl, nbc = load_data(dataset=dataset, w=w, h=h)
+    if kw_load_data is None:
+        kw_load_data = {}
+    data, w, h, c, nbl, nbc = load_data(dataset=dataset, w=w, h=h, batch_size=batch_size, **kw_load_data)
     logger.info("Loading the model...")
     layers = load_(filename, w=w, h=h)
     logger.info("Compiling the model...")
@@ -393,7 +447,7 @@ def check(filename="out.pkl",
             compile_="functions_only")
     if type(params) == list:
         pass
-    else:    
+    else:
         if params is None:
             params = [{}]
         else:
@@ -412,13 +466,15 @@ def check(filename="out.pkl",
             exc_type, exc_value, exc_traceback = sys.exc_info()
             #traceback.print_tb(exc_traceback, limit=4, file=sys.stdout)
             traceback.print_exception(exc_type, exc_value, exc_traceback,
-                                      limit=4, file=sys.stdout)
+                                      limit=5, file=sys.stdout)
     return ret
 
-def save_(layers, builder, kw_builder, filename):
+def save_(layers, builder, kw_builder, filename, info=None):
+    if info is None:
+        info = {}
     with open(filename, "w") as fd:
         values = L.get_all_param_values(layers["output"])
-        data = {"values": values, "builder": builder, "kw_builder": kw_builder}
+        data = {"values": values, "builder": builder, "kw_builder": kw_builder, "info": info}
         dill.dump(data, fd)
 
 

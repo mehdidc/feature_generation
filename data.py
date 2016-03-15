@@ -3,9 +3,25 @@ import os
 from skimage.io import imread
 
 
-def load_data(dataset="digits", w=None, h=None, include_test=False):
+def load_data(dataset="digits", w=None, h=None, include_test=False, batch_size=128, **kw):
     nbl, nbc = 10, 10
-    batch_size = 128
+
+    if dataset == 'random':
+        c = 1
+        w, h = 28, 28
+        prob = 0.1
+        class Random(object):
+
+            def __init__(self, shape):
+                self.shape = shape
+                self.img_dim = shape[1:]
+            def load(self):
+                self.X = np.random.uniform(size=self.shape) <= prob
+                self.X = self.X.reshape((self.shape[0], -1))
+                self.X = self.X.astype(np.float32)
+
+        data = Random((batch_size, c, w, h))
+        data.load()
 
     if dataset == "digits":
         from lasagnekit.datasets.mnist import MNIST
@@ -57,17 +73,27 @@ def load_data(dataset="digits", w=None, h=None, include_test=False):
     elif dataset == "flaticon":
         from lasagnekit.datasets.flaticon import FlatIcon
         from lasagnekit.datasets.transformed import Transformed
+        from lasagnekit.datasets.helpers import load_once
+        from lasagnekit.datasets.subsampled import SubSampled
+
         if w is None and h is None:
             w, h = 64, 64
         c = 1
-        data = FlatIcon(size=(w, h), nb=batch_size)
-        data.load()
 
+        mode = kw.get("mode", "all")
+        if mode == "all":
+            nb = 38698
+        else:
+            nb = batch_size
+        data = load_once(FlatIcon)(size=(w, h), nb=nb, mode=mode)
+        data.load()
         def preprocess(X):
             X = X[:, :, :, 0]
             X = X.reshape((X.shape[0], -1))
             return X
         data = Transformed(data, preprocess, per_example=False)
+        if mode == "all":
+            data = SubSampled(data, batch_size)
         data.load()
         print(data.X.shape)
 

@@ -1,16 +1,33 @@
 import theano.tensor as T
+import numpy as np
+import theano
+import os
 
 
 def wta_spatial(X):
     # From http://arxiv.org/pdf/1409.2752v2.pdf
-    # Introduce sparsity for each channel/feature map, for each 
+    # Introduce sparsity for each channel/feature map, for each
     # feature map make all activations zero except the max
-    # This introduces a sparsity level dependent on the number 
+    # This introduces a sparsity level dependent on the number
     # of feature maps,
     # for instance if we have 10 feature maps, the sparsity level
     # is 1/10 = 10%
     mask = (equals_(X, T.max(X, axis=(2, 3), keepdims=True))) * 1
     return X * mask
+
+
+def wta_k_spatial(nb=1):
+
+    def apply_(X):
+        shape = X.shape
+        X_ = X.reshape((X.shape[0] * X.shape[1], X.shape[2] * X.shape[3]))
+        idx = T.argsort(X_, axis=1)[:, X_.shape[1] - nb]
+        val = X_[T.arange(X_.shape[0]), idx]
+        mask = X_ >= val.dimshuffle(0, 'x')
+        X_ = X_ * mask
+        X_ = X_.reshape(shape)
+        return X_
+    return apply_
 
 
 def wta_lifetime(percent):
@@ -42,3 +59,31 @@ def wta_channel_strided(stride=2):
 
 def equals_(x, y, eps=1e-8):
     return T.abs_(x - y) <= eps
+
+def cross_correlation(a, b):
+    a = a - a.mean(axis=0)
+    b = b - b.mean(axis=0)
+    return 0.5 * ((((a.dimshuffle(0, 'x', 1) * b.dimshuffle(0, 1, 'x'))).mean(axis=0))**2).sum()
+
+
+def salt_and_pepper(x, rng=np.random, backend='theano', corruption_level=0.5):
+    a = rng.binomial(
+        size=x.shape,
+        p=(1 - corruption_level),
+        dtype=theano.config.floatX
+    )
+    b = rng.binomial(
+        size=x.shape,
+        p=0.5,
+        dtype=theano.config.floatX
+    )
+    if backend == 'theano':
+        c = T.eq(a, 0) * b
+    else:
+        c = (a==0) * b
+    return x * a + c
+
+
+def mkdir_path(path):
+    if not os.access(path, os.F_OK):
+        os.makedirs(path)
