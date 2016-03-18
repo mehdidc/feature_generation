@@ -36,12 +36,24 @@ logger.setLevel(logging.INFO)
 
 
 @task
-def train(dataset="digits", prefix="", model_name="model8", force_w=None, force_h=None, denoise=None, autoencoding_loss="squared_error"):
+def train(dataset="digits", prefix="",
+          model_name="model8",
+          force_w=None, force_h=None,
+          params=None):
+    import json
+
+    if type(params) == dict:
+        pass
+    else:
+        if params is None:
+            params = {}
+        else:
+            params = json.load(open(params))
+
     if force_w is not None:
         w = force_w
     else:
         w = None
-
     if force_h is not None:
         h = force_h
     else:
@@ -49,7 +61,8 @@ def train(dataset="digits", prefix="", model_name="model8", force_w=None, force_
     state = 2
     np.random.seed(state)
     logger.info("Loading data...")
-    data, w, h, c, nbl, nbc = load_data(dataset=dataset, w=w, h=h, include_test=True, batch_size=128)
+    data, w, h, c, nbl, nbc = load_data(
+        dataset=dataset, w=w, h=h, include_test=True, batch_size=128)
     # nbl and nbc are just used to show couple of nblxnbc reconstructed
     # vs true samples
 
@@ -90,17 +103,12 @@ def train(dataset="digits", prefix="", model_name="model8", force_w=None, force_
     def report_event(status):
         #  periodically save the model
         print("Saving the model...")
-        info = {
-            "denoise": denoise,
-            "autoencoding_loss": autoencoding_loss,
-        }
-        save_(layers, builder, kw_builder, "{}/model.pkl".format(prefix), info=info)
+        save_(layers, builder, kw_builder, "{}/model.pkl".format(prefix), info=params)
 
     logger.info("Compiling the model...")
     capsule = build_capsule_(layers, data, nbl, nbc,
                              report_event, prefix=prefix,
-                             denoise=denoise,
-                             autoencoding_loss=autoencoding_loss)
+                             **params)
     dummy = np.zeros((1, c, w, h)).astype(np.float32)
 
     V = {"X": dummy}
@@ -117,13 +125,13 @@ def train(dataset="digits", prefix="", model_name="model8", force_w=None, force_
     # save model and report at the end
     capsule.report(capsule.batch_optimizer.stats[-1])
 
-
 def build_capsule_(layers, data, nbl, nbc,
                    report_event=None,
                    prefix="",
                    compile_="all",
-                   denoise=None,
-                   autoencoding_loss="squared_error"):
+                   **train_params):
+    denoise = train_params.get("denoise", None)
+    autoencoding_loss = train_params.get("autoencoding_loss", "squared_error")
 
     if denoise is not None:
         from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
@@ -346,7 +354,7 @@ def build_capsule_(layers, data, nbl, nbc,
         verbose=1)
     batch_optimizer.lr = lr
 
-    def loss_function(model, tensors, lambda_=10., mu=10.):
+    def loss_function(model, tensors):
         X = tensors["X"]
         if denoise is not None:
             Xtilde = salt_and_pepper(X, corruption_level=float(denoise), rng=theano_rng, backend='theano')
@@ -365,13 +373,35 @@ def build_capsule_(layers, data, nbl, nbc,
         if is_predictive:
             y_pred = predict(model, X)
             classif = -T.log(y_pred[T.arange(y_pred.shape[0]), tensors["y"]]).mean()
+            lambda_ = train_params.get("lambda_", 10.)
             loss += lambda_ * classif
         if has_factors:
             assert is_predictive
             y_pred = predict(model, X)
             for layer_name, layer in layers.items():
                 if layer_name.startswith("factor") and type(layer) == L.DenseLayer:
+                    mu = train_params.get("mu", 10.)
                     loss += mu * cross_correlation(L.get_output(layer, X), y_pred)
+        print(train_params)
+        if train_params.get("contractive", False) is True:
+            contcoef = train_params.get("contractive_coef", 0.1)
+            contlayers = train_params.get("contractive_layers", layers.keys())
+            for layername in contlayers:
+                layer = layers[layername]
+                if hasattr(layer, "W"):
+                    hid = L.get_output(layer, X)
+                    print("contracting...")
+                    J = theano.grad(hid.sum(axis=1).mean(), X)
+                    loss += contcoef * (J**2).sum(axis=(1, 2, 3)).mean()
+        if train_params.get("ladder", False) is True:
+            lambda_ = train_params.get("lambda", 0.1)
+            for layername in layers.keys():
+                if layername.startswith("enc"):
+                    enc = layers[layername]
+                    dec = layers[layername.replace("enc", "dec")]
+                    print(enc.name, dec.name, enc.output_shape, dec.output_shape)
+                    rec_error = ((L.get_output(enc, X) - L.get_output(dec, X))**2).sum(axis=1).mean()
+                    loss += lambda_ * rec_error
         return loss, updates
 
     def transform(batch_index, batch_slice, tensors):
@@ -384,7 +414,6 @@ def build_capsule_(layers, data, nbl, nbc,
 
     def preprocess(X):
         return X.reshape((X.shape[0], c, w, h))
-
     batch_iterator = build_batch_iterator(transform)
 
     # put all together
@@ -439,12 +468,13 @@ def check(filename="out.pkl",
         kw_load_data = {}
     data, w, h, c, nbl, nbc = load_data(dataset=dataset, w=w, h=h, batch_size=batch_size, **kw_load_data)
     logger.info("Loading the model...")
-    layers = load_(filename, w=w, h=h)
+    layers, model_params = load_(filename, w=w, h=h)
     logger.info("Compiling the model...")
     capsule = build_capsule_(
             layers, data, nbl, nbc,
             prefix=prefix,
-            compile_="functions_only")
+            compile_="functions_only",
+            **model_params)
     if type(params) == list:
         pass
     else:
@@ -486,4 +516,4 @@ def load_(filename, **kwargs):
         kw_builder.update(**kwargs)
     layers = builder(**kw_builder)
     L.set_all_param_values(layers["output"], values)
-    return layers
+    return layers, data.get("info", {})

@@ -6,6 +6,7 @@ from lasagnekit.layers import Deconv2DLayer, Depool2DLayer
 from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided
 import theano.tensor as T
 import numpy as np
+from batch_norm import batch_norm, BatchNormLayer
 
 def model1(nb_filters=64, w=32, h=32, c=1):
     l_in = layers.InputLayer((None, c, w, h), name="input")
@@ -2299,6 +2300,64 @@ def model41(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     print(l_out.output_shape)
     return layers_from_list_to_dict([l_in, l_hid, l_pre_out, l_out])
 
+def model42(w=32, h=32, c=1, nb_hidden=[500, 250, 100], sigma=0.1, nb_filters=None):
+    """
+    ladder network with fully connected layers
+    """
+
+    nb_hidden = [c * w * h] + nb_hidden
+    nb_layers = len(nb_hidden)
+
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    # Encoder noisy path
+    x_noisy = layers.GaussianNoiseLayer(l_in, sigma=sigma)
+    h = x_noisy
+    encoder = []
+
+    for i in range(1, nb_layers):
+        z = layers.DenseLayer(h, nb_hidden[i], nonlinearity=linear, name="noisy_enc{}".format(i))
+        encoder.append(z)
+        z = BatchNormLayer(z)
+        z = layers.GaussianNoiseLayer(z, sigma=sigma)
+        z = layers.NonlinearityLayer(z, rectify)
+        h = z
+    encoder_clean = []
+    # Encoder normal path
+    h = l_in
+    i = 1
+    for lay in encoder:
+        z = layers.DenseLayer(h, nb_hidden[i], W=lay.W, b=lay.b, nonlinearity=linear)
+        z = batch_norm(z)
+        z.name = "enc{}".format(i)
+        encoder_clean.append(z)
+        z = layers.NonlinearityLayer(z, rectify)
+        h = z
+        i += 1
+    # decoder
+    i -= 1
+    decoder = []
+    u = batch_norm(encoder[-1])
+    for lay in reversed([x_noisy] + encoder):
+        if i < len(nb_hidden) - 1:
+            u = layers.DenseLayer(u, nb_hidden[i], nonlinearity=linear)
+            u = BatchNormLayer(u)
+
+        if len(lay.output_shape) > 2:
+            lay_ = layers.ReshapeLayer(lay, ([0], np.prod(lay.output_shape[1:])))
+        else:
+            lay_ = lay
+        v = layers.ConcatLayer([lay_, u], axis=1)
+        nb_units = np.prod(l_in.output_shape[1:]) if i == 0 else nb_hidden[i]
+        v = layers.DenseLayer(v, nb_units, nonlinearity=linear)
+        v = BatchNormLayer(v)
+        nonlin = sigmoid if lay == x_noisy else rectify
+        v = layers.NonlinearityLayer(v, nonlin)
+        v.name = "dec{}".format(i)
+        decoder.append(v)
+        u = v
+        i -= 1
+    output = layers.ReshapeLayer(u, ([0],) + l_in.output_shape[1:], name="output")
+    return layers_from_list_to_dict([l_in] + encoder + encoder_clean + decoder + [output])
 
 build_convnet_simple = model1
 build_convnet_simple_2 = model2
