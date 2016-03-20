@@ -365,7 +365,9 @@ def simple_genetic(capsule, data, layers, w, h, c, **params):
         "crossover": crossover,
         "switcher": switcher,
         "new_mutation": new_mutation,
-        "random": random
+        "random": random,
+        "dropout": dropout,
+        "salt_and_pepper": salt_and_pepper
     }
 
     def apply_op(f):
@@ -409,22 +411,23 @@ def simple_genetic(capsule, data, layers, w, h, c, **params):
         px = np.random.uniform(size=shape)
         px = px.astype(np.float32)
 
-    code = px_to_code(px)
+    for i in range(params.get("nb_iterations", 1)):
+        code = px_to_code(px)
 
-    if flatten:
-        shape = code.shape[1:]
-        code = code.reshape((code.shape[0], -1))
-        new_code = apply_op(code)
-        new_code = new_code.reshape((new_code.shape[0],) + shape)
-        code = code.reshape((code.shape[0],) + shape)
-    else:
-        new_code = apply_op(code)
+        if flatten:
+            shape = code.shape[1:]
+            code = code.reshape((code.shape[0], -1))
+            new_code = apply_op(code)
+            new_code = new_code.reshape((new_code.shape[0],) + shape)
+            code = code.reshape((code.shape[0],) + shape)
+        else:
+            new_code = apply_op(code)
 
-    if layer_name == "input":
-        new_px = new_code
-    else:
-        new_px = code_to_px(new_code)
-
+        if layer_name == "input" and params.get("reconstruct", False) is False:
+            new_px = new_code
+        else:
+            new_px = code_to_px(new_code)
+        px = new_px
     if params.get("filter", False):
         from sklearn.svm import OneClassSVM
         m = OneClassSVM(verbose=1, nu=0.9)
@@ -1062,6 +1065,13 @@ def random(A, nb=100, k=2):
         H = H.astype(np.float32)
         HID += H
     return HID
+
+def salt_and_pepper(A, nb=100, p=0.5):
+    from helpers import salt_and_pepper as sp
+    return sp(A, corruption_level=p, backend='numpy')
+
+def dropout(A, nb=100, p=0.5):
+    return A * (np.random.uniform(size=A.shape) <= p)
 
 def mutation(A, born_perc=0.1, dead_perc=0.1, nbtimes=1, val=10, inplace=True, nb=100):
     perc = born_perc + dead_perc

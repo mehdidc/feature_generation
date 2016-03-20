@@ -129,6 +129,18 @@ m=sparseautoencoder
 #        done
 #    done
 #done
-sbatch launch python $v --sel=0 --crossover=0 --mutation=0 --layer_name=input --perc=0.1 --initial_source=random --model=sparseautoencoder --nb_runs=1000
-sbatch launch python $v --sel=0 --crossover=0 --mutation=0 --layer_name=input --perc=0.1 --initial_source=random --model=sparsedenoisingautoencoder --nb_runs=1000
-sbatch launch python $v --sel=0 --crossover=0 --mutation=0 --layer_name=input --perc=0.1 --initial_source=random --model=denoisingautoencoder --nb_runs=1000
+
+#post-iccc
+
+#sbatch launch python $v --sel=0 --crossover=0 --mutation=0 --layer_name=input --perc=0.1 --initial_source=random --model=sparseautoencoder --nb_runs=1000
+#sbatch launch python $v --sel=0 --crossover=0 --mutation=0 --layer_name=input --perc=0.1 --initial_source=random --model=sparsedenoisingautoencoder --nb_runs=1000
+#sbatch launch python $v --sel=0 --crossover=0 --mutation=0 --layer_name=input --perc=0.1 --initial_source=random --model=denoisingautoencoder --nb_runs=1000
+
+m=walkbackdenoisingautoencoder
+for cv in 0 1; do
+    for mut in 0 1; do
+        for sel in 0 1; do
+            sbatch launch python $v --sel="$sel" --crossover="$cv" --mutation="$mut" --layer_name=input --perc=0.1 --initial_source=random --model=$m --sort=1
+        done
+    done
+done

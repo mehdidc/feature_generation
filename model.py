@@ -6,7 +6,7 @@ from lasagnekit.layers import Deconv2DLayer, Depool2DLayer
 from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided
 import theano.tensor as T
 import numpy as np
-from batch_norm import batch_norm, BatchNormLayer
+from batch_norm import NormalizeLayer, ScaleAndShiftLayer, DecoderNormalizeLayer, DenoiseLayer, FakeLayer
 
 def model1(nb_filters=64, w=32, h=32, c=1):
     l_in = layers.InputLayer((None, c, w, h), name="input")
@@ -2300,7 +2300,7 @@ def model41(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     print(l_out.output_shape)
     return layers_from_list_to_dict([l_in, l_hid, l_pre_out, l_out])
 
-def model42(w=32, h=32, c=1, nb_hidden=[500, 250, 100], sigma=0.1, nb_filters=None):
+def model42(w=32, h=32, c=1, nb_hidden=[1000, 500, 250, 250, 250], sigma=0.4, nb_filters=None):
     """
     ladder network with fully connected layers
     """
@@ -2313,51 +2313,113 @@ def model42(w=32, h=32, c=1, nb_hidden=[500, 250, 100], sigma=0.1, nb_filters=No
     x_noisy = layers.GaussianNoiseLayer(l_in, sigma=sigma)
     h = x_noisy
     encoder = []
-
+    encoder_fc = []
+    encoder_normlz = []
+    encoder_scaleshift = []
+    encoder_out = []
     for i in range(1, nb_layers):
-        z = layers.DenseLayer(h, nb_hidden[i], nonlinearity=linear, name="noisy_enc{}".format(i))
-        encoder.append(z)
-        z = BatchNormLayer(z)
+        z = layers.DenseLayer(h, nb_hidden[i], nonlinearity=linear, name="noisy_enc_dense{}".format(i))
+        encoder_fc.append(z)
+        z = NormalizeLayer(z)
+        encoder_normlz.append(z)
         z = layers.GaussianNoiseLayer(z, sigma=sigma)
+        z.name = "noisy_enc{}".format(i)
+        encoder.append(z)
+        z = ScaleAndShiftLayer(z)
+        encoder_scaleshift.append(z)
         z = layers.NonlinearityLayer(z, rectify)
         h = z
+        encoder_out.append(h)
     encoder_clean = []
     # Encoder normal path
     h = l_in
     i = 1
-    for lay in encoder:
-        z = layers.DenseLayer(h, nb_hidden[i], W=lay.W, b=lay.b, nonlinearity=linear)
-        z = batch_norm(z)
+    for fc, scaleshift in zip(encoder_fc, encoder_scaleshift):
+        z = layers.DenseLayer(h, nb_hidden[i], W=fc.W, b=fc.b, nonlinearity=linear)
+        z = NormalizeLayer(z)
         z.name = "enc{}".format(i)
         encoder_clean.append(z)
+        z = ScaleAndShiftLayer(z, beta=scaleshift.beta, gamma=scaleshift.gamma)
         z = layers.NonlinearityLayer(z, rectify)
         h = z
         i += 1
     # decoder
     i -= 1
     decoder = []
-    u = batch_norm(encoder[-1])
     for lay in reversed([x_noisy] + encoder):
-        if i < len(nb_hidden) - 1:
-            u = layers.DenseLayer(u, nb_hidden[i], nonlinearity=linear)
-            u = BatchNormLayer(u)
-
-        if len(lay.output_shape) > 2:
-            lay_ = layers.ReshapeLayer(lay, ([0], np.prod(lay.output_shape[1:])))
+        if i == len(nb_hidden) - 1:
+            u = NormalizeLayer(encoder_out[-1])
+            u = ScaleAndShiftLayer(u)
         else:
-            lay_ = lay
-        v = layers.ConcatLayer([lay_, u], axis=1)
-        nb_units = np.prod(l_in.output_shape[1:]) if i == 0 else nb_hidden[i]
-        v = layers.DenseLayer(v, nb_units, nonlinearity=linear)
-        v = BatchNormLayer(v)
-        nonlin = sigmoid if lay == x_noisy else rectify
-        v = layers.NonlinearityLayer(v, nonlin)
+            u = layers.DenseLayer(u, nb_hidden[i], nonlinearity=linear)
+            u = NormalizeLayer(u)
+            u = ScaleAndShiftLayer(u)
+        if len(lay.output_shape) > 2:
+            z = layers.ReshapeLayer(lay, ([0], np.prod(lay.output_shape[1:])))
+        else:
+            z = lay
+
+        nonlin = sigmoid
+        v = DenoiseLayer(u, z, nonlinearity=nonlin, name="dec{}".format(i))
+        if i == 0:
+            v = layers.NonlinearityLayer(v, sigmoid, name="dec{}".format(i))
+        else:
+            mean = encoder_normlz[i - 1].mean
+            std = T.sqrt(encoder_normlz[i - 1].var)
+            v = DecoderNormalizeLayer(
+                v,
+                mean=FakeLayer(encoder_normlz[i - 1], mean),
+                std=FakeLayer(encoder_normlz[i - 1], std))
         v.name = "dec{}".format(i)
         decoder.append(v)
         u = v
         i -= 1
     output = layers.ReshapeLayer(u, ([0],) + l_in.output_shape[1:], name="output")
     return layers_from_list_to_dict([l_in] + encoder + encoder_clean + decoder + [output])
+
+def model43(nb_filters=64, w=32, h=32, c=1):
+    """
+    Deconvolutional networks, Matthew D. Zeiler, Dilip Krishnan, Graham W. Taylor and Rob Fergus, 2010
+    """
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_conv = layers.Conv2DLayer(
+            l_in,
+            num_filters=nb_filters,
+            filter_size=(5, 5),
+            nonlinearity=sigmoid,
+            W=init.GlorotUniform(),
+            pad=2,
+            name="conv")
+    l_wta = layers.NonlinearityLayer(l_conv, wta_spatial, name="wta")
+    l_wta = l_conv
+    l_unconv = layers.Conv2DLayer(
+            l_wta,
+            num_filters=c,
+            filter_size=(11, 11),
+            nonlinearity=linear,
+            W=init.GlorotUniform(),
+            pad=5,
+            name='unconv')
+
+    l_out = layers.NonlinearityLayer(
+            l_unconv,
+            sigmoid, name="output")
+    return layers_from_list_to_dict([l_in, l_conv, l_wta, l_unconv, l_out])
+
+def model44(nb_filters=64, w=32, h=32, c=1, sparsity=True):
+    """
+    from Contractive Autencoders, 2010
+    """
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_hid = layers.DenseLayer(l_in, 1000, nonlinearity=sigmoid, name="hid")
+    l_pre_out = layers.DenseLayer(l_hid, num_units=c*w*h, nonlinearity=linear, W=l_hid.W.T,
+                                  name="pre_output")
+    l_out = layers.NonlinearityLayer(l_pre_out, sigmoid, name="output")
+    l_out = layers.ReshapeLayer(l_out, ([0], c, w, h), name="output")
+    print(l_out.output_shape)
+    return layers_from_list_to_dict([l_in, l_hid, l_pre_out, l_out])
+
+
 
 build_convnet_simple = model1
 build_convnet_simple_2 = model2

@@ -24,7 +24,6 @@ import numpy as np
 from data import load_data
 from model import *  # for dill
 import logging
-from helpers import cross_correlation, salt_and_pepper
 
 sys.setrecursionlimit(10000)
 
@@ -131,6 +130,7 @@ def build_capsule_(layers, data, nbl, nbc,
                    compile_="all",
                    **train_params):
     denoise = train_params.get("denoise", None)
+    walkback = train_params.get("walkback", 1)
     autoencoding_loss = train_params.get("autoencoding_loss", "squared_error")
 
     if denoise is not None:
@@ -191,7 +191,7 @@ def build_capsule_(layers, data, nbl, nbc,
         # save reconstructions
         k = 1
         idx = 0
-        fig = plt.figure()
+        fig = plt.figure(figsize=(10, 10))
         for row in range(nbl):
             for col in range(nbc):
                 plt.subplot(nbl, nbc * 2, k)
@@ -228,7 +228,11 @@ def build_capsule_(layers, data, nbl, nbc,
             fig.patch.set_facecolor('gray')
             if not hasattr(layers[layer_name], "W"):
                 continue
-            W = layers[layer_name].W.get_value().copy()
+            try:
+                W = layers[layer_name].W.get_value().copy()
+            except Exception as e:
+                print(str(e))
+                continue
             if len(W.shape) == 2:
                 if W.shape[0] == c * w * h:
                     W = W.T
@@ -328,7 +332,7 @@ def build_capsule_(layers, data, nbl, nbc,
 
     # Initialize the optimization algorithm
     lr_decay_method = "none"
-    initial_lr = 0.01
+    initial_lr = 0.1
     lr_decay = 0
     lr = theano.shared(np.array(initial_lr, dtype=np.float32))
     # algo = updates.momentum
@@ -364,10 +368,13 @@ def build_capsule_(layers, data, nbl, nbc,
             X_pred = reconstruct(model, X)
             updates = []
 
-        if autoencoding_loss == "squared_error":
-            recons = ((X - X_pred) ** 2).sum(axis=(1, 2, 3)).mean()
-        elif autoencoding_loss == "cross_entropy":
-            recons = -(X * T.log(X_pred) + (1 - X) * T.log(1 - X_pred)).sum(axis=(1, 2, 3)).mean()
+        recons = 0
+        for i in range(walkback):
+            if autoencoding_loss == "squared_error":
+                recons += ((X - X_pred) ** 2).sum(axis=(1, 2, 3)).mean()
+            elif autoencoding_loss == "cross_entropy":
+                recons += -(X * T.log(X_pred) + (1 - X) * T.log(1 - X_pred)).sum(axis=(1, 2, 3)).mean()
+            X_pred = reconstruct(model, X_pred)
         loss = recons
 
         if is_predictive:
@@ -384,6 +391,7 @@ def build_capsule_(layers, data, nbl, nbc,
                     loss += mu * cross_correlation(L.get_output(layer, X), y_pred)
         print(train_params)
         if train_params.get("contractive", False) is True:
+            from lasagne import nonlinearities
             contcoef = train_params.get("contractive_coef", 0.1)
             contlayers = train_params.get("contractive_layers", layers.keys())
             for layername in contlayers:
@@ -391,8 +399,17 @@ def build_capsule_(layers, data, nbl, nbc,
                 if hasattr(layer, "W"):
                     hid = L.get_output(layer, X)
                     print("contracting...")
-                    J = theano.grad(hid.sum(axis=1).mean(), X)
-                    loss += contcoef * (J**2).sum(axis=(1, 2, 3)).mean()
+                    if layer.nonlinearity == nonlinearities.sigmoid:
+                        hid = hid.dimshuffle(0, 'x', 1)
+                        W = layer.W.dimshuffle('x', 0, 1)
+                        if train_params.get("marginalized", False) is True:
+                            coefs = (W**2).sum(axis=0)
+                            coefs = coefs.dimshuffle('x', 0)
+                        else:
+                            coefs = 1
+                        loss += contcoef * (coefs * ((hid * (1 - hid) * W)**2)).sum() / hid.shape[0]
+                    else:
+                        raise Exception("unknown nonlinearity")
         if train_params.get("ladder", False) is True:
             lambda_ = train_params.get("lambda", 0.1)
             for layername in layers.keys():

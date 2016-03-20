@@ -67,16 +67,23 @@ def cross_correlation(a, b):
 
 
 def salt_and_pepper(x, rng=np.random, backend='theano', corruption_level=0.5):
-    a = rng.binomial(
-        size=x.shape,
-        p=(1 - corruption_level),
-        dtype=theano.config.floatX
-    )
-    b = rng.binomial(
-        size=x.shape,
-        p=0.5,
-        dtype=theano.config.floatX
-    )
+    if backend == 'theano':
+        a = rng.binomial(
+            size=x.shape,
+            p=(1 - corruption_level),
+            dtype=theano.config.floatX
+        )
+    else:
+        a = rng.uniform(size=x.shape) <= (1 - corruption_level)
+    if backend == 'theano':
+        b = rng.binomial(
+            size=x.shape,
+            p=0.5,
+            dtype=theano.config.floatX
+        )
+    else:
+        b = rng.uniform(size=x.shape) <=  0.5
+
     if backend == 'theano':
         c = T.eq(a, 0) * b
     else:
