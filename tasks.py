@@ -403,7 +403,7 @@ def build_capsule_(layers, data, nbl, nbc,
                         hid = hid.dimshuffle(0, 'x', 1)
                         W = layer.W.dimshuffle('x', 0, 1)
                         if train_params.get("marginalized", False) is True:
-                            coefs = (W**2).sum(axis=0)
+                            coefs = (W**2).sum(axis=(0, 1))
                             coefs = coefs.dimshuffle('x', 0)
                         else:
                             coefs = 1

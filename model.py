@@ -2420,6 +2420,21 @@ def model44(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     return layers_from_list_to_dict([l_in, l_hid, l_pre_out, l_out])
 
 
+def model45(nb_filters=64, w=32, h=32, c=1, sparsity=True):
+    """
+    from Zero-bias auto-encoders
+    """
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_hid = layers.DenseLayer(l_in, 1000, nonlinearity=lambda v: (T.abs_(v) > 0.3)*v, b=None,
+                              name="hid")
+    l_pre_out = layers.DenseLayer(l_hid, num_units=c*w*h, nonlinearity=linear,
+                                  W=l_hid.W.T,
+                                  name="pre_output")
+    #l_out = layers.NonlinearityLayer(l_pre_out, sigmoid, name="output")
+    l_out = layers.ReshapeLayer(l_pre_out, ([0], c, w, h), name="output")
+    print(l_out.output_shape)
+    return layers_from_list_to_dict([l_in, l_hid, l_pre_out, l_out])
+
 
 build_convnet_simple = model1
 build_convnet_simple_2 = model2
