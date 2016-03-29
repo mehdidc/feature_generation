@@ -420,7 +420,6 @@ def build_capsule_(layers, data, nbl, nbc,
         X = tensors["X"]
         if denoise is not None:
             noise = train_params.get("noise", "salt_and_pepper")
-
             def noisify(X):
                 if noise == "salt_and_pepper":
                     Xtilde = salt_and_pepper(X, corruption_level=float(denoise), rng=theano_rng, backend='theano')
@@ -454,6 +453,7 @@ def build_capsule_(layers, data, nbl, nbc,
                 Xcur_tilde = noisify(Xcur)
                 recons += recons_loss(Xcur, stoch_reconstruct(model, Xcur_tilde))
                 Xcur = Xcur_tilde
+            loss = recons
         if is_predictive:
             y_pred = predict(model, X)
             classif = -T.log(y_pred[T.arange(y_pred.shape[0]), tensors["y"]]).mean()
@@ -508,11 +508,11 @@ def build_capsule_(layers, data, nbl, nbc,
 
     def preprocess(X):
         X = X.reshape((X.shape[0], c, w, h))
-        thresh = train_params.get("binarize_thresh", None)
-        if thresh is None:
-            return X
-        else:
+        if train_params.get("binarize_thresh", None) is not None:
+            thresh = train_params.get("binarize_thresh", 0.5)
             return X > thresh
+        else:
+            return X
 
     if train_params.get("mode", "random") == "random":
         batch_iterator = build_batch_iterator(transform)
