@@ -416,17 +416,17 @@ def build_capsule_(layers, data, nbl, nbc,
     batch_optimizer.lr = lr
     batch_optimizer.optim_params = optim_params
 
+    def noisify(X):
+        pr = float(denoise)
+        if noise == "salt_and_pepper":
+            Xtilde = salt_and_pepper(X, corruption_level=pr, rng=theano_rng, backend='theano')
+        elif noise == "zero_masking":
+            Xtilde = zero_masking(X, corruption_level=pr, rng=theano_rng)
+        return Xtilde
+
     def loss_function(model, tensors):
         X = tensors["X"]
         if denoise is not None:
-            noise = train_params.get("noise", "salt_and_pepper")
-            def noisify(X):
-                if noise == "salt_and_pepper":
-                    Xtilde = salt_and_pepper(X, corruption_level=float(denoise), rng=theano_rng, backend='theano')
-                elif noise == "zero_masking":
-                    Xtilde = zero_masking(X, corruption_level=float(denoise), rng=theano_rng)
-                return Xtilde
-
             Xtilde = noisify(X)
             X_pred = stoch_reconstruct(model, Xtilde)
             updates =  [(v, u) for v, u, _, _ in theano_rng.updates()]
@@ -440,20 +440,26 @@ def build_capsule_(layers, data, nbl, nbc,
             elif autoencoding_loss == "cross_entropy":
                 return (true * T.log(pred) + (1 - true) * T.log(1 - pred)).sum(axis=(1, 2, 3)).mean()
 
-        if train_params.get("walkback_jump", True) is True:
-            recons = 0
-            for i in range(walkback):
-                recons += recons_loss(X, X_pred)
-                X_pred = stoch_reconstruct(model, X_pred)
-            loss = recons
+        if denoise is not None:
+
+            if train_params.get("walkback_jump", True) is True:
+                recons = 0
+                for i in range(walkback):
+                    recons += recons_loss(X, X_pred)
+                    X_pred = stoch_reconstruct(model, X_pred)
+                loss = recons
+            else:
+                recons = 0
+                Xcur = X
+                for i in range(walkback):
+                    Xcur_tilde = noisify(Xcur)
+                    recons += recons_loss(Xcur, stoch_reconstruct(model, Xcur_tilde))
+                    Xcur = Xcur_tilde
+                loss = recons
         else:
-            recons = 0
-            Xcur = X
-            for i in range(walkback):
-                Xcur_tilde = noisify(Xcur)
-                recons += recons_loss(Xcur, stoch_reconstruct(model, Xcur_tilde))
-                Xcur = Xcur_tilde
+            recons = recons_loss(X, X_pred)
             loss = recons
+
         if is_predictive:
             y_pred = predict(model, X)
             classif = -T.log(y_pred[T.arange(y_pred.shape[0]), tensors["y"]]).mean()
@@ -547,6 +553,7 @@ def build_capsule_(layers, data, nbl, nbc,
     elif compile_ == "none":
         pass
     capsule.report = report
+    print("Ok finished")
     return capsule
 
 
