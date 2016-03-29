@@ -1,0 +1,32 @@
+{
+    "save_all": true,
+    "save_all_folder": "out",
+
+    "tsne": false,
+    "out": "out/out",
+    "evalsfile": "out/evals.csv",
+    "evalsmeanfile": "out/evalsmean.csv",
+
+    "layer_name": "input",
+    "nb_iter": 400,
+    "fitness_name": "reconstruction",
+    "initial_source": "random",
+
+    "nb_initial": 100,
+
+    "nbchildren": 100,
+    "nbsurvive": 50,
+
+    "strategy": "nosel",
+    "dead_perc": 0.1,
+    "nbtimes": 1,
+    "seed": 2,
+    "do_mutation": false,
+    "do_crossover": false,
+    "do_zero_masking": false,
+    "sort": false,
+    "flatten": true, 
+    "recons": true,
+
+    "group_plot_save_each": 1
+} 

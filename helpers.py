@@ -66,7 +66,7 @@ def cross_correlation(a, b):
     return 0.5 * ((((a.dimshuffle(0, 'x', 1) * b.dimshuffle(0, 1, 'x'))).mean(axis=0))**2).sum()
 
 
-def salt_and_pepper(x, rng=np.random, backend='theano', corruption_level=0.5):
+def salt_and_pepper(x, rng=np.random, backend='theano', corruption_level=1.5):
     if backend == 'theano':
         a = rng.binomial(
             size=x.shape,
@@ -89,6 +89,14 @@ def salt_and_pepper(x, rng=np.random, backend='theano', corruption_level=0.5):
     else:
         c = (a==0) * b
     return x * a + c
+
+def zero_masking(x, rng, corruption_level=0.5):
+    a = rng.binomial(
+        size=x.shape,
+        p=(1 - corruption_level),
+        dtype=theano.config.floatX
+    )
+    return x * a
 
 
 def mkdir_path(path):

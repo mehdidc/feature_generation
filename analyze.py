@@ -189,15 +189,21 @@ def fixedpointscounter(capsule, data, layers, w, h, c, **params):
         """
 
     nb_clusters = params.get("nb_clusters_quantization", 10)
-    logger.info("Quantizing pixels...")
-    clus = KMeans(n_clusters=nb_clusters, verbose=0, n_jobs=40, n_init=30)
     nb_examples = X.shape[0]
+    logger.info("Quantizing pixels...")
+    """
+    clus = KMeans(n_clusters=nb_clusters, verbose=0, n_jobs=40, n_init=30)
     X_pixels = X.flatten()[:, None]
     clus.fit(X_pixels)
     print(clus.cluster_centers_)
     X_quantized = clus.predict(X_pixels)
     X_quantized = X_quantized.reshape((nb_examples, -1))
-
+    """
+    from skimage.filters import threshold_otsu
+    X_quantized = np.empty(X.shape)
+    for i in range(X.shape[0]):
+        thresh = threshold_otsu(X[i])
+        X_quantized[i] = X[i] > thresh
     def h11(w):
         m = hashlib.md5()
         for e in w:
@@ -208,7 +214,6 @@ def fixedpointscounter(capsule, data, layers, w, h, c, **params):
     for i in range(nb_examples):
         hh = h11(X_quantized[i].tolist())
         clusters[hh].append(i)
-    logger.info("Number of fixed points : {}".format(len(clusters)))
 
     folder = params.get("folder", "out")
     mkdir_path(folder)
@@ -224,7 +229,7 @@ def fixedpointscounter(capsule, data, layers, w, h, c, **params):
             tile_shape=(size, size), tile_spacing=(20, 20))
         out = "{}/{}.png".format(folder, cl)
         imsave(out, img)
-
+    logger.info("Number of fixed points : {}".format(len(clusters)))
     return ret
 
 def clusterfinder(capsule, data, layers, w, h, c, **params):
@@ -448,7 +453,7 @@ def simple_genetic(capsule, data, layers, w, h, c, **params):
         new_px = new_px[:, 0, :, :]
         nb_samples = new_px.shape[0]
         size = int(np.sqrt(nb_samples))
-        img = tile_raster_images(new_px, img_shape=(w, h), tile_shape=(size, size), tile_spacing=(20, 20))
+        img = tile_raster_images(new_px, img_shape=(w, h), tile_shape=(size, size), tile_spacing=(2, 2))
         imsave(out, img)
     else:
         pass # next time
@@ -505,7 +510,9 @@ def genetic(capsule, data, layers, w, h, c,
         "group_plot_save",
         "do_mutation",
         "do_crossover",
-        "groupshowchildren"
+        "groupshowchildren",
+        "group_plot_save_each",
+        "do_zero_masking"
     ])
     for p in params.keys():
         assert p in allowed_params, "'{}' not recognizable parameter".format(p)
@@ -632,7 +639,9 @@ def genetic(capsule, data, layers, w, h, c,
                 p=params.get("dead_perc", 0.1),
                 nbtimes=params.get("nbtimes", 1)
             )
-
+        if params.get("do_zero_masking", False):
+            new_feat = new_feat * np.random.uniform(size=new_feat.shape) <= (1 - params.get("dead_perc"))
+            new_feat = new_feat.astype(np.float32)
         return new_feat
 
     # Choose and init fitness
@@ -741,7 +750,7 @@ def genetic(capsule, data, layers, w, h, c,
         children_px = None
         for i in range(nb_iter):
 
-            if i>=1 and (i % 10 == 0 or i in params.get("group_plot_save", range(0, 20))):
+            if i>=1 and (i % params.get("group_plot_save_each", 10) == 0 or i in params.get("group_plot_save", range(0, 20))):
             #if i>=1:
                 logger.info("Group plotting...")
                 if params.get("groupshowchildren", True):

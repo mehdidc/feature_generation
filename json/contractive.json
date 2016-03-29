@@ -1,5 +1,5 @@
 {
     "contractive": true,
     "contractive_layers": ["hid"],
-    "contractive_coef": 0.01
+    "contractive_coef": 0.1
 }

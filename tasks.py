@@ -21,8 +21,10 @@ from lasagnekit.nnet.capsule import Capsule, make_function
 from lasagnekit.misc.plot_weights import grid_plot, dispims_color, tile_raster_images
 from lasagnekit.easy import get_stat, iterate_minibatches
 import numpy as np
+from helpers import salt_and_pepper, zero_masking
 from data import load_data
 from model import *  # for dill
+from skimage.io import imsave
 import logging
 
 sys.setrecursionlimit(10000)
@@ -34,12 +36,19 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
 
+def mkdir_path(path):
+    if not os.access(path, os.F_OK):
+        os.makedirs(path)
+
 @task
 def train(dataset="digits", prefix="",
           model_name="model8",
           force_w=None, force_h=None,
           params=None):
     import json
+    mkdir_path("{}/features".format(prefix))
+    mkdir_path("{}/recons".format(prefix))
+    mkdir_path("{}/out".format(prefix))
 
     if type(params) == dict:
         pass
@@ -48,24 +57,29 @@ def train(dataset="digits", prefix="",
             params = {}
         else:
             params = json.load(open(params))
-
+    params["job_id"] = os.getenv("SLURM_JOBID")
     if force_w is not None:
-        w = force_w
+        w = int(force_w)
     else:
         w = None
     if force_h is not None:
-        h = force_h
+        h = int(force_h)
     else:
         h = None
     state = 2
     np.random.seed(state)
     logger.info("Loading data...")
+    mode = params.get("mode", "random")
+
+    batch_size = params.get("batch_size", 128)
     data, w, h, c, nbl, nbc = load_data(
-        dataset=dataset, w=w, h=h, include_test=True, batch_size=128)
+        dataset=dataset, w=w, h=h, include_test=True,
+        batch_size=batch_size,
+        mode=mode)
     # nbl and nbc are just used to show couple of nblxnbc reconstructed
     # vs true samples
-
-    nb_filters = 64
+    model_params = params.get("model_params", {})
+    nb_filters = model_params.get("nb_filters", 128)
     kw_builder = dict(
         nb_filters=nb_filters,
         w=w, h=h, c=c
@@ -92,28 +106,35 @@ def train(dataset="digits", prefix="",
         u = dict(nb_layers=3, size_filters=2**3+2)
         kw_builder.update(u)
         kw_builder["nb_filters"] = 128
-
+    kw_builder.update(model_params)
     builder = getattr(model, model_name)
 
     # build the model and return layers dictionary
     logger.info("Building the architecture..")
     layers = builder(**kw_builder)
 
+    info = params.copy()
     def report_event(status):
         #  periodically save the model
         print("Saving the model...")
-        save_(layers, builder, kw_builder, "{}/model.pkl".format(prefix), info=params)
+        save_(layers, builder, kw_builder, "{}/model.pkl".format(prefix), info=info)
 
     logger.info("Compiling the model...")
     capsule = build_capsule_(layers, data, nbl, nbc,
                              report_event, prefix=prefix,
                              **params)
-    dummy = np.zeros((1, c, w, h)).astype(np.float32)
+    info["stats"] = capsule.batch_optimizer.stats
+    # info["optimization"] = capsule.batch_optimizer.optim_params
+    if mode == 'random':
+        dummy = np.zeros((1, c, w, h)).astype(np.float32)
+        V = {"X": dummy}
+        if "y" in layers:
+            dummy_y = np.zeros((1,)).astype(np.int32)
+            V.update({"y": dummy_y})
+    elif mode == 'minibatch':
+        V = {"X": capsule.preprocess(data.X)}
+        # y not handled for now
 
-    V = {"X": dummy}
-    if "y" in layers:
-        dummy_y = np.zeros((1,)).astype(np.int32)
-        V.update({"y": dummy_y})
     logger.info("Start training!")
     try:
         capsule.fit(**V)
@@ -124,11 +145,13 @@ def train(dataset="digits", prefix="",
     # save model and report at the end
     capsule.report(capsule.batch_optimizer.stats[-1])
 
+
 def build_capsule_(layers, data, nbl, nbc,
                    report_event=None,
                    prefix="",
                    compile_="all",
                    **train_params):
+    batch_size = train_params.get("batch_size", 128)
     denoise = train_params.get("denoise", None)
     walkback = train_params.get("walkback", 1)
     autoencoding_loss = train_params.get("autoencoding_loss", "squared_error")
@@ -157,11 +180,15 @@ def build_capsule_(layers, data, nbl, nbc,
     c, w, h = layers["input"].output_shape[1:]
 
     def reconstruct(model, X):
+        X_rec, = model.get_output(X, deterministic=True)
+        return X_rec
+
+    def stoch_reconstruct(model, X):
         X_rec, = model.get_output(X)
         return X_rec
 
     def predict(model, X):
-        return L.get_output(layers["y"], X)
+        return L.get_output(layers["y"], X, deterministic=True)
 
     def is_conv_layer(name):
         return name.startswith("conv1")
@@ -172,7 +199,7 @@ def build_capsule_(layers, data, nbl, nbc,
     def get_conv(model, X):
         out = []
         for layer in conv_layers:
-            out.append(L.get_output(layer, X))
+            out.append(L.get_output(layer, X, determnistic=True))
         return out
 
     functions = {
@@ -224,6 +251,9 @@ def build_capsule_(layers, data, nbl, nbc,
         # save features (raw)
         layer_names = layers.keys()
         for layer_name in layer_names:
+
+            filename = "{}/features/{}-{}.png".format(prefix, ep, layer_name)
+
             fig = plt.figure()
             fig.patch.set_facecolor('gray')
             if not hasattr(layers[layer_name], "W"):
@@ -238,30 +268,33 @@ def build_capsule_(layers, data, nbl, nbc,
                     W = W.T
                 if W.shape[1] == c * w * h:
                     W = W.reshape((W.shape[0], c, w , h))
-                print(W.shape)
             if 3 in W.shape[0:2]:
                 if W.shape[0] == 3:
                     W = W.transpose((1, 2, 3, 0))  # F w h col
                 elif W.shape[1] == 3:
                     W = W.transpose((0, 2, 3, 1))  # F w h col
                 img = dispims_color(W, border=1, shape=(11, 11))
-                plt.axis('off')
-                plt.imshow(img, interpolation='none')
+                imsave(filename, img)
+                #plt.axis('off')
+                #plt.imshow(img, interpolation='none')
             elif 1 in W.shape[0:2]:
                 W = W.reshape((W.shape[0] * W.shape[1],
                                W.shape[2], W.shape[3]))
-                if W.shape[0] > 256:
-                    sz = int(np.sqrt(W.shape[0]))
-                    img = tile_raster_images(W, (w, h), (sz, sz))
-                    plt.axis('off')
-                    plt.imshow(img, cmap='gray', interpolation='none')
-                else:
-                    opt = dict(cmap='gray', interpolation='none')
-                    grid_plot(W, imshow_options=opt, fig=fig)
+                sz = int(np.sqrt(W.shape[0]))
+                print(w, h, W.shape)
+                img = tile_raster_images(W, (W.shape[1], W.shape[2]), (sz, sz),
+                                         scale_rows_to_unit_interval=True,
+                                         output_pixel_vals=True,
+                                         tile_spacing=(1, 1))
+                #plt.axis('off')
+                #plt.imshow(img, cmap='gray', interpolation='none')
+                imsave(filename, img)
+                #opt = dict(cmap='gray', interpolation='none')
+                    #grid_plot(W, imshow_options=opt, fig=fig)
+                    #plt.axis('off')
+                    #plt.savefig(filename, facecolor=fig.get_facecolor(), transparent=True)
             else:
                 continue
-            plt.savefig("{}/features/{}-{}.png".format(prefix, ep, layer_name),
-                        facecolor=fig.get_facecolor(), transparent=True)
             plt.close(fig)
 
         # learning curve
@@ -323,6 +356,14 @@ def build_capsule_(layers, data, nbl, nbc,
             status["acc_test"] = acc
 
         N = 1000
+        if mode == "minibatch":
+            t = (t * data.X.shape[0] / batch_size)
+            next_ = (t + batch_size) / N
+            next_ = next_ * N
+            if next_ >= (t + batch_size):
+                next_ += N
+            if next_ >= t and next_ <= t + batch_size:
+                t = next_
         # each N epochs save reconstructions
         # and how features look like
         if t % N == 0:
@@ -331,52 +372,88 @@ def build_capsule_(layers, data, nbl, nbc,
         return status
 
     # Initialize the optimization algorithm
-    lr_decay_method = "none"
-    initial_lr = 0.1
-    lr_decay = 0
+    optim_params_default = dict(
+        lr_decay_method="none",
+        initial_lr=0.1,
+        lr_decay=0,
+        algo="adadelta",
+        momentum=0.9,
+        beta1=0.95,
+        beta2=0.95,
+        epsilon=1e-8,
+        max_nb_epochs=100000,
+        patience_stat='avg_loss_train_fix',
+        patience_nb_epochs=800,
+        min_nb_epochs=250000,
+        batch_size=batch_size,
+    )
+    optim_params = optim_params_default.copy()
+    optim_params.update(train_params.get("optimization", {}))
+    lr_decay_method = optim_params["lr_decay_method"]
+    initial_lr = optim_params["initial_lr"]
+    lr_decay = optim_params["lr_decay"]
     lr = theano.shared(np.array(initial_lr, dtype=np.float32))
-    # algo = updates.momentum
-    algo = updates.adadelta
-    # algo = updates.adam
+    algos = {"adam": updates.adam, "adadelta": updates.adadelta}
+    algo = algos[optim_params["algo"]]
     params = {"learning_rate": lr}
 
     if algo in (updates.momentum, updates.nesterov_momentum):
-        momentum = 0.9
-        params["momentum"] = momentum
+        params["momentum"] = optim_params["momentum"]
     if algo == updates.adam:
-        params["beta1"] = 0.9
+        params["beta1"] = optim_params["beta1"]
+        params["beta2"] = optim_params["beta2"]
+        params["epsilon"] = optim_params["epsilon"]
     optim = (algo, params)
-    batch_size = nbl * nbc
     batch_optimizer = make_batch_optimizer(
         update_status,
-        max_nb_epochs=100000,
+        max_nb_epochs=optim_params["max_nb_epochs"],
         optimization_procedure=optim,
-        patience_stat='avg_loss_train_fix',
-        patience_nb_epochs=800,
-        min_nb_epochs=25000,
+        patience_stat=optim_params["patience_stat"],
+        patience_nb_epochs=optim_params["patience_nb_epochs"],
+        min_nb_epochs=optim_params["min_nb_epochs"],
         batch_size=batch_size,
         verbose=1)
     batch_optimizer.lr = lr
+    batch_optimizer.optim_params = optim_params
 
     def loss_function(model, tensors):
         X = tensors["X"]
         if denoise is not None:
-            Xtilde = salt_and_pepper(X, corruption_level=float(denoise), rng=theano_rng, backend='theano')
-            X_pred = reconstruct(model, Xtilde)
+            noise = train_params.get("noise", "salt_and_pepper")
+
+            def noisify(X):
+                if noise == "salt_and_pepper":
+                    Xtilde = salt_and_pepper(X, corruption_level=float(denoise), rng=theano_rng, backend='theano')
+                elif noise == "zero_masking":
+                    Xtilde = zero_masking(X, corruption_level=float(denoise), rng=theano_rng)
+                return Xtilde
+
+            Xtilde = noisify(X)
+            X_pred = stoch_reconstruct(model, Xtilde)
             updates =  [(v, u) for v, u, _, _ in theano_rng.updates()]
         else:
-            X_pred = reconstruct(model, X)
+            X_pred = stoch_reconstruct(model, X)
             updates = []
 
-        recons = 0
-        for i in range(walkback):
+        def recons_loss(true, pred):
             if autoencoding_loss == "squared_error":
-                recons += ((X - X_pred) ** 2).sum(axis=(1, 2, 3)).mean()
+                return ((true - pred) ** 2).sum(axis=(1, 2, 3)).mean()
             elif autoencoding_loss == "cross_entropy":
-                recons += -(X * T.log(X_pred) + (1 - X) * T.log(1 - X_pred)).sum(axis=(1, 2, 3)).mean()
-            X_pred = reconstruct(model, X_pred)
-        loss = recons
+                return (true * T.log(pred) + (1 - true) * T.log(1 - pred)).sum(axis=(1, 2, 3)).mean()
 
+        if train_params.get("walkback_jump", True) is True:
+            recons = 0
+            for i in range(walkback):
+                recons += recons_loss(X, X_pred)
+                X_pred = stoch_reconstruct(model, X_pred)
+            loss = recons
+        else:
+            recons = 0
+            Xcur = X
+            for i in range(walkback):
+                Xcur_tilde = noisify(Xcur)
+                recons += recons_loss(Xcur, stoch_reconstruct(model, Xcur_tilde))
+                Xcur = Xcur_tilde
         if is_predictive:
             y_pred = predict(model, X)
             classif = -T.log(y_pred[T.arange(y_pred.shape[0]), tensors["y"]]).mean()
@@ -430,9 +507,18 @@ def build_capsule_(layers, data, nbl, nbc,
         return t
 
     def preprocess(X):
-        return X.reshape((X.shape[0], c, w, h))
-    batch_iterator = build_batch_iterator(transform)
+        X = X.reshape((X.shape[0], c, w, h))
+        thresh = train_params.get("binarize_thresh", None)
+        if thresh is None:
+            return X
+        else:
+            return X > thresh
 
+    if train_params.get("mode", "random") == "random":
+        batch_iterator = build_batch_iterator(transform)
+    else:
+        #mode minibatch
+        batch_iterator = None
     # put all together
     capsule = Capsule(
         input_variables,
@@ -445,15 +531,20 @@ def build_capsule_(layers, data, nbl, nbc,
     )
     capsule.layers = layers
     capsule.preprocess = preprocess
-    dummy = np.zeros((1, c, w, h)).astype(np.float32)
     if compile_ == "all":
-        dummyvars = {"X": dummy}
-        if is_predictive:
-            dummyvars.update({"y": dummy})
-        capsule._build(dummyvars)
+        mode = train_params.get("mode", "random")
+        if mode == "random":
+            dummy = np.zeros((1, c, w, h)).astype(np.float32)
+            dummyvars = {"X": dummy}
+            if is_predictive:
+                dummyvars.update({"y": dummy})
+            capsule._build(dummyvars)
+        elif mode == "minibatch":
+            V = {"X": capsule.preprocess(data.X)}
+            capsule._build(V)
     elif compile_ == "functions_only":
         capsule._build_functions()
-    elif compile__ == "none":
+    elif compile_ == "none":
         pass
     capsule.report = report
     return capsule
@@ -515,6 +606,7 @@ def check(filename="out.pkl",
             traceback.print_exception(exc_type, exc_value, exc_traceback,
                                       limit=5, file=sys.stdout)
     return ret
+
 
 def save_(layers, builder, kw_builder, filename, info=None):
     if info is None:

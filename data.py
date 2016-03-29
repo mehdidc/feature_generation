@@ -3,7 +3,7 @@ import os
 from skimage.io import imread
 
 
-def load_data(dataset="digits", w=None, h=None, include_test=False, batch_size=128, **kw):
+def load_data(dataset="digits", w=None, h=None, include_test=False, batch_size=128, mode='random', **kw):
     nbl, nbc = 10, 10
 
     if dataset == 'random':
@@ -37,7 +37,8 @@ def load_data(dataset="digits", w=None, h=None, include_test=False, batch_size=1
         data = load_once(MNIST)(which=which)
         data.load()
         w, h = data.img_dim
-        data = SubSampled(data, batch_size)
+        if mode == 'random':
+            data = SubSampled(data, batch_size)
         if include_test:
             data.test = MNIST(which='test')
             data.test.load()

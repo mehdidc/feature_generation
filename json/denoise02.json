@@ -1,5 +1,5 @@
 {
-    "denoise": 0.5,
+    "denoise": 0.2,
     "noise": "zero_masking",
     "walkback": 1 
 }

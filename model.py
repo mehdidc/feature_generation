@@ -2425,7 +2425,7 @@ def model45(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     from Zero-bias auto-encoders
     """
     l_in = layers.InputLayer((None, c, w, h), name="input")
-    l_hid = layers.DenseLayer(l_in, 1000, nonlinearity=lambda v: (T.abs_(v) > 0.3)*v, b=None,
+    l_hid = layers.DenseLayer(l_in, 1000, nonlinearity=lambda v: (T.abs_(v) > 1)*v, b=None,
                               name="hid")
     l_pre_out = layers.DenseLayer(l_hid, num_units=c*w*h, nonlinearity=linear,
                                   W=l_hid.W.T,
@@ -2435,6 +2435,578 @@ def model45(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     print(l_out.output_shape)
     return layers_from_list_to_dict([l_in, l_hid, l_pre_out, l_out])
 
+def model46(nb_filters=64, w=32, h=32, c=1, sparsity=True):
+    """
+    Mean-covariance auto-encoders
+    http://www.iro.umontreal.ca/~memisevr/pubs/rae.pdf
+    """
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_hidx = layers.DenseLayer(layers.DropoutLayer(l_in, 0.5, rescale=False), 500,
+                               nonlinearity=linear,
+                               name="hidx")
+    l_hidy = layers.DenseLayer(layers.DropoutLayer(l_in, 0.5, rescale=False), 500,
+                               nonlinearity=linear,
+                               name="hidy")
+    l_hid = layers.ElemwiseMergeLayer([l_hidx, l_hidy], T.mul, name="hid")
+    l_hid = layers.DenseLayer(
+        l_hid,
+        500,
+        nonlinearity=rectify,
+        name="hid")
+
+    l_hidxr = l_hidx
+    l_hidyr = layers.DenseLayer(l_hid, 500, nonlinearity=linear, name="hidyr")
+    l_hidr = layers.ElemwiseMergeLayer([l_hidxr, l_hidyr], T.mul, name="hidr")
+    l_pre_out = layers.DenseLayer(l_hidr,
+                                  W=l_hidy.W.T,
+                                  num_units=c*w*h,
+                                  nonlinearity=linear,
+                                  name="pre_output")
+    l_out = layers.NonlinearityLayer(l_pre_out, sigmoid, name="output")
+    l_out = layers.ReshapeLayer(l_pre_out, ([0], c, w, h), name="output")
+    print(l_out.output_shape)
+    return layers_from_list_to_dict([l_in, l_hid, l_pre_out, l_out])
+
+def model47(nb_filters=64, w=32, h=32, c=1, sparsity=True):
+    """
+    Simple Denoising AA model
+    """
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_hid = layers.DenseLayer(l_in, 1000, nonlinearity=sigmoid, name="hid")
+    l_pre_out = layers.DenseLayer(l_hid, num_units=c*w*h, nonlinearity=linear, name="pre_output")
+    l_out = layers.NonlinearityLayer(l_pre_out, sigmoid, name="output")
+    l_out = layers.ReshapeLayer(l_out, ([0], c, w, h), name="output")
+    print(l_out.output_shape)
+    return layers_from_list_to_dict([l_in, l_hid, l_pre_out, l_out])
+
+def model48(nb_filters=64, w=32, h=32, c=1, sparsity=True):
+    """
+    same than model8 but filters are multiplied by two in each layer
+    """
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_convs = []
+    l_conv = layers.Conv2DLayer(
+            l_in,
+            num_filters=nb_filters,
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            name="conv1")
+    l_convs.append(l_conv)
+    l_conv = layers.Conv2DLayer(
+            l_conv,
+            num_filters=nb_filters * 2,
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            name="conv2")
+    l_convs.append(l_conv)
+    l_conv = layers.Conv2DLayer(
+            l_conv,
+            num_filters=nb_filters * 2 * 2,
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            name="conv3")
+    l_convs.append(l_conv)
+    l_wta1 = layers.NonlinearityLayer(l_conv, wta_spatial, name="wta_spatial")
+    l_wta2 = layers.NonlinearityLayer(l_wta1, wta_channel_strided(stride=4), name="wta_channel")
+    l_unconv = layers.Conv2DLayer(
+            l_wta2,
+            num_filters=c,
+            filter_size=(13, 13),
+            nonlinearity=linear,
+            W=init.GlorotUniform(),
+            pad='full',
+            name='unconv')
+    l_out = layers.NonlinearityLayer(
+            l_unconv,
+            sigmoid, name="output")
+    print(l_out.output_shape)
+    return layers_from_list_to_dict([l_in] + l_convs + [l_wta1, l_wta2, l_unconv, l_out])
+
+
+def model49(nb_filters=64, w=32, h=32, c=1, sparsity=True):
+    """
+    bigger version of model41
+    """
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_hid1 = layers.DenseLayer(l_in, 2000, nonlinearity=rectify, name="hid1")
+    l_hid2 = layers.DenseLayer(l_hid1, 2000, nonlinearity=rectify, name="hid2")
+    l_hid3 = layers.DenseLayer(l_hid2, 2000, nonlinearity=rectify, name="hid3")
+    l_hid4 = layers.DenseLayer(l_hid3, 2000, nonlinearity=rectify, name="hid4")
+    l_pre_out = layers.DenseLayer(l_hid4, num_units=c*w*h, nonlinearity=linear, name="pre_output")
+    l_out = layers.NonlinearityLayer(l_pre_out, sigmoid, name="output")
+    l_out = layers.ReshapeLayer(l_out, ([0], c, w, h), name="output")
+    print(l_out.output_shape)
+    return layers_from_list_to_dict([l_in, l_hid1, l_pre_out, l_out])
+
+
+def model50(nb_filters=64, w=32, h=32, c=1, sparsity=True):
+    """
+    Pyramidal auto-encoder!
+    """
+    l_in_scale1 = layers.InputLayer((None, c, w, h), name="scale1_input")
+    l_in_scale2 = layers.InputLayer((None, c, w/2, h/2), name="scale2_input")
+    l_in_scale3 = layers.InputLayer((None, c, w/4, h/4), name="scale3_input")
+    l_in_scale4 = layers.InputLayer((None, c, w/8, h/8), name="scale4_input")
+    inputs = [l_in_scale1, l_in_scale2, l_in_scale3, l_in_scale4]
+
+    l_conv1 = layers.Conv2DLayer(
+           l_in_scale1,
+           num_filters=nb_filters,
+           filter_size=(2, 2),
+           stride=2,
+           nonlinearity=rectify,
+           W=init.GlorotUniform(),
+           name='conv1')
+    l_conv2 = layers.Conv2DLayer(
+           l_conv1,
+           num_filters=nb_filters,
+           filter_size=(2, 2),
+           stride=2,
+           nonlinearity=rectify,
+           W=init.GlorotUniform(),
+           name='conv2')
+    l_conv3 = layers.Conv2DLayer(
+           l_conv2,
+           num_filters=nb_filters,
+           filter_size=(2, 2),
+           stride=2,
+           nonlinearity=rectify,
+           W=init.GlorotUniform(),
+           name='conv3')
+    encoder = [l_conv1, l_conv2, l_conv3]
+    l_scale4_output = layers.Conv2DLayer(
+        l_conv3,
+        num_filters=c,
+        filter_size=(3, 3),
+        pad=1,
+        nonlinearity=sigmoid,
+        W=init.GlorotUniform(),
+        name='scale4_output',
+    )
+    l_scale4_up = Deconv2DLayer(
+        l_scale4_output,
+        num_filters=c,
+        filter_size=(2, 2),
+        stride=2,
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name='unconv4_up',
+    )
+    #l_scale3_prep = layers.ConcatLayer([l_in_scale3, l_scale4_up], axis=1)
+    l_scale3_prep = l_scale4_up
+    l_scale3_output = layers.Conv2DLayer(
+        l_scale3_prep,
+        num_filters=c,
+        filter_size=(3, 3),
+        pad=1,
+        nonlinearity=sigmoid,
+        W=init.GlorotUniform(),
+        name='scale3_output')
+
+    l_scale3_up = Deconv2DLayer(
+        l_scale3_output,
+        num_filters=c,
+        filter_size=(2, 2),
+        stride=2,
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name='unconv3_up',
+    )
+    #l_scale2_prep = layers.ConcatLayer([l_in_scale2, l_scale3_up], axis=1)
+    l_scale2_prep = l_scale3_up
+    l_scale2_output = layers.Conv2DLayer(
+        l_scale2_prep,
+        num_filters=c,
+        filter_size=(3, 3),
+        pad=1,
+        nonlinearity=sigmoid,
+        W=init.GlorotUniform(),
+        name='scale2_output')
+
+    l_scale2_up = Deconv2DLayer(
+        l_scale2_output,
+        num_filters=c,
+        filter_size=(2, 2),
+        stride=2,
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name='unconv2_up',
+    )
+    #l_scale1_prep = layers.ConcatLayer([l_in_scale1, l_scale2_up], axis=1)
+    l_scale1_prep = l_scale2_up
+    l_scale1_output = layers.Conv2DLayer(
+        l_scale1_prep,
+        num_filters=c,
+        filter_size=(3, 3),
+        pad=1,
+        nonlinearity=sigmoid,
+        W=init.GlorotUniform(),
+        name='scale1_output')
+    outputs = [l_scale1_output, l_scale2_output, l_scale3_output, l_scale4_output]
+    return layers_from_list_to_dict(inputs + encoder + outputs)
+
+def model51(nb_filters=64, w=32, h=32, c=1, sparsity=True):
+    """
+    Pyramidal auto-encoder using hints in each scale
+    """
+    l_in_scale1 = layers.InputLayer((None, c, w, h), name="scale1_input")
+    l_in_scale2 = layers.InputLayer((None, c, w/2, h/2), name="scale2_input")
+    l_in_scale3 = layers.InputLayer((None, c, w/4, h/4), name="scale3_input")
+    l_in_scale4 = layers.InputLayer((None, c, w/8, h/8), name="scale4_input")
+    inputs = [l_in_scale1, l_in_scale2, l_in_scale3, l_in_scale4]
+
+    l_conv1 = layers.Conv2DLayer(
+           l_in_scale1,
+           num_filters=nb_filters,
+           filter_size=(2, 2),
+           stride=2,
+           nonlinearity=rectify,
+           W=init.GlorotUniform(),
+           name='conv1')
+    l_conv2 = layers.Conv2DLayer(
+           l_conv1,
+           num_filters=nb_filters,
+           filter_size=(2, 2),
+           stride=2,
+           nonlinearity=rectify,
+           W=init.GlorotUniform(),
+           name='conv2')
+    l_conv3 = layers.Conv2DLayer(
+           l_conv2,
+           num_filters=nb_filters,
+           filter_size=(2, 2),
+           stride=2,
+           nonlinearity=rectify,
+           W=init.GlorotUniform(),
+           name='conv3')
+    encoder = [l_conv1, l_conv2, l_conv3]
+    l_scale4_output = layers.Conv2DLayer(
+        l_conv3,
+        num_filters=c,
+        filter_size=(3, 3),
+        pad=1,
+        nonlinearity=sigmoid,
+        W=init.GlorotUniform(),
+        name='scale4_output',
+    )
+    l_scale4_up = Deconv2DLayer(
+        l_scale4_output,
+        num_filters=c,
+        filter_size=(2, 2),
+        stride=2,
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name='unconv4_up',
+    )
+    l_scale3_prep = layers.ConcatLayer([l_in_scale3, l_scale4_up], axis=1)
+    #l_scale3_prep = l_scale4_up
+    l_scale3_output = layers.Conv2DLayer(
+        l_scale3_prep,
+        num_filters=c,
+        filter_size=(3, 3),
+        pad=1,
+        nonlinearity=sigmoid,
+        W=init.GlorotUniform(),
+        name='scale3_output')
+
+    l_scale3_up = Deconv2DLayer(
+        l_scale3_output,
+        num_filters=c,
+        filter_size=(2, 2),
+        stride=2,
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name='unconv3_up',
+    )
+    l_scale2_prep = layers.ConcatLayer([l_in_scale2, l_scale3_up], axis=1)
+    #l_scale2_prep = l_scale3_up
+    l_scale2_output = layers.Conv2DLayer(
+        l_scale2_prep,
+        num_filters=c,
+        filter_size=(3, 3),
+        pad=1,
+        nonlinearity=sigmoid,
+        W=init.GlorotUniform(),
+        name='scale2_output')
+
+    l_scale2_up = Deconv2DLayer(
+        l_scale2_output,
+        num_filters=c,
+        filter_size=(2, 2),
+        stride=2,
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name='unconv2_up',
+    )
+    l_scale1_prep = layers.ConcatLayer([l_in_scale1, l_scale2_up], axis=1)
+    #l_scale1_prep = l_scale2_up
+    l_scale1_output = layers.Conv2DLayer(
+        l_scale1_prep,
+        num_filters=c,
+        filter_size=(3, 3),
+        pad=1,
+        nonlinearity=sigmoid,
+        W=init.GlorotUniform(),
+        name='scale1_output')
+    outputs = [l_scale1_output, l_scale2_output, l_scale3_output, l_scale4_output]
+    return layers_from_list_to_dict(inputs + encoder + outputs)
+
+def model52(nb_filters=64, w=32, h=32, c=1, sparsity=True):
+    """
+    Pyramidal auto-encoder using hints in each scale
+    with noise
+    """
+    def sparse(l):
+        l = layers.GaussianNoiseLayer(l, 0.2)
+        return l
+
+    l_in_scale1 = layers.InputLayer((None, c, w, h), name="scale1_input")
+    l_in_scale2 = layers.InputLayer((None, c, w/2, h/2), name="scale2_input")
+    l_in_scale3 = layers.InputLayer((None, c, w/4, h/4), name="scale3_input")
+    l_in_scale4 = layers.InputLayer((None, c, w/8, h/8), name="scale4_input")
+    inputs = [l_in_scale1, l_in_scale2, l_in_scale3, l_in_scale4]
+
+    l_conv1 = layers.Conv2DLayer(
+           l_in_scale1,
+           num_filters=nb_filters,
+           filter_size=(2, 2),
+           stride=2,
+           nonlinearity=rectify,
+           W=init.GlorotUniform(),
+           name='conv1')
+    l_conv2 = layers.Conv2DLayer(
+           l_conv1,
+           num_filters=nb_filters,
+           filter_size=(2, 2),
+           stride=2,
+           nonlinearity=rectify,
+           W=init.GlorotUniform(),
+           name='conv2')
+    l_conv3 = layers.Conv2DLayer(
+           l_conv2,
+           num_filters=nb_filters,
+           filter_size=(2, 2),
+           stride=2,
+           nonlinearity=rectify,
+           W=init.GlorotUniform(),
+           name='conv3')
+    encoder = [l_conv1, l_conv2, l_conv3]
+    l_scale4_output = layers.Conv2DLayer(
+        l_conv3,
+        num_filters=c,
+        filter_size=(3, 3),
+        pad=1,
+        nonlinearity=sigmoid,
+        W=init.GlorotUniform(),
+        name='scale4_output',
+    )
+    l_scale4_up = Deconv2DLayer(
+        l_scale4_output,
+        num_filters=c,
+        filter_size=(2, 2),
+        stride=2,
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name='unconv4_up',
+    )
+    l_scale3_prep = layers.ConcatLayer([sparse(l_in_scale3), l_scale4_up], axis=1)
+    #l_scale3_prep = l_scale4_up
+    l_scale3_output = layers.Conv2DLayer(
+        l_scale3_prep,
+        num_filters=c,
+        filter_size=(3, 3),
+        pad=1,
+        nonlinearity=sigmoid,
+        W=init.GlorotUniform(),
+        name='scale3_output')
+
+    l_scale3_up = Deconv2DLayer(
+        l_scale3_output,
+        num_filters=c,
+        filter_size=(2, 2),
+        stride=2,
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name='unconv3_up',
+    )
+    l_scale2_prep = layers.ConcatLayer([sparse(l_in_scale2), l_scale3_up], axis=1)
+    #l_scale2_prep = l_scale3_up
+    l_scale2_output = layers.Conv2DLayer(
+        l_scale2_prep,
+        num_filters=c,
+        filter_size=(3, 3),
+        pad=1,
+        nonlinearity=sigmoid,
+        W=init.GlorotUniform(),
+        name='scale2_output')
+
+    l_scale2_up = Deconv2DLayer(
+        l_scale2_output,
+        num_filters=c,
+        filter_size=(2, 2),
+        stride=2,
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name='unconv2_up',
+    )
+    l_scale1_prep = layers.ConcatLayer([sparse(l_in_scale1), l_scale2_up], axis=1)
+    #l_scale1_prep = l_scale2_up
+    l_scale1_output = layers.Conv2DLayer(
+        l_scale1_prep,
+        num_filters=c,
+        filter_size=(3, 3),
+        pad=1,
+        nonlinearity=sigmoid,
+        W=init.GlorotUniform(),
+        name='scale1_output')
+    outputs = [l_scale1_output, l_scale2_output, l_scale3_output, l_scale4_output]
+    return layers_from_list_to_dict(inputs + encoder + outputs)
+
+
+def model53(nb_filters=64, w=32, h=32, c=1, sparsity=True):
+    """
+    Pyramidal auto-encoder
+    """
+    l_in = layers.InputLayer((None, c, w/8, h/8), name="input")
+    l_deconv1 = Deconv2DLayer(
+        l_in,
+        num_filters=nb_filters,
+        filter_size=(2, 2),
+        stride=2,
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name='unconv4_up',
+    )
+    l_deconv2 = Deconv2DLayer(
+        l_deconv1,
+        num_filters=nb_filters,
+        filter_size=(2, 2),
+        stride=2,
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name='unconv4_up')
+
+    l_deconv3 = Deconv2DLayer(
+        l_deconv2,
+        num_filters=nb_filters,
+        filter_size=(2, 2),
+        stride=2,
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name='unconv4_up')
+    l_output = layers.Conv2DLayer(
+        l_deconv3,
+        num_filters=c,
+        filter_size=(3, 3),
+        pad=1,
+        nonlinearity=sigmoid,
+        W=init.GlorotUniform(),
+        name="output"
+    )
+    return layers_from_list_to_dict([l_in, l_deconv1, l_deconv2, l_deconv3, l_output])
+
+
+def model54(nb_filters=64, w=32, h=32, c=1, sparsity=True):
+    """
+    Pyramidal auto-encoder
+    """
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_in_rescaled = layers.Pool2DLayer(l_in, (8, 8), mode='average_exc_pad')
+    l_deconv1 = Deconv2DLayer(
+        l_in_rescaled,
+        num_filters=nb_filters,
+        filter_size=(2, 2),
+        stride=2,
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name='unconv4_up',
+    )
+    l_deconv2 = Deconv2DLayer(
+        l_deconv1,
+        num_filters=nb_filters,
+        filter_size=(2, 2),
+        stride=2,
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name='unconv4_up')
+
+    l_deconv3 = Deconv2DLayer(
+        l_deconv2,
+        num_filters=nb_filters,
+        filter_size=(2, 2),
+        stride=2,
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name='unconv4_up')
+    l_pre_output = layers.Conv2DLayer(
+        l_deconv3,
+
+    )
+    l_output = layers.Conv2DLayer(
+        l_deconv3,
+        num_filters=c,
+        filter_size=(3, 3),
+        pad=1,
+        nonlinearity=sigmoid,
+        W=init.GlorotUniform(),
+        name="output"
+    )
+    return layers_from_list_to_dict([l_in, l_deconv1, l_deconv2, l_deconv3, l_output])
+
+
+def model55(nb_filters=64,  w=32, h=32, c=1,
+            use_wta_channel=True,
+            use_wta_spatial=True,
+            nb_filters_mul=1,
+            wta_channel_stride=2,
+            nb_layers=3,
+            filter_size=5):
+    """
+    model8 but parametrized
+    """
+    if type(nb_filters) == int:
+        nb_filters = [nb_filters] * nb_layers
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_convs = []
+    l_conv = l_in
+    for i in range(nb_layers):
+        l_conv = layers.Conv2DLayer(
+                l_conv,
+                num_filters=nb_filters[i] * nb_filters_mul**i,
+                filter_size=(filter_size, filter_size),
+                nonlinearity=rectify,
+                W=init.GlorotUniform(),
+                name="conv{}".format(i + 1))
+        l_convs.append(l_conv)
+
+    if use_wta_spatial is True:
+        l_wta1 = layers.NonlinearityLayer(l_conv, wta_spatial, name="wta_spatial")
+    else:
+        l_wta1 = l_conv
+    if use_wta_channel is True:
+        l_wta2 = layers.NonlinearityLayer(l_wta1, wta_channel_strided(stride=wta_channel_stride), name="wta_channel")
+    else:
+        l_wta2 = l_wta1
+
+    w_out = l_conv.output_shape[2]
+    w_remaining = w - w_out + 1
+    print(w_remaining)
+    l_unconv = layers.Conv2DLayer(
+            l_wta2,
+            num_filters=c,
+            filter_size=(w_remaining, w_remaining),
+            nonlinearity=linear,
+            W=init.GlorotUniform(),
+            pad='full',
+            name='unconv')
+    l_out = layers.NonlinearityLayer(
+            l_unconv,
+            sigmoid, name="output")
+    print(l_out.output_shape)
+    return layers_from_list_to_dict([l_in] + l_convs + [l_wta1, l_wta2, l_unconv, l_out])
 
 build_convnet_simple = model1
 build_convnet_simple_2 = model2

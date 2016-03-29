@@ -1,0 +1,7 @@
+{
+    "denoise": 0.5,
+    "noise": "salt_and_pepper",
+    "walkback": 1,
+    "autoencoding_loss": "cross_entropy",
+    "binarize_thresh": 0.5
+}
