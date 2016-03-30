@@ -6,17 +6,19 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--nb', default=1, type=int, required=False)
+    parser.add_argument('--expr', default='jobs/available/**/*', type=str, required=False)
     parser.add_argument('-l', '--list', nargs='+', required=False)
     parser.add_argument('-f', '--force', type=bool, required=False)
     args = parser.parse_args()
     nb = args.nb
+    expr = args.expr
     force = args.force
     l = args.list
 
     if l is not None:
         jobs = l
     else:
-        jobs = glob.glob("jobs/available/*")
+        jobs = glob.glob(args.expr)
         jobs = jobs[0:nb]
     print("Number of jobs to run : {}".format(nb))
     print(jobs)

@@ -40,12 +40,13 @@ def build_cmd(model_name="model8", dataset="digits", params=None, prefix=None, b
     )
     return cmd
 
-def job_write(id_, cmd):
+
+def job_write(id_, cmd, where=""):
     name_finished = "jobs/finished/{}".format(id_)
     if os.path.exists(name_finished):
         print("Job {} already done".format(id_))
         return
-    name = "jobs/available/{}".format(id_)
+    name = "jobs/available/{}/{}".format(where, id_)
     with open(name, "w")  as fd:
         fd.write(cmd)
 
@@ -186,6 +187,6 @@ if __name__ == "__main__":
             s = summarize(p)
             cmd = build_cmd(model_name="model56", dataset="digits", params=p, budget_hours=24)
             print(cmd)
-            #job_write(s, cmd)
+            job_write(s, cmd, where="jobset2")
     #jobset1()
     jobset2()
