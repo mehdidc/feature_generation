@@ -40,6 +40,14 @@ def wta_lifetime(percent):
     return apply_
 
 
+def wta_fc_lifetime(percent):
+    def apply_(X):
+        idx = (1 - percent) * X.shape[0] - 1
+        mask = T.argsort(X, axis=0) >= idx  # (B, F)
+        return X * mask
+    return apply_
+
+
 def wta_channel(X):
     mask = equals_(X, T.max(X, axis=1, keepdims=True)) * 1
     return X * mask

@@ -11,7 +11,7 @@ from collections import OrderedDict
 import theano.tensor as T
 import model
 import theano
-
+from datetime import datetime
 from lasagne import updates
 from lasagnekit.easy import (
     make_batch_optimizer, InputOutputMapping,
@@ -43,6 +43,7 @@ def mkdir_path(path):
 @task
 def train(dataset="digits", prefix="",
           model_name="model8",
+          budget_hours=np.inf,
           force_w=None, force_h=None,
           params=None):
     import json
@@ -122,6 +123,7 @@ def train(dataset="digits", prefix="",
     logger.info("Compiling the model...")
     capsule = build_capsule_(layers, data, nbl, nbc,
                              report_event, prefix=prefix,
+                             budget_hours=float(budget_hours),
                              **params)
     info["stats"] = capsule.batch_optimizer.stats
     # info["optimization"] = capsule.batch_optimizer.optim_params
@@ -149,6 +151,7 @@ def train(dataset="digits", prefix="",
 def build_capsule_(layers, data, nbl, nbc,
                    report_event=None,
                    prefix="",
+                   budget_hours=np.inf,
                    compile_="all",
                    **train_params):
     batch_size = train_params.get("batch_size", 128)
@@ -318,7 +321,10 @@ def build_capsule_(layers, data, nbl, nbc,
 
         report_event(status)
 
+    begin = datetime.now()
+    budget_sec = budget_hours * 3600
     # called each epoch for monitoring
+
     def update_status(self, status):
         t = status["epoch"]
         cur_lr = lr.get_value()
@@ -368,6 +374,10 @@ def build_capsule_(layers, data, nbl, nbc,
         # and how features look like
         if t % N == 0:
             report(status)
+
+        if (datetime.now() - begin).total_seconds() >= budget_sec:
+            logger.info("Budget finished.quit.")
+            raise KeyboardInterrupt("Budget finished.quit.")
 
         return status
 
