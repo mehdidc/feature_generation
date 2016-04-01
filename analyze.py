@@ -5,6 +5,7 @@ import theano
 from lasagne import layers as L
 import numpy as np
 import sys
+import os
 from skimage.filters import threshold_otsu, rank
 import logging
 from helpers import mkdir_path
@@ -359,7 +360,11 @@ def clusterfinder(capsule, data, layers, w, h, c, **params):
         #    plt.scatter(code_2d[categories==-cl, 0], code_2d[categories==-cl, 1], c='')
 
     return ret
-def simple_genetic(capsule, data, layers, w, h, c, **params):
+def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
+
+    from skimage.io import imsave
+
+    print(params)
     op_params = params.get("op_params", [{"nb": 100}])
     op_names = params.get("op_names", ["mutation"])
     flatten  = params.get("flatten", False)
@@ -382,9 +387,16 @@ def simple_genetic(capsule, data, layers, w, h, c, **params):
             f = op_func(f, **op_param)
         return f
 
-    layer_name = params.get("layer_name", "conv3")
-
-    out = params.get("out", "out.png")
+    layer_name = params.get("layer_name", "input")
+    tol = params.get("tol", 0)
+    mkdir_path(folder)
+    logger.info("Folder : {}".format(folder))
+    iterations_folder = os.path.join(folder, "iterations")
+    mkdir_path(iterations_folder)
+    final_folder = os.path.join(folder, "final")
+    mkdir_path(final_folder)
+    csv_folder = os.path.join(folder, "csv")
+    mkdir_path(csv_folder)
 
     x = T.tensor4()
 
@@ -398,25 +410,72 @@ def simple_genetic(capsule, data, layers, w, h, c, **params):
         [x],
         L.get_output(layers["output"], {layers[layer_name]: x}))
 
-    logger.info("Applying genetic op:")
 
-
-    initial = params.get("initial_source", "dataset")
+    initial = params.get("initial", "dataset")
     initial_size = params.get("initial_size", 1)
 
     if initial == "dataset":
         px_batch = []
-        for i in range(initial_size):
+        for i in range(initial_size / data.X.shape[0] + data.X.shape[0]):
             data.load()
             shape = (data.X.shape[0], c, w, h)
             px_batch.append(data.X.reshape(shape))
         px = np.concatenate(px_batch, axis=0)
+        px = px[0:initial_size]
     elif initial == "random":
-        shape = (data.X.shape[0] * initial_size, c, w, h)
-        px = np.random.uniform(size=shape)
+        shape = (initial_size, c, w, h)
+        px = np.random.uniform(0, 1, size=shape)
         px = px.astype(np.float32)
+    up_binarize = params.get("up_binarize")
+    down_binarize = params.get("down_binarize")
+    nb_iterations = params.get("nb_iterations", 1)
+    evals = []
 
-    for i in range(params.get("nb_iterations", 1)):
+    rec_error = None
+
+    def save_samples(px, i, rec_error):
+        filename = os.path.join(iterations_folder, "{:04d}.png".format(i))
+        if c == 1:
+            from lasagnekit.misc.plot_weights import tile_raster_images
+            px_ = px[:, 0, :, :]
+            if params.get("sort", True) is True:
+                sorting = np.argsort(rec_error)
+                px_ = px_[sorting]
+            print(px_.shape)
+            nb_samples = px_.shape[0]
+            size = int(np.sqrt(nb_samples))
+            img = tile_raster_images(
+                px_,
+                img_shape=(w, h),
+                tile_shape=(size, size),
+                tile_spacing=(2, 2),
+                scale_rows_to_unit_interval=True,
+                output_pixel_vals=False)
+            imsave(filename, img)
+        else:
+            pass # next time
+
+    for i in range(nb_iterations + 1):
+        logger.info("Iteration {}".format(i))
+
+        px_rec = capsule.reconstruct(px)
+        if up_binarize:
+            px_rec = 1. * (px_rec > up_binarize)
+        rec_error = ((px_rec  - px) ** 2).sum(axis=(1, 2, 3))
+        evals.append(rec_error.tolist())
+        logger.info("reconstruction error : {}".format(rec_error.mean()))
+
+        save_samples(px, i, rec_error)
+        if i > 0 and rec_error.sum() <= tol:
+            break
+        if i == nb_iterations:
+            break
+        # binarize
+        if down_binarize:
+            px = 1. * (px > down_binarize)
+            px = px.astype(np.float32)
+
+        # transform
         code = px_to_code(px)
 
         if flatten:
@@ -432,32 +491,81 @@ def simple_genetic(capsule, data, layers, w, h, c, **params):
             new_px = new_code
         else:
             new_px = code_to_px(new_code)
+        # binarize
+        if up_binarize:
+            new_px = 1. * (new_px > up_binarize)
+            new_px = new_px.astype(np.float32)
+
         px = new_px
-    if params.get("filter", False):
-        from sklearn.svm import OneClassSVM
-        m = OneClassSVM(verbose=1, nu=0.9)
-        new_code = px_to_code(new_px)
-        D = np.concatenate((new_code, code), axis=0)
-        D = D.reshape((D.shape[0], -1))
-        m.fit(D)
-        is_novel = (m.predict(D) == 1)
-        is_novel = is_novel[0:len(new_code)]
-        logger.info("Ratio of novel : {}".format(is_novel.sum()/float(len(is_novel))))
-        new_px = new_px[is_novel]
 
-    logger.info("Saving image...")
-
-    if c == 1:
-        from lasagnekit.misc.plot_weights import tile_raster_images
-        from skimage.io import imsave
-        new_px = new_px[:, 0, :, :]
-        nb_samples = new_px.shape[0]
-        size = int(np.sqrt(nb_samples))
-        img = tile_raster_images(new_px, img_shape=(w, h), tile_shape=(size, size), tile_spacing=(2, 2))
-        imsave(out, img)
+    # save the resuling images
+    px_ = px[:, 0, :, :]
+    if params.get("sort", True) is True:
+        sorting = np.argsort(rec_error)
+        px_ = px_[sorting]
     else:
-        pass # next time
+        px_ = px
+    for i in range(px_.shape[0]):
+        x = px_[i]
+        filename = os.path.join(final_folder, "{:06d}.png".format(i))
+        if c == 1:
+            imsave(filename, x)
+        else:
+            pass
 
+    # save csv
+    evals = np.array(evals)
+    filename = os.path.join(csv_folder, "iterations.csv")
+    np.savetxt(filename, np.mean(evals, axis=1))
+    filename = os.path.join(csv_folder, "last.csv")
+    np.savetxt(filename, evals[-1][np.argsort(evals[-1])])
+
+    #counting fixed points
+    import hashlib
+    from collections import Counter
+    def hash_binary_vector(x):
+        m = hashlib.md5()
+        ss = str(x.flatten().tolist())
+        m.update(ss)
+        return m.hexdigest()
+    def hash_matrix(X):
+        hashes = []
+        for i in range(X.shape[0]):
+            h = hash_binary_vector(X[i])
+            hashes.append(h)
+        return hashes
+
+    #thresh = params.get("fixed_point_counting_thresh", 0.5)
+    hm = hash_matrix(px)
+    filename = os.path.join(csv_folder, "hashmatrix")
+    np.save(filename, np.array(hm))
+    cnt = Counter(hm)
+    V = sorted(cnt.values(), reverse=True)
+    V = np.array(V)
+    fig = plt.figure(figsize=(15, 15))
+    plt.bar(np.arange(len(V)), V)
+    #plt.hist(V)
+    plt.ylabel("frequency")
+    plt.xlabel("fixed point")
+    plt.legend()
+    plt.xlim((0, len(cnt)))
+    plt.title("Frequency of fixed points")
+    filename = os.path.join(csv_folder, "fixedpointshistogram.png")
+    plt.savefig(filename)
+    plt.close(fig)
+
+    fig = plt.figure(figsize=(15, 15))
+    plt.bar(np.arange(len(V)), V)
+    #plt.hist(V)
+    plt.ylabel("frequency")
+    plt.xlabel("fixed point")
+    plt.legend()
+    plt.yscale('log')
+    plt.xlim((0, len(cnt)))
+    plt.title("Frequency of fixed points")
+    filename = os.path.join(csv_folder, "fixedpointshistogram_ylog.png")
+    plt.savefig(filename)
+    plt.close(fig)
 
 
 def genetic(capsule, data, layers, w, h, c,

@@ -35,15 +35,48 @@ handler = logging.StreamHandler(stream=sys.stdout)
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
+from lightjob.cli import get_dotfolder
+from lightjob.db import DB, SUCCESS, RUNNING, AVAILABLE, ERROR
+
+
+folder = get_dotfolder()
+db = DB()
+db.load(folder)
+
 
 def mkdir_path(path):
     if not os.access(path, os.F_OK):
         os.makedirs(path)
 
+def dict_reader(params):
+    if type(params) == dict:
+        pass
+    else:
+        if params is None:
+            params = {}
+        elif params.endswith(".json"):
+            params = json.load(open(params))
+        else:
+            job = db.get_job_by_summary(params)
+            assert job, "Job does not exist : {}".format(params)
+            params = job['content']['check']['params']
+            assert params is not None
+    return params
+
+
+def list_dict_reader(params):
+    if type(params) == list:
+        return params
+    else:
+        params = dict_reader(params)
+        return [params]
+
+
 @task
 def train(dataset="digits", prefix="",
           model_name="model8",
           budget_hours=np.inf,
+          update_db=None,
           force_w=None, force_h=None,
           params=None):
     import json
@@ -56,9 +89,18 @@ def train(dataset="digits", prefix="",
     else:
         if params is None:
             params = {}
-        else:
+        elif params.endswith(".json"):
             params = json.load(open(params))
+        else:
+            job_summary = params
+            job = db.get_job_by_summary(params)
+            assert job, "Job does not exist : {}".format(params)
+            params = job['content']
+            assert params is not None
     params["job_id"] = os.getenv("SLURM_JOBID")
+    if update_db:
+        assert db.get_state_of(job_summary) == RUNNING
+        db.job_update(job_summary, {'slurm_job_id': os.getenv('SLURM_JOBID')})
     if force_w is not None:
         w = int(force_w)
     else:
@@ -123,7 +165,6 @@ def train(dataset="digits", prefix="",
     logger.info("Compiling the model...")
     capsule = build_capsule_(layers, data, nbl, nbc,
                              report_event, prefix=prefix,
-                             budget_hours=float(budget_hours),
                              **params)
     info["stats"] = capsule.batch_optimizer.stats
     # info["optimization"] = capsule.batch_optimizer.optim_params
@@ -143,9 +184,16 @@ def train(dataset="digits", prefix="",
     except KeyboardInterrupt:
         print("keyboard interrupt.")
         pass
+    except Exception:
+        if update_db:
+            db.modify_state_of(job_summary, ERROR)
+        raise
     print(capsule.__dict__.keys())
     # save model and report at the end
     capsule.report(capsule.batch_optimizer.stats[-1])
+    print("Ok finished training")
+    if update_db:
+        db.modify_state_of(job_summary, SUCCESS)
 
 
 def build_capsule_(layers, data, nbl, nbc,
@@ -428,6 +476,7 @@ def build_capsule_(layers, data, nbl, nbc,
 
     def noisify(X):
         pr = float(denoise)
+        noise = train_params.get("noise", "zero_masking")
         if noise == "salt_and_pepper":
             Xtilde = salt_and_pepper(X, corruption_level=pr, rng=theano_rng, backend='theano')
         elif noise == "zero_masking":
@@ -496,13 +545,14 @@ def build_capsule_(layers, data, nbl, nbc,
                         hid = hid.dimshuffle(0, 'x', 1)
                         W = layer.W.dimshuffle('x', 0, 1)
                         if train_params.get("marginalized", False) is True:
-                            coefs = (W**2).sum(axis=(0, 1))
+                            coefs = 0.5 * (W**2).sum(axis=(0, 1)) #equation 7 in marginalized denoising auto-encoders
                             coefs = coefs.dimshuffle('x', 0)
                         else:
                             coefs = 1
-                        loss += contcoef * (coefs * ((hid * (1 - hid) * W)**2)).sum() / hid.shape[0]
+                        J = ((hid * (1 - hid) * W)**2)
+                        loss += contcoef * (coefs * J).sum() / hid.shape[0]
                     else:
-                        raise Exception("unknown nonlinearity")
+                        print("Unknown nonlinearity, do not contract")
         if train_params.get("ladder", False) is True:
             lambda_ = train_params.get("lambda", 0.1)
             for layername in layers.keys():
@@ -563,7 +613,6 @@ def build_capsule_(layers, data, nbl, nbc,
     elif compile_ == "none":
         pass
     capsule.report = report
-    print("Ok finished")
     return capsule
 
 
@@ -575,6 +624,8 @@ def check(filename="out.pkl",
           force_w=None,
           force_h=None,
           params=None,
+          folder=None,
+          update_db=None,
           batch_size=128,
           kw_load_data=None):
     import json
@@ -602,11 +653,24 @@ def check(filename="out.pkl",
             **model_params)
     if type(params) == list:
         pass
+    elif type(params) == dict:
+        params = [params]
+    elif params is None:
+            params = {}
+    elif params.endswith(".json"):
+            params = json.load(open(params))
     else:
-        if params is None:
-            params = [{}]
-        else:
-            params = [json.load(open(params))]
+        job_summary = params
+        job = db.get_job_by_summary(params)
+        assert job, "Job does not exist : {}".format(params)
+        params = job['content']['check']['params']
+        assert params is not None
+        print(params)
+        params = [params]
+
+    if update_db:
+        assert db.get_state_of(job_summary) == RUNNING
+        db.job_update(job_summary, {'slurm_job_id': os.getenv('SLURM_JOBID')})
 
     assert hasattr(analyze, what)
     func = getattr(analyze, what)
@@ -616,12 +680,19 @@ def check(filename="out.pkl",
             state = p.get("seed", 2)
             np.random.seed(state)
             p["seed"] = state
-            ret = func(capsule, data, layers, w, h, c, **p)
+            ret = func(capsule, data, layers, w, h, c, folder, **p)
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             #traceback.print_tb(exc_traceback, limit=4, file=sys.stdout)
             traceback.print_exception(exc_type, exc_value, exc_traceback,
                                       limit=5, file=sys.stdout)
+            if update_db:
+                db.modify_state_of(job_summary, ERROR)
+                return None
+
+    if update_db:
+        db.modify_state_of(job_summary, SUCCESS)
+
     return ret
 
 

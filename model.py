@@ -3035,6 +3035,36 @@ def model56(nb_filters=64, w=32, h=32, c=1,
     print(l_out.output_shape)
     return layers_from_list_to_dict([l_in] + hids + [l_pre_out, l_out])
 
+def model57(nb_filters=64, w=32, h=32, c=1,
+            use_wta_lifetime=True,
+            wta_lifetime_perc=0.1,
+            nb_hidden_units=1000,
+            tied=False):
+    """
+    Generalization of "Generalized Denoising Auto-Encoders as Generative
+    Models"
+    """
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    hids = []
+    l_hid = layers.DenseLayer(
+        l_in,
+        nb_hidden_units,
+        nonlinearity=sigmoid,
+        name="hid")
+    hids.append(l_hid)
+    if use_wta_lifetime is True:
+        l_hid = layers.NonlinearityLayer(l_hid, wta_fc_lifetime(wta_lifetime_perc), name="hid_sparse")
+        hids.append(l_hid)
+    if tied:
+        W = hids[0].W.T
+    else:
+        W = init.GlorotUniform()
+    l_pre_out = layers.DenseLayer(l_hid, num_units=c*w*h, W=W, nonlinearity=linear, name="pre_output")
+    l_out = layers.NonlinearityLayer(l_pre_out, sigmoid, name="output")
+    l_out = layers.ReshapeLayer(l_out, ([0], c, w, h), name="output")
+    print(l_out.output_shape)
+    return layers_from_list_to_dict([l_in] + hids + [l_pre_out, l_out])
+
 
 build_convnet_simple = model1
 build_convnet_simple_2 = model2
