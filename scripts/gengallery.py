@@ -1,18 +1,57 @@
 import os
 import json
 from collections import defaultdict
+import os
+import pandas as pd
+import matplotlib as mpl
+if os.getenv("DISPLAY") is None:  # NOQA
+    mpl.use('Agg')  # NOQA
 
 
 def mkdir_path(path):
     if not os.access(path, os.F_OK):
         os.makedirs(path)
 
+def loglogplot(hash_matrix, filename):
+    from collections import Counter
+    import matplotlib.pyplot as plt
+   hm = hash_matrix
+    cnt = Counter(hm)
+    V = sorted(cnt.values(), reverse=True)
+    V = np.array(V)
+    fig = plt.figure(figsize=(15, 15))
+    plt.bar(np.arange(len(V)), V)
+    plt.ylabel("frequency")
+    plt.xlabel("fixed point")
+    plt.legend()
+    plt.xlim((0, len(cnt)))
+    plt.title("Frequency of fixed points")
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.savefig(filename)
+    plt.close(fig)
+
+
+def get_powerlaw_exponent(hash_matrix):
+    from collections import Counter
+    import powerlaw
+    hm = hash_matrix
+    cnt = Counter(hm)
+
+    s = np.argsort(cnt.values())[::-1]
+
+    K = cnt.keys()
+    K = [K[s[i]] for i in range(len(K))]
+    K_to_int = {k: i + 1 for i, k in enumerate(K)}
+    x = [K_to_int[v] for v in hm]
+    results = powerlaw.Fit(x)
+    return results.alpha, results.xmin, results.pdf()
 
 if __name__ == "__main__":
     from lightjob.db import DB, SUCCESS, RUNNING, AVAILABLE, ERROR
     from lightjob.cli import get_dotfolder
     import subprocess
-
+    import numpy as np
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, required=True)
@@ -41,11 +80,15 @@ if __name__ == "__main__":
                          os.listdir(os.path.join(folder, "iterations")))
         iteration = max(iterations)
         img_filename = os.path.join(folder, "iterations", "{:04d}.png".format(iteration))
-        freq_filename = os.path.join(folder, "csv", "fixedpointshistogram_ylog.png")
+        freq_filename = os.path.join(folder, "csv", "fixedpointshistogram_xlog_ylog.png")
         if not os.path.exists(img_filename):
             continue
-        if not os.path.exists(freq_filename):
-            continue
+        if not os.path.exists(freq_filename) or True:
+            hash_matrix_filename = os.path.join(folder, "csv", "hashmatrix.npy")
+            print(hash_matrix_filename)
+            hash_matrix = np.load(hash_matrix_filename)
+            alpha, xmin, pdf = get_powerlaw_exponent(hash_matrix)
+            loglogplot(hash_matrix, freq_filename)
         freqs.append(freq_filename)
         images.append(img_filename)
         #c = json.dumps(model_details, indent=4)
@@ -98,7 +141,8 @@ if __name__ == "__main__":
         cur_images = ["\( {} -set label '{}' \)".format(img, caption) for img, caption in zip(cur_images, captions)]
         cur_images = " ".join(cur_images)
         out = os.path.join(out_folder, model_name, "generated", "page{:04d}".format(pg))
-        cmd = "montage {} -tile x4 -geometry {}x{}+50+1 {}.png".format(cur_images, w, h, out)
+        cmd = "montage {} -tile 4x -geometry {}x{}+50+1 {}.png".format(cur_images, w, h, out)
+        print(cmd)
         subprocess.call(cmd, shell=True)
 
         cur_freqs = freqs[first:last]
@@ -107,13 +151,14 @@ if __name__ == "__main__":
         cur_images = ["\( {} -set label '{}' \)".format(img, caption) for img, caption in zip(cur_freqs, captions)]
         cur_images = " ".join(cur_images)
         out = os.path.join(out_folder, model_name, "freqs", "page{:04d}".format(pg))
-        cmd = "montage {} -tile x4 -geometry {}x{} {}.png".format(cur_images, w, h, out)
+        cmd = "montage {} -tile 4x -geometry {}x{} {}.png".format(cur_images, w, h, out)
+        print(cmd)
         subprocess.call(cmd, shell=True)
 
-    save_imgs(0, nb, pg=0)
+    #save_imgs(0, nb, pg=0)
     while first < nb:
         print("page {}".format(pg))
         last = first + per_page
-        save_imgs(first, last)
+        save_imgs(first, last, pg=pg)
         pg += 1
         first = last

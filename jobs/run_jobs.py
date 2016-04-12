@@ -1,4 +1,5 @@
 import subprocess
+import time
 
 if __name__ == "__main__":
     import argparse
@@ -43,3 +44,4 @@ if __name__ == "__main__":
         print(cmd)
         db.modify_state_of(j['summary'], RUNNING)
         subprocess.call(cmd, shell=True)
+        time.sleep(1)

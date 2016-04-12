@@ -37,7 +37,6 @@ if __name__ == "__main__":
 	nb_runs = args.nb_runs
 	initial_source = args.initial_source
 
-
 	for i in range(nb_runs):
 		seed = np.random.randint(0,999999999)
 		print(seed)

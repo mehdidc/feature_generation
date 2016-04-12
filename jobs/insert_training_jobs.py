@@ -271,17 +271,15 @@ if __name__ == "__main__":
         return nb
     nb = 0
     #nb += test()
-    #nb += jobset1()
+    nb += jobset1()
     #nb += jobset2()
     #nb += jobset3()
 
-    """
     from tinydb import Query
     Job = Query()
     def op(el):
         el['type'] = 'training'
         print(el.keys())
         return el
-    db.jobs.update(op, Job.where=="jobset2")
-    """
+    db.jobs.update(op, Job.where=="jobset1")
     print("Total number of jobs added : {}".format(nb))

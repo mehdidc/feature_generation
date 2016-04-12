@@ -1,8 +1,0 @@
-#!/bin/bash
-#SBATCH -N 1
-#SBATCH -n 8
-#SBATCH --gres=gpu:1
-#SBATCH --time=24:15:00
-export THEANO_FLAGS="device=gpu"
-echo $*
-$*

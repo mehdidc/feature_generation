@@ -58,15 +58,15 @@ if __name__ == "__main__":
         print(seed)
         name = "exp{}".format(fitness_name)
         folder = "answers/{}_multipleruns/{}_{}_{}_{}_{}_{}_{}_{}/run{}".format(args.model,
-                                                                             fitness_name,
-                                                                             layer_name,
-                                                                             initial_source,
-                                                                             "sel" if sel==1 else "nosel",
-                                                                             "cv" if cv==1 else "nocv",
-                                                                             "mut" if mut==1 else "nomut",
-                                                                              perc,
-                                                                              "sort" if sort==1 else "nosort",
-                                                                              i + 1)
+                                                                                fitness_name,
+                                                                                layer_name,
+                                                                                initial_source,
+                                                                               "sel" if sel==1 else "nosel",
+                                                                               "cv" if cv==1 else "nocv",
+                                                                               "mut" if mut==1 else "nomut",
+                                                                                perc,
+                                                                                "sort" if sort==1 else "nosort",
+                                                                                i + 1)
         mkdir_path(folder)
         params = {
             "save_all": True,

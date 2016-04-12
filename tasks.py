@@ -39,37 +39,11 @@ from lightjob.cli import get_dotfolder
 from lightjob.db import DB, SUCCESS, RUNNING, AVAILABLE, ERROR
 
 
-folder = get_dotfolder()
-db = DB()
-db.load(folder)
-
+db_folder = get_dotfolder()
 
 def mkdir_path(path):
     if not os.access(path, os.F_OK):
         os.makedirs(path)
-
-def dict_reader(params):
-    if type(params) == dict:
-        pass
-    else:
-        if params is None:
-            params = {}
-        elif params.endswith(".json"):
-            params = json.load(open(params))
-        else:
-            job = db.get_job_by_summary(params)
-            assert job, "Job does not exist : {}".format(params)
-            params = job['content']['check']['params']
-            assert params is not None
-    return params
-
-
-def list_dict_reader(params):
-    if type(params) == list:
-        return params
-    else:
-        params = dict_reader(params)
-        return [params]
 
 
 @task
@@ -92,15 +66,21 @@ def train(dataset="digits", prefix="",
         elif params.endswith(".json"):
             params = json.load(open(params))
         else:
+            db = DB()
+            db.load(db_folder)
             job_summary = params
             job = db.get_job_by_summary(params)
+            db.close()
             assert job, "Job does not exist : {}".format(params)
             params = job['content']
             assert params is not None
     params["job_id"] = os.getenv("SLURM_JOBID")
     if update_db:
+        db = DB()
+        db.load(db_folder)
         assert db.get_state_of(job_summary) == RUNNING
         db.job_update(job_summary, {'slurm_job_id': os.getenv('SLURM_JOBID')})
+        db.close()
     if force_w is not None:
         w = int(force_w)
     else:
@@ -186,14 +166,20 @@ def train(dataset="digits", prefix="",
         pass
     except Exception:
         if update_db:
+            db = DB()
+            db.load(db_folder)
             db.modify_state_of(job_summary, ERROR)
+            db.close()
         raise
     print(capsule.__dict__.keys())
     # save model and report at the end
     capsule.report(capsule.batch_optimizer.stats[-1])
     print("Ok finished training")
     if update_db:
+        db = DB()
+        db.load(db_folder)
         db.modify_state_of(job_summary, SUCCESS)
+        db.close()
 
 
 def build_capsule_(layers, data, nbl, nbc,
@@ -661,7 +647,10 @@ def check(filename="out.pkl",
             params = json.load(open(params))
     else:
         job_summary = params
+        db = DB()
+        db.load(db_folder)
         job = db.get_job_by_summary(params)
+        db.close()
         assert job, "Job does not exist : {}".format(params)
         params = job['content']['check']['params']
         assert params is not None
@@ -669,8 +658,14 @@ def check(filename="out.pkl",
         params = [params]
 
     if update_db:
-        assert db.get_state_of(job_summary) == RUNNING
+        db = DB()
+        db.load(db_folder)
+        if db.get_state_of(job_summary) != RUNNING:
+            print("Job Not on running state")
+            db.modify_state_of(job_summary, ERROR)
+            return
         db.job_update(job_summary, {'slurm_job_id': os.getenv('SLURM_JOBID')})
+        db.close()
 
     assert hasattr(analyze, what)
     func = getattr(analyze, what)
@@ -687,12 +682,17 @@ def check(filename="out.pkl",
             traceback.print_exception(exc_type, exc_value, exc_traceback,
                                       limit=5, file=sys.stdout)
             if update_db:
+                db = DB()
+                db.load(db_folder)
                 db.modify_state_of(job_summary, ERROR)
+                db.close()
                 return None
 
     if update_db:
+        db = DB()
+        db.load(db_folder)
         db.modify_state_of(job_summary, SUCCESS)
-
+        db.close()
     return ret
 
 
