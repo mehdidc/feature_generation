@@ -4,6 +4,7 @@ from collections import defaultdict
 import os
 import pandas as pd
 import matplotlib as mpl
+import glob
 if os.getenv("DISPLAY") is None:  # NOQA
     mpl.use('Agg')  # NOQA
 
@@ -56,11 +57,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, required=True)
     parser.add_argument('--folder', type=str, default='gallery')
-    parser.add_argument('--nbpages', type=int, default=3, required=False)
+    parser.add_argument('--nbpages', type=int, default=1, required=False)
+    parser.add_argument('--limit', type=int, default=None, required=False)
     args = parser.parse_args()
     out_folder = args.folder
     nbpages = args.nbpages
-
+    limit = args.limit
     folder = get_dotfolder()
     db = DB()
     db.load(folder)
@@ -79,11 +81,23 @@ if __name__ == "__main__":
         iterations = map(lambda name: int(name.split(".")[0]),
                          os.listdir(os.path.join(folder, "iterations")))
         iteration = max(iterations)
-        img_filename = os.path.join(folder, "iterations", "{:04d}.png".format(iteration))
+        if limit is None:
+            img_filename = os.path.join(folder, "iterations", "{:04d}.png".format(iteration))
+        else:
+            filenames = glob.glob(os.path.join(folder, 'final', '*.png'))
+            filenames = sorted(filenames)
+            filenames = filenames[0:limit]
+            filenames = " ".join(filenames)
+
+            img_filename = os.path.join(folder, "final{}.png".format(limit))
+            if not os.path.exists(img_filename):
+                cmd = "montage {} -geometry +2+2 {}".format(filenames, img_filename)
+                subprocess.call(cmd, shell=True)
+
         freq_filename = os.path.join(folder, "csv", "fixedpointshistogram_xlog_ylog.png")
         if not os.path.exists(img_filename):
             continue
-        if not os.path.exists(freq_filename) or True:
+        if not os.path.exists(freq_filename):
             hash_matrix_filename = os.path.join(folder, "csv", "hashmatrix.npy")
             print(hash_matrix_filename)
             hash_matrix = np.load(hash_matrix_filename)

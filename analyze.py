@@ -461,7 +461,18 @@ def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
         for sl in iterate_minibatches(X.shape[0], size):
             r = f(X[sl])
             res.append(r)
-        return np.concatenate(r, axis=0)
+        return np.concatenate(res, axis=0)
+
+    def minibatcher2d(X, Y, f, size=128):
+        assert X.shape[0] == Y.shape[0]
+        res = []
+        for sl in iterate_minibatches(X.shape[0], size):
+            r = f(X[sl], Y[sl])
+            res.append(r)
+        return np.concatenate(res, axis=0)
+
+    def get_reconstruction_error(X, Y):
+        return ((X - Y) ** 2).sum(axis=(1, 2, 3))
 
     for i in range(nb_iterations + 1):
         logger.info("Iteration {}".format(i))
@@ -469,7 +480,7 @@ def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
         px_rec = minibatcher(px, capsule.reconstruct, size=batch_size)
         if up_binarize:
             px_rec = 1. * (px_rec > up_binarize)
-        rec_error = ((px_rec  - px) ** 2).sum(axis=(1, 2, 3))
+        rec_error = minibatcher2d(px_rec, px, get_reconstruction_error, size=batch_size)
         evals.append(rec_error.tolist())
         logger.info("reconstruction error : {}".format(rec_error.mean()))
 
