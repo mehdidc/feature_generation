@@ -429,6 +429,7 @@ def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
     up_binarize = params.get("up_binarize")
     down_binarize = params.get("down_binarize")
     nb_iterations = params.get("nb_iterations", 1)
+    batch_size = params.get("batch_size", 1024)
     evals = []
 
     rec_error = None
@@ -453,12 +454,19 @@ def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
                 output_pixel_vals=False)
             imsave(filename, img)
         else:
-            pass # next time
+            pass #next time
+    from lasagnekit.easy import iterate_minibatches
+    def minibatcher(X, f, size=128):
+        res = []
+        for sl in iterate_minibatches(X.shape[0], size):
+            r = f(X[sl])
+            res.append(r)
+        return np.concatenate(r, axis=0)
 
     for i in range(nb_iterations + 1):
         logger.info("Iteration {}".format(i))
 
-        px_rec = capsule.reconstruct(px)
+        px_rec = minibatcher(px, capsule.reconstruct, size=batch_size)
         if up_binarize:
             px_rec = 1. * (px_rec > up_binarize)
         rec_error = ((px_rec  - px) ** 2).sum(axis=(1, 2, 3))
@@ -476,7 +484,10 @@ def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
             px = px.astype(np.float32)
 
         # transform
-        code = px_to_code(px)
+        if layer_name == 'input':
+            code = px
+        else:
+            code = minibatcher(px, px_to_code, size=batch_size)
 
         if flatten:
             shape = code.shape[1:]
@@ -490,7 +501,7 @@ def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
         if layer_name == "input" and params.get("reconstruct", False) is False:
             new_px = new_code
         else:
-            new_px = code_to_px(new_code)
+            new_px = minibatcher(new_code, code_to_px, size=batch_size)
         # binarize
         if up_binarize:
             new_px = 1. * (new_px > up_binarize)

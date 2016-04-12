@@ -44,7 +44,7 @@ if __name__ == "__main__":
         cmd = "sbatch --time={time} --output={out} --error={out} {launch} invoke check --update-db=1 --what={what} --dataset={dataset} --filename={filename} --params={params} --folder={folder}"
         cmd =  cmd.format(
             time=180,
-            launch='scripts/launch_cpu',
+            launch='scripts/launch_gpu',
             out="jobs/outputs/{}".format(s),
             what=check['what'],
             dataset=check['dataset'],
@@ -52,7 +52,11 @@ if __name__ == "__main__":
             params=s,
             folder="jobs/results/{}".format(s)
         )
-        print(cmd)
+        #print(cmd)
         folder = 'jobs/generations/{}'.format(s)
         nb += db.safe_add_job(d, cmd=cmd, type="generation")
+        #if db.job_exists(d) and db.get_job_by_summary(s)['state'] != SUCCESS:
+        #    print(db.get_job_by_summary(s)['cmd'])
+        ##    db.job_update(s, dict(cmd=cmd))
+
     print("Total number of jobs added : {}".format(nb))

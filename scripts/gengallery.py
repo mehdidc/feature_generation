@@ -15,7 +15,7 @@ def mkdir_path(path):
 def loglogplot(hash_matrix, filename):
     from collections import Counter
     import matplotlib.pyplot as plt
-   hm = hash_matrix
+    hm = hash_matrix
     cnt = Counter(hm)
     V = sorted(cnt.values(), reverse=True)
     V = np.array(V)
