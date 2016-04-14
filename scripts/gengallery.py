@@ -6,10 +6,38 @@ import pandas as pd
 import matplotlib as mpl
 import glob
 from collections import Counter
+from itertools import product
+from numba import jit
 
 if os.getenv("DISPLAY") is None:  # NOQA
     mpl.use('Agg')  # NOQA
 
+def neighcorr(im, corrdata=None, pad=3):
+    assert corrdata is not None
+    i = 0
+    for x in range(pad, im.shape[0] - pad):
+        for y in range(pad, im.shape[1] - pad):
+            pxc = im[x, y]
+            ctot = 0
+            for dx, dy in product((0, 1, -1), (0, 1, -1)):
+                px = im[x+dx, y+dy]
+                c = px * pxc
+                corrdata[i] += c
+            i += 1
+
+def neighbcorr_filenames(filenames):
+    from skimage.io import imread
+    corr = []
+    corrdata = defaultdict(int)
+    for i, f in enumerate(filenames):
+        if i % 100 == 0:
+            print(i)
+        im = imread(f)
+        im = 2 * (im / im.max()) - 1
+        assert set(im.flatten().tolist()) <= set([1, -1]), set(im.flatten().tolist())
+        neighcorr(im, corrdata=corrdata, pad=3)
+    nc = np.abs(np.array(corrdata.values())).mean() / len(filenames)
+    return nc
 
 def mkdir_path(path):
     if not os.access(path, os.F_OK):
@@ -34,6 +62,17 @@ def loglogplot(hash_matrix, filename):
     plt.savefig(filename)
     plt.close(fig)
 
+def hash_matrix_to_int(hm):
+    from collections import Counter
+    cnt = Counter(hm)
+    s = np.argsort(cnt.values())[::-1]
+    K = cnt.keys()
+    K = [K[s[i]] for i in range(len(K))]
+    K_to_int = {k: i + 1 for i, k in enumerate(K)}
+    x = [K_to_int[v] for v in hm]
+    x = np.array(x)
+    return x
+
 def powerlawplot(hash_matrix, folder, force=False):
     from collections import Counter
     import powerlaw
@@ -52,7 +91,6 @@ def powerlawplot(hash_matrix, folder, force=False):
     hm = hash_matrix
     cnt = Counter(hm)
     s = np.argsort(cnt.values())[::-1]
-
     K = cnt.keys()
     K = [K[s[i]] for i in range(len(K))]
     K_to_int = {k: i + 1 for i, k in enumerate(K)}
@@ -108,8 +146,10 @@ if __name__ == "__main__":
     import subprocess
     import numpy as np
     import argparse
+    from scipy.stats import skew
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, required=True)
+    parser.add_argument('--model', type=str, required=False, default=None)
+    parser.add_argument('--where', type=str, required=True)
     parser.add_argument('--folder', type=str, default='gallery')
     parser.add_argument('--nbpages', type=int, default=1, required=False, help='-1 to use one page per  model')
     parser.add_argument('--limit', type=int, default=None, required=False)
@@ -118,6 +158,7 @@ if __name__ == "__main__":
     out_folder = args.folder
     nbpages = args.nbpages
     limit = args.limit
+    where = args.where
     folder = get_dotfolder()
     db = DB()
     db.load(folder)
@@ -130,8 +171,11 @@ if __name__ == "__main__":
         s = j['content']['model_summary']
         ref_job = db.get_job_by_summary(s)
         model_details = ref_job['content']
-        if model_details['model_name'] != model_name:
+        if ref_job['where'] != where:
             continue
+        if model_name and model_details['model_name'] != model_name:
+            continue
+        print(model_details)
         folder = "jobs/results/{}".format(j['summary'])
         iterations = map(lambda name: int(name.split(".")[0]),
                          os.listdir(os.path.join(folder, "iterations")))
@@ -176,16 +220,40 @@ if __name__ == "__main__":
         cat = {}
         hash_matrix_filename = os.path.join(folder, "csv", "hashmatrix.npy")
         hash_matrix = np.load(hash_matrix_filename)
-        cat.update(powerlawplot(hash_matrix, folder))
+        #cat.update(powerlawplot(hash_matrix, folder))
         freqs.append(cat)
         images.append(img_filename)
-        #c = json.dumps(model_details, indent=4)
-        #c = ["{}={}".format(k, v) for k, v in model_details.items()]
-        #c = " ".join(c)
-        #c = c.replace("_", "-")
-        #c = r"%s" % (c,)
         print(img_filename)
-        captions.append(model_details)
+        c = model_details.copy()
+        K = hash_matrix_to_int(hash_matrix)
+        distrib = dict(
+            mean=K.mean(),
+            var=K.var(ddof=1),
+            skew=skew(K)
+        )
+        c.update(distrib)
+
+        filename = os.path.join(folder, "csv", "nc.csv")
+        if not os.path.exists(filename) or True:
+            import pandas as pd
+            filenames = glob.glob(os.path.join(folder, 'final', '*.png'))
+            filenames = sorted(filenames)
+            K = {}
+            for i, h in enumerate(hm):
+               if h not in K:
+                   K[h] = i
+            indices = K.values()
+            filenames = [filenames[ind] for ind in indices]
+            print('comute neigh in {}'.format(len(filenames)))
+            nc = neighbcorr_filenames(filenames)
+            pd.Series([nc]).to_csv(filename)
+            print(filename, nc)
+        else:
+            nc = pd.read_csv(filename)
+            nc = nc.values()
+            nc = nc[0]
+        c['neighbcorr'] = nc
+        captions.append(c)
     print(len(images))
     p_vals = defaultdict(set)
     p_model_vals = defaultdict(set)
@@ -217,43 +285,44 @@ if __name__ == "__main__":
             for k in p_model_vals.keys():
                 cn['model_params'][k] = c['model_params'][k]
         captions[i] = json.dumps(cn, indent=4)
-
     if nbpages == -1:
         per_page = 1
     else:
         per_page = len(images) / nbpages
     first = 0
     pg = 1
-    mkdir_path(os.path.join(out_folder, model_name, "generated"))
+    mkdir_path(os.path.join(out_folder, where, "generated"))
     plot_names = freqs[0].keys()
     for a in plot_names:
-        mkdir_path(os.path.join(out_folder, model_name, a))
+        mkdir_path(os.path.join(out_folder, where, a))
     nb = len(images)
 
     def save_imgs(first, last, pg=0, w=1500, h=1500, wp=800, hp=800):
         cur_images = images[first:last]
-        cur_images = ["\( {} -set label '{}' \)".format(img, caption) for img, caption in zip(cur_images, captions)]
+        cur_captions = captions[first:last]
+        cur_images = ["\( {} -set label '{}' \)".format(img, caption) for img, caption in zip(cur_images, cur_captions)]
         cur_images = " ".join(cur_images)
-        out = os.path.join(out_folder, model_name, "generated", "page{:04d}".format(pg))
+        out = os.path.join(out_folder, where, "generated", "page{:04d}".format(pg))
         if w is not None and h is not None:
             sz = '{}x{}'.format(w, h)
         else:
             sz = ''
-        cmd = "montage {} -tile 4x -geometry {}+50+1 {}.png".format(cur_images, sz, out)
+        # TODO if nb items is 1 just copy the image
+        cmd = "montage {} -geometry {}+50+1 {}.png".format(cur_images, sz, out)
         print(cmd)
         subprocess.call(cmd, shell=True)
 
         cur_freqs = freqs[first:last]
 
         for p in plot_names:
-            cur_images = ["\( {} -set label '{}' \)".format(img[p], caption) for img, caption in zip(cur_freqs, captions)]
+            cur_images = ["\( {} -set label '{}' \)".format(img[p], caption) for img, caption in zip(cur_freqs, cur_captions)]
             cur_images = " ".join(cur_images)
-            out = os.path.join(out_folder, model_name, p, "page{:04d}".format(pg))
+            out = os.path.join(out_folder, where, p, "page{:04d}".format(pg))
             if wp is not None and hp is not None:
-                sz = '{}x{}'.format(wp, hp)
+                sz = '-geometry {}x{}'.format(wp, hp)
             else:
                 sz = ''
-            cmd = "montage {} -tile 4x -geometry {} {}.png".format(cur_images, sz, out)
+            cmd = "montage {} {}.png".format(cur_images, sz, out)
             print(cmd)
             subprocess.call(cmd, shell=True)
 
