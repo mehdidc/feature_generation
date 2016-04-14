@@ -3,7 +3,7 @@ import time
 
 if __name__ == "__main__":
     import argparse
-    from lightjob.db import DB, AVAILABLE, RUNNING
+    from lightjob.db import DB, AVAILABLE, PENDING
     from lightjob.cli import get_dotfolder
 
     parser = argparse.ArgumentParser()
@@ -42,6 +42,6 @@ if __name__ == "__main__":
     for j in jobs:
         cmd = j["cmd"]
         print(cmd)
-        db.modify_state_of(j['summary'], RUNNING)
+        db.modify_state_of(j['summary'], PENDING)
         subprocess.call(cmd, shell=True)
         time.sleep(1)

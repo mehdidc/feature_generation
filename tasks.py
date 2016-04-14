@@ -36,8 +36,7 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
 from lightjob.cli import get_dotfolder
-from lightjob.db import DB, SUCCESS, RUNNING, AVAILABLE, ERROR
-
+from lightjob.db import DB, SUCCESS, RUNNING, AVAILABLE, ERROR, PENDING
 
 db_folder = get_dotfolder()
 
@@ -78,7 +77,11 @@ def train(dataset="digits", prefix="",
     if update_db:
         db = DB()
         db.load(db_folder)
-        assert db.get_state_of(job_summary) == RUNNING
+        state = db.get_state_of(job_summary)
+        if state != PENDING:
+            logger.error("state of the job is not pending, state is : {}".format(state))
+            return
+        db.modify_state_of(job_summary, RUNNING)
         db.job_update(job_summary, {'slurm_job_id': os.getenv('SLURM_JOBID')})
         db.close()
     if force_w is not None:
@@ -538,7 +541,7 @@ def build_capsule_(layers, data, nbl, nbc,
                         J = ((hid * (1 - hid) * W)**2)
                         loss += contcoef * (coefs * J).sum() / hid.shape[0]
                     else:
-                        print("Unknown nonlinearity, do not contract")
+                        print("Unknown nonlinearity : {}, do not contract".format(layer.nonlinearity))
         if train_params.get("ladder", False) is True:
             lambda_ = train_params.get("lambda", 0.1)
             for layername in layers.keys():
@@ -660,10 +663,11 @@ def check(filename="out.pkl",
     if update_db:
         db = DB()
         db.load(db_folder)
-        if db.get_state_of(job_summary) != RUNNING:
-            print("Job Not on running state")
-            db.modify_state_of(job_summary, ERROR)
+        state = db.get_state_of(job_summary)
+        if state != PENDING:
+            logger.error("state of the job is not pending, state is : {}".format(state))
             return
+        db.modify_state_of(job_summary, RUNNING)
         db.job_update(job_summary, {'slurm_job_id': os.getenv('SLURM_JOBID')})
         db.close()
 

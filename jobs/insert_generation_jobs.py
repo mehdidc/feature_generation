@@ -27,9 +27,6 @@ if __name__ == "__main__":
         sort=True,
         tol=0,
     )
-    from tinydb import Query
-    #Job = Query()
-    #db.jobs.remove(Job.type == 'generation')
     for job in jobs:
         sref = job['summary']
         d = {}

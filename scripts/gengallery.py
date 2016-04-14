@@ -5,6 +5,8 @@ import os
 import pandas as pd
 import matplotlib as mpl
 import glob
+from collections import Counter
+
 if os.getenv("DISPLAY") is None:  # NOQA
     mpl.use('Agg')  # NOQA
 
@@ -32,21 +34,73 @@ def loglogplot(hash_matrix, filename):
     plt.savefig(filename)
     plt.close(fig)
 
-
-def get_powerlaw_exponent(hash_matrix):
+def powerlawplot(hash_matrix, folder, force=False):
     from collections import Counter
     import powerlaw
+    import matplotlib.pyplot as plt
+
+    cat = {}
+    filenamenoxmin = os.path.join(folder, "powerlawnoxmin.png")
+    cat["powerlawnoxmin"] = filenamenoxmin
+
+    filenamexminfull = os.path.join(folder, "powerlawxmin_full.png")
+    cat["powerlawxminfull"] = filenamexminfull
+
+    filenamexminwindow = os.path.join(folder, "powerlawxmin_window.png")
+    cat["powerlawxminwindow"] = filenamexminwindow
+
     hm = hash_matrix
     cnt = Counter(hm)
-
     s = np.argsort(cnt.values())[::-1]
 
     K = cnt.keys()
     K = [K[s[i]] for i in range(len(K))]
     K_to_int = {k: i + 1 for i, k in enumerate(K)}
     x = [K_to_int[v] for v in hm]
-    results = powerlaw.Fit(x)
-    return results.alpha, results.xmin, results.pdf()
+    x = np.array(x)
+    if not os.path.exists(filenamenoxmin) or force:
+        fit = powerlaw.Fit(x, discrete=True, xmin=x.min())
+        plt.clf()
+        fig = plt.figure()
+        try:
+            fig2 = fit.plot_pdf(original_data=True, color='b', linewidth=2, label='original pdf')
+            fit.power_law.plot_pdf(color='b', linestyle='--',
+                                ax=fig2,
+                                label=r"fit pdf ($\alpha={:.2f},\sigma={:.2f}$)".format(fit.alpha, fit.sigma))
+            plt.axvline(fit.xmin, color='g', linestyle='--', label='xmin={}'.format(int(fit.xmin)))
+            plt.xlabel('x')
+            plt.ylabel('$p(x)$')
+            plt.legend()
+        except Exception as e:
+            print(str(e))
+        plt.savefig(filenamenoxmin)
+        print(filenamenoxmin)
+        plt.close(fig)
+
+    if not os.path.exists(filenamexminfull) or not os.path.exists(filenamexminwindow) or force:
+        fit = powerlaw.Fit(x, discrete=True)
+        for o in (True, False):
+            plt.clf()
+            fig = plt.figure()
+            try:
+                fig2 = fit.plot_pdf(original_data=o, color='b', linewidth=2, label='original pdf')
+                fit.power_law.plot_pdf(color='b', linestyle='--',
+                                       ax=fig2,
+                                       label=r"fit pdf ($\alpha={:.2f},\sigma={:.2f}$)".format(fit.alpha, fit.sigma))
+                plt.axvline(fit.xmin, color='g', linestyle='--', label='xmin={}'.format(int(fit.xmin)))
+                plt.xlabel('x')
+                plt.ylabel('$p(x)$')
+                plt.legend()
+            except Exception as e:
+                print(str(e))
+            if o == True:
+                plt.savefig(filenamexminfull)
+                print(filenamexminfull)
+            else:
+                plt.savefig(filenamexminwindow)
+                print(filenamexminwindow)
+            plt.close(fig)
+    return cat
 
 if __name__ == "__main__":
     from lightjob.db import DB, SUCCESS, RUNNING, AVAILABLE, ERROR
@@ -57,8 +111,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, required=True)
     parser.add_argument('--folder', type=str, default='gallery')
-    parser.add_argument('--nbpages', type=int, default=1, required=False)
+    parser.add_argument('--nbpages', type=int, default=1, required=False, help='-1 to use one page per  model')
     parser.add_argument('--limit', type=int, default=None, required=False)
+    use_filtering = True
     args = parser.parse_args()
     out_folder = args.folder
     nbpages = args.nbpages
@@ -84,26 +139,45 @@ if __name__ == "__main__":
         if limit is None:
             img_filename = os.path.join(folder, "iterations", "{:04d}.png".format(iteration))
         else:
+            hash_matrix_filename = os.path.join(folder, "csv", "hashmatrix.npy")
+            hash_matrix = np.load(hash_matrix_filename)
+            hm = hash_matrix
+            cnt = Counter(hm)
+            s = sum(cnt.values())
+            for k, v in cnt.items():
+                cnt[k] = float(cnt[k]) / s
+
+            if use_filtering:
+                K = {}
+                for i, h in enumerate(hm):
+                    if h not in K:
+                        K[h] = i
+                indices = K.values()
+                indices = indices[0:limit]
+                indices = sorted(indices, key=lambda ind:-cnt[hm[ind]])
+            else:
+                indices = range(0, limit)
             filenames = glob.glob(os.path.join(folder, 'final', '*.png'))
             filenames = sorted(filenames)
-            filenames = filenames[0:limit]
+            filenames = [filenames[ind] for ind in indices]
+            texts = ["{:.2f}".format(100. * cnt[hm[ind]]) for ind in indices]
+            filenames = ["\( {} -set label '{}' \)".format(img, txt) for img, txt in zip(filenames, texts)]
             filenames = " ".join(filenames)
 
             img_filename = os.path.join(folder, "final{}.png".format(limit))
             if not os.path.exists(img_filename):
-                cmd = "montage {} -geometry +2+2 {}".format(filenames, img_filename)
+                print(img_filename)
+                cmd = "montage {} -pointsize 8.5 -geometry +4+4 {}".format(filenames, img_filename)
                 subprocess.call(cmd, shell=True)
 
-        freq_filename = os.path.join(folder, "csv", "fixedpointshistogram_xlog_ylog.png")
         if not os.path.exists(img_filename):
             continue
-        if not os.path.exists(freq_filename):
-            hash_matrix_filename = os.path.join(folder, "csv", "hashmatrix.npy")
-            print(hash_matrix_filename)
-            hash_matrix = np.load(hash_matrix_filename)
-            alpha, xmin, pdf = get_powerlaw_exponent(hash_matrix)
-            loglogplot(hash_matrix, freq_filename)
-        freqs.append(freq_filename)
+
+        cat = {}
+        hash_matrix_filename = os.path.join(folder, "csv", "hashmatrix.npy")
+        hash_matrix = np.load(hash_matrix_filename)
+        cat.update(powerlawplot(hash_matrix, folder))
+        freqs.append(cat)
         images.append(img_filename)
         #c = json.dumps(model_details, indent=4)
         #c = ["{}={}".format(k, v) for k, v in model_details.items()]
@@ -121,6 +195,8 @@ if __name__ == "__main__":
                 continue
             p_vals[k].add(v)
         for k, v in c['model_params'].items():
+            if type(v) == list:
+                v = tuple(v)
             p_model_vals[k].add(v)
     for k in p_vals.keys():
         if len(p_vals[k]) == 1:
@@ -142,37 +218,48 @@ if __name__ == "__main__":
                 cn['model_params'][k] = c['model_params'][k]
         captions[i] = json.dumps(cn, indent=4)
 
-    per_page = len(images) / nbpages
+    if nbpages == -1:
+        per_page = 1
+    else:
+        per_page = len(images) / nbpages
     first = 0
     pg = 1
     mkdir_path(os.path.join(out_folder, model_name, "generated"))
-    mkdir_path(os.path.join(out_folder, model_name, "freqs"))
+    plot_names = freqs[0].keys()
+    for a in plot_names:
+        mkdir_path(os.path.join(out_folder, model_name, a))
     nb = len(images)
 
-    def save_imgs(first, last, pg=0):
-        w, h = 1500, 1500
+    def save_imgs(first, last, pg=0, w=1500, h=1500, wp=800, hp=800):
         cur_images = images[first:last]
         cur_images = ["\( {} -set label '{}' \)".format(img, caption) for img, caption in zip(cur_images, captions)]
         cur_images = " ".join(cur_images)
         out = os.path.join(out_folder, model_name, "generated", "page{:04d}".format(pg))
-        cmd = "montage {} -tile 4x -geometry {}x{}+50+1 {}.png".format(cur_images, w, h, out)
+        if w is not None and h is not None:
+            sz = '{}x{}'.format(w, h)
+        else:
+            sz = ''
+        cmd = "montage {} -tile 4x -geometry {}+50+1 {}.png".format(cur_images, sz, out)
         print(cmd)
         subprocess.call(cmd, shell=True)
 
         cur_freqs = freqs[first:last]
 
-        w, h = 800, 800
-        cur_images = ["\( {} -set label '{}' \)".format(img, caption) for img, caption in zip(cur_freqs, captions)]
-        cur_images = " ".join(cur_images)
-        out = os.path.join(out_folder, model_name, "freqs", "page{:04d}".format(pg))
-        cmd = "montage {} -tile 4x -geometry {}x{} {}.png".format(cur_images, w, h, out)
-        print(cmd)
-        subprocess.call(cmd, shell=True)
+        for p in plot_names:
+            cur_images = ["\( {} -set label '{}' \)".format(img[p], caption) for img, caption in zip(cur_freqs, captions)]
+            cur_images = " ".join(cur_images)
+            out = os.path.join(out_folder, model_name, p, "page{:04d}".format(pg))
+            if wp is not None and hp is not None:
+                sz = '{}x{}'.format(wp, hp)
+            else:
+                sz = ''
+            cmd = "montage {} -tile 4x -geometry {} {}.png".format(cur_images, sz, out)
+            print(cmd)
+            subprocess.call(cmd, shell=True)
 
-    #save_imgs(0, nb, pg=0)
     while first < nb:
         print("page {}".format(pg))
         last = first + per_page
-        save_imgs(first, last, pg=pg)
+        save_imgs(first, last, pg=pg, w=None, h=None, wp=None, hp=None)
         pg += 1
         first = last

@@ -45,7 +45,9 @@ if __name__ == "__main__":
     db.load(folder)
 
     def job_write(params, cmd, where=""):
-        return db.safe_add_job(params, cmd=cmd, where=where)
+        #db.job_update(summarize(params), {'type': 'training'})
+        #return 0
+        return db.safe_add_job(params, type='training', cmd=cmd, where=where)
 
     def build_params(model_params,
                      denoise,
@@ -229,6 +231,47 @@ if __name__ == "__main__":
             nb += job_write(p, cmd, where="jobset3")
         return nb
 
+    def jobset4():
+        all_params = (
+            build_params(
+                OrderedDict(tied=tied,
+                            use_wta_lifetime=use_wta_lifetime,
+                            wta_lifetime_perc=wta_lifetime_perc,
+                            nb_hidden_units=nb_hidden_units),
+                denoise,
+                noise,
+                walkback,
+                walkback_jump,
+                autoencoding_loss,
+                contractive,
+                contractive_coef,
+                marginalized,
+                binarize_thresh)
+            for nb_hidden_units in (1000,)
+            for use_wta_lifetime in (False,)
+            for wta_lifetime_perc in (None,)
+            for denoise in (None, 0.5)
+            for noise in ("zero_masking",)
+            for walkback in (1,)
+            for walkback_jump in (False,)
+            for autoencoding_loss in ("squared_error",)
+            for contractive in (True,)
+            for tied in (True,)
+            for contractive_coef in ((0.2, 0.5, 0.7, 0.9, 2, 3, 4, 5, 10, 20, 30, 50, 80) if contractive is True else (None,))
+            for marginalized in (False,)
+            for binarize_thresh in (None,)
+        )
+        all_params = list(all_params)
+        print(len(all_params))
+        nb = 0
+        for p in all_params:
+            p['model_name'] = 'model57'
+            p['dataset'] = 'digits'
+            p['budget_hours'] = budget_hours
+            cmd = build_cmd(model_name="model57", dataset="digits", params=p, budget_hours=budget_hours)
+            nb += job_write(p, cmd, where="jobset4")
+        return nb
+
     def test():
         all_params = (
             build_params(
@@ -271,15 +314,8 @@ if __name__ == "__main__":
         return nb
     nb = 0
     #nb += test()
-    nb += jobset1()
+    #nb += jobset1()
     #nb += jobset2()
     #nb += jobset3()
-
-    from tinydb import Query
-    Job = Query()
-    def op(el):
-        el['type'] = 'training'
-        print(el.keys())
-        return el
-    db.jobs.update(op, Job.where=="jobset1")
+    nb += jobset4()
     print("Total number of jobs added : {}".format(nb))
