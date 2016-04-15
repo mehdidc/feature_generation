@@ -1,6 +1,6 @@
 import os
 import json
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 import os
 import pandas as pd
 import matplotlib as mpl
@@ -224,7 +224,8 @@ if __name__ == "__main__":
         freqs.append(cat)
         images.append(img_filename)
         print(img_filename)
-        c = model_details.copy()
+        c = OrderedDict()
+        c.update(model_details)
         K = hash_matrix_to_int(hash_matrix)
         distrib = dict(
             mean=K.mean(),
@@ -234,7 +235,7 @@ if __name__ == "__main__":
         c.update(distrib)
 
         filename = os.path.join(folder, "csv", "nc.csv")
-        if not os.path.exists(filename) or True:
+        if not os.path.exists(filename):
             import pandas as pd
             filenames = glob.glob(os.path.join(folder, 'final', '*.png'))
             filenames = sorted(filenames)
@@ -249,12 +250,17 @@ if __name__ == "__main__":
             pd.Series([nc]).to_csv(filename)
             print(filename, nc)
         else:
-            nc = pd.read_csv(filename)
-            nc = nc.values()
-            nc = nc[0]
+            nc = float(pd.read_csv(filename).columns[1])
         c['neighbcorr'] = nc
         captions.append(c)
     print(len(images))
+
+    indices = range(len(images))
+    indices = sorted(indices, key=lambda i: captions[i].items())
+    images = [images[i] for i in indices]
+    captions = [captions[i] for i in indices]
+    freqs = [freqs[i] for i in indices]
+
     p_vals = defaultdict(set)
     p_model_vals = defaultdict(set)
     for c in captions:
@@ -285,6 +291,8 @@ if __name__ == "__main__":
             for k in p_model_vals.keys():
                 cn['model_params'][k] = c['model_params'][k]
         captions[i] = json.dumps(cn, indent=4)
+
+
     if nbpages == -1:
         per_page = 1
     else:
