@@ -316,7 +316,9 @@ if __name__ == "__main__":
 
     def jobset5():
         import numpy as np
-        C = np.linspace(0, 1, 50)
+        C = np.linspace(0, 1, 50).tolist()
+        C.append(np.linspace(0, 0.1).tolist())
+        C = sorted(C)
         all_params = (
             build_params(
                 OrderedDict(tied=tied,
