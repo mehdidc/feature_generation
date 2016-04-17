@@ -319,6 +319,7 @@ if __name__ == "__main__":
         C = np.linspace(0, 1, 50).tolist()
         C.extend(np.linspace(1, 2, 50).tolist())
         C.extend(np.linspace(2, 5, 50).tolist())
+        C.extend(np.linspace(5, 10, 30).tolist())
 
         C = sorted(C)
         print(C)
