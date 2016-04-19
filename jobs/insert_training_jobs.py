@@ -364,11 +364,54 @@ if __name__ == "__main__":
             print(p)
         return nb
 
+    def jobset6():
+        import numpy as np
+        all_params = (
+            build_params(
+                OrderedDict(tied=tied,
+                            use_wta_lifetime=use_wta_lifetime,
+                            wta_lifetime_perc=wta_lifetime_perc,
+                            nb_hidden_units=nb_hidden_units),
+                denoise,
+                noise,
+                walkback,
+                walkback_jump,
+                autoencoding_loss,
+                contractive,
+                contractive_coef,
+                marginalized,
+                binarize_thresh)
+            for nb_hidden_units in (1000,)
+            for use_wta_lifetime in (False,)
+            for wta_lifetime_perc in (None,)
+            for denoise in (0.1, 0.2, 0.3, 0.4, 0.5)
+            for noise in ("zero_masking",)
+            for walkback in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+            for walkback_jump in (True,)
+            for autoencoding_loss in ("squared_error",)
+            for contractive in (False,)
+            for tied in (False,)
+            for contractive_coef in (None,)
+            for marginalized in (False,)
+            for binarize_thresh in (None,)
+        )
+        all_params = list(all_params)
+        print(len(all_params))
+        nb = 0
+        for p in all_params:
+            p['model_name'] = 'model57'
+            p['dataset'] = 'digits'
+            p['budget_hours'] = budget_hours
+            cmd = build_cmd(model_name="model57", dataset="digits", params=p, budget_hours=budget_hours)
+            nb += job_write(p, cmd, where="jobset6")
+            print(p)
+        return nb
     nb = 0
     #nb += test()
     #nb += jobset1()
     #nb += jobset2()
     #nb += jobset3()
     #nb += jobset4()
-    nb += jobset5()
+    #nb += jobset5()
+    nb += jobset6()
     print("Total number of jobs added : {}".format(nb))

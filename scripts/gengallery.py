@@ -134,8 +134,8 @@ def gengallery(jobs, limit=None, use_filtering=True, out_folder='gallery', nbpag
                 cn[k] = c[k]
             for k in p_model_vals.keys():
                 cn['model_params'][k] = c['model_params'][k]
+            cn['stats'] = c['stats']
         captions[i] = json.dumps(cn, indent=4)
-
     if nbpages == -1:
         per_page = 1
     else:
