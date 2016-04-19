@@ -320,6 +320,7 @@ if __name__ == "__main__":
         C.extend(np.linspace(1, 2, 50).tolist())
         C.extend(np.linspace(2, 5, 50).tolist())
         C.extend(np.linspace(5, 10, 30).tolist())
+        C.extend(np.linspace(10, 100, 50).tolist())
 
         C = sorted(C)
         print(C)
@@ -387,7 +388,7 @@ if __name__ == "__main__":
             for denoise in (0.1, 0.2, 0.3, 0.4, 0.5)
             for noise in ("zero_masking",)
             for walkback in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-            for walkback_jump in (True,)
+            for walkback_jump in (True, False)
             for autoencoding_loss in ("squared_error",)
             for contractive in (False,)
             for tied in (False,)

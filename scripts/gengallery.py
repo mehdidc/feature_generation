@@ -91,6 +91,7 @@ def gengallery(jobs, limit=None, use_filtering=True, out_folder='gallery', nbpag
         images.append(img_filename)
         c = OrderedDict()
         c.update(model_details)
+        c['id'] = j['summary']
         if "stats" in j:
             c["stats"] = j["stats"]
         captions.append(c)
@@ -134,7 +135,9 @@ def gengallery(jobs, limit=None, use_filtering=True, out_folder='gallery', nbpag
                 cn[k] = c[k]
             for k in p_model_vals.keys():
                 cn['model_params'][k] = c['model_params'][k]
-            cn['stats'] = c['stats']
+            if 'stats' in c:
+                cn['stats'] = c['stats']
+            cn['id'] = c['id']
         captions[i] = json.dumps(cn, indent=4)
     if nbpages == -1:
         per_page = 1
