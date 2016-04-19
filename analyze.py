@@ -410,7 +410,6 @@ def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
         [x],
         L.get_output(layers["output"], {layers[layer_name]: x}))
 
-
     initial = params.get("initial", "dataset")
     initial_size = params.get("initial_size", 1)
 
@@ -426,7 +425,22 @@ def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
         shape = (initial_size, c, w, h)
         px = np.random.uniform(0, 1, size=shape)
         px = px.astype(np.float32)
+
     up_binarize = params.get("up_binarize")
+    if up_binarize == 'moving':
+        nb_white = 0
+        nb_total = 0
+        thresh = params.get('up_binarize_data_threshold', 0.5)
+        for i in range(initial_size / data.X.shape[0] + data.X.shape[0]):
+            data.load()
+            xcur = data.X.flatten()
+            nb_white += np.sum(xcur > thresh)
+            nb_total += len(xcur)
+        whitepx_ratio = float(nb_white) / nb_total
+        print('white ratio : {}'.format(whitepx_ratio))
+    else:
+        whitepx_ratio = None
+
     down_binarize = params.get("down_binarize")
     nb_iterations = params.get("nb_iterations", 1)
     batch_size = params.get("batch_size", 1024)
@@ -474,12 +488,24 @@ def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
     def get_reconstruction_error(X, Y):
         return ((X - Y) ** 2).sum(axis=(1, 2, 3))
 
+    def do_up_binarize(x):
+        if up_binarize == 'moving':
+            vals = x.flatten()
+            vals = vals[np.argsort(vals)]
+            thresh = vals[-int(whitepx_ratio * len(vals)) - 1]
+            print("actual ratio : {}, desired ratio : {}".format(float(np.sum(vals>thresh)) / len(vals), whitepx_ratio))
+        else:
+            thresh = up_binarize
+        x = 1. * (x > thresh)
+        x = x.astype(np.float32)
+        return x
+
     for i in range(nb_iterations + 1):
         logger.info("Iteration {}".format(i))
 
         px_rec = minibatcher(px, capsule.reconstruct, size=batch_size)
         if up_binarize:
-            px_rec = 1. * (px_rec > up_binarize)
+            px_rec = do_up_binarize(px_rec)
         rec_error = minibatcher2d(px_rec, px, get_reconstruction_error, size=batch_size)
         evals.append(rec_error.tolist())
         logger.info("reconstruction error : {}".format(rec_error.mean()))
@@ -515,9 +541,7 @@ def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
             new_px = minibatcher(new_code, code_to_px, size=batch_size)
         # binarize
         if up_binarize:
-            new_px = 1. * (new_px > up_binarize)
-            new_px = new_px.astype(np.float32)
-
+            new_px = do_up_binarize(new_px)
         px = new_px
 
     # save the resuling images
@@ -2007,7 +2031,7 @@ def ipython(capsule, data, layers, w, h, c, **kw):
     embed()
 
 
-def notebook(capsule, data, layers, w, h, c, **kw):
+def notebook(capsule, data, layers, w, h, c, folder, **kw):
     return capsule, data, layers, w, h, c
 
 

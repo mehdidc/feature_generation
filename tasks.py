@@ -645,9 +645,9 @@ def check(filename="out.pkl",
     elif type(params) == dict:
         params = [params]
     elif params is None:
-            params = {}
+            params = [{}]
     elif params.endswith(".json"):
-            params = json.load(open(params))
+        params = [json.load(open(params))]
     else:
         job_summary = params
         db = DB()
@@ -673,7 +673,7 @@ def check(filename="out.pkl",
 
     assert hasattr(analyze, what)
     func = getattr(analyze, what)
-
+    ret = None
     for p in params:
         try:
             state = p.get("seed", 2)
@@ -690,6 +690,8 @@ def check(filename="out.pkl",
                 db.load(db_folder)
                 db.modify_state_of(job_summary, ERROR)
                 db.close()
+                return None
+            else:
                 return None
 
     if update_db:
