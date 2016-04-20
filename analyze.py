@@ -233,7 +233,7 @@ def fixedpointscounter(capsule, data, layers, w, h, c, **params):
     logger.info("Number of fixed points : {}".format(len(clusters)))
     return ret
 
-def clusterfinder(capsule, data, layers, w, h, c, **params):
+def clusterfinder(capsule, data, layers, w, h, c, folder, **params):
     from glob import glob
     from skimage.io import imread
     from sklearn.cluster import KMeans
@@ -264,11 +264,15 @@ def clusterfinder(capsule, data, layers, w, h, c, **params):
     #    [x],
     #    L.get_output(layers["output"], {layers[layer_name]: x}))
     filenames = []
-    for filename in glob(params.get("filenames_pattern")):
-        if "out" in filename:
-            continue
-        if "_cv_" in filename and not filename.endswith("0.png"):
-            continue
+    patterns = params.get("filenames_pattern", [])
+    if type(patterns) != list:
+        patterns = [patterns]
+    F = (f for p in patterns for f in glob(p))
+    for filename in F:
+        #if "out" in filename:
+        #    continue
+        #if "_cv_" in filename and not filename.endswith("0.png"):
+        #    continue
         filenames.append(filename)
     if params.get("force_nb") is not None:
         nb = params.get("force_nb")
@@ -280,7 +284,8 @@ def clusterfinder(capsule, data, layers, w, h, c, **params):
         if len(img.shape) == 3:
             img = img[:, :, 0]
         img = img.astype(np.float32)
-        img /= img.max()
+        if img.max() > 0:
+            img /= img.max()
         assert len(img.shape) == 2, str(img.shape)
         X.append(img[None, None, :, :])
     X = np.concatenate(X, axis=0)
@@ -308,7 +313,6 @@ def clusterfinder(capsule, data, layers, w, h, c, **params):
     clus.fit(code)
     clusters = clus.predict(code)
     ret["clusters"] = clusters
-    folder = params.get("folder", "out")
     mkdir_path(folder)
 
     for cl in range(nb_clusters):

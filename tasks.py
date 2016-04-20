@@ -679,6 +679,7 @@ def check(filename="out.pkl",
             state = p.get("seed", 2)
             np.random.seed(state)
             p["seed"] = state
+            print(p)
             ret = func(capsule, data, layers, w, h, c, folder, **p)
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
