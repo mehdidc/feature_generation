@@ -87,7 +87,8 @@ if __name__ == "__main__":
     db.load(folder)
 
     def job_write(params, cmd, where=""):
-        db.job_update(summarize(params), dict(cmd=cmd))
+        db.job_update(summarize(params), dict(cmd=cmd
+            ))
         #return 0
         return db.safe_add_job(params, type='training', cmd=cmd, where=where)
 
