@@ -470,6 +470,8 @@ def build_capsule_(layers, data, nbl, nbc,
             Xtilde = salt_and_pepper(X, corruption_level=pr, rng=theano_rng, backend='theano')
         elif noise == "zero_masking":
             Xtilde = zero_masking(X, corruption_level=pr, rng=theano_rng)
+        elif noise == "superpose":
+            Xtilde = X * pr + theano_rng.permutation(n=X.shape[0], size=(1,)) * (1 - pr)
         return Xtilde
 
     def loss_function(model, tensors):

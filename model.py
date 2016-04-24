@@ -2914,7 +2914,7 @@ def model54(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     Pyramidal auto-encoder
     """
     l_in = layers.InputLayer((None, c, w, h), name="input")
-    l_in_rescaled = layers.Pool2DLayer(l_in, (8, 8), mode='average_exc_pad')
+    l_in_rescaled = layers.Pool2DLayer(l_in, (8, 8), mode='average_inc_pad')
     l_deconv1 = Deconv2DLayer(
         l_in_rescaled,
         num_filters=nb_filters,
@@ -3060,6 +3060,35 @@ def model57(nb_filters=64, w=32, h=32, c=1,
     l_out = layers.ReshapeLayer(l_out, ([0], c, w, h), name="output")
     print(l_out.output_shape)
     return layers_from_list_to_dict([l_in] + hids + [l_pre_out, l_out])
+
+
+def model58(nb_filters=64, w=32, h=32, c=1, sparsity=True):
+    """
+    Pyramidal auto-encoder 2x
+    """
+    l_in = layers.InputLayer((None, c, w / 2, h  / 2), name="input")
+    #l_in_rescaled = layers.Pool2DLayer(l_in, (2, 2), mode='average_inc_pad')
+    nb_layers = (w - w / 2) / (5 - 1)
+    l_conv = l_in
+    for i in range(nb_layers):
+        l_conv = layers.Conv2DLayer(
+            l_conv,
+            num_filters=nb_filters,
+            filter_size=(5, 5),
+            pad='full',
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+        )
+    l_output = layers.Conv2DLayer(
+        l_conv,
+        num_filters=c,
+        filter_size=(3, 3),
+        pad=1,
+        nonlinearity=sigmoid,
+        W=init.GlorotUniform(),
+        name="output"
+    )
+    return layers_from_list_to_dict([l_in, l_output])
 
 
 build_convnet_simple = model1
