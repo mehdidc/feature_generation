@@ -2941,10 +2941,6 @@ def model54(nb_filters=64, w=32, h=32, c=1, sparsity=True):
         nonlinearity=rectify,
         W=init.GlorotUniform(),
         name='unconv4_up')
-    l_pre_output = layers.Conv2DLayer(
-        l_deconv3,
-
-    )
     l_output = layers.Conv2DLayer(
         l_deconv3,
         num_filters=c,

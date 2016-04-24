@@ -88,7 +88,7 @@ if __name__ == "__main__":
 
     def job_write(params, cmd, where=""):
         #db.job_update(summarize(params), dict(where=where))
-        db.job_update(summarize(params), dict(cmd=cmd))
+        #db.job_update(summarize(params), dict(cmd=cmd))
         #return 0
         return db.safe_add_job(params, type='training', cmd=cmd, where=where)
 
@@ -497,6 +497,51 @@ if __name__ == "__main__":
             nb += job_write(p, cmd, where="jobset8")
             print(p)
         return nb
+
+    def jobset9():
+        import numpy as np
+        C = np.linspace(0, 1, 30)
+        all_params = (
+            build_params(
+                OrderedDict(tied=tied,
+                            use_wta_lifetime=use_wta_lifetime,
+                            wta_lifetime_perc=wta_lifetime_perc,
+                            nb_hidden_units=nb_hidden_units),
+                denoise,
+                noise,
+                walkback,
+                walkback_jump,
+                autoencoding_loss,
+                contractive,
+                contractive_coef,
+                marginalized,
+                binarize_thresh)
+            for nb_hidden_units in (1000,)
+            for use_wta_lifetime in (False,)
+            for wta_lifetime_perc in (None,)
+            for denoise in C
+            for noise in ("zero_masking",)
+            for walkback in (1,)
+            for walkback_jump in (False,)
+            for autoencoding_loss in ("squared_error",)
+            for contractive in (False,)
+            for tied in (False,)
+            for contractive_coef in (1,)
+            for marginalized in (False,)
+            for binarize_thresh in (None,)
+        )
+        all_params = list(all_params)
+        print(len(all_params))
+        nb = 0
+        for p in all_params:
+            p['model_name'] = 'model57'
+            p['dataset'] = 'digits'
+            p['budget_hours'] = 3
+            p['optimization'] = dict(max_nb_epochs=72180)
+            cmd = build_cmd(model_name="model57", dataset="digits", params=p, budget_hours=p['budget_hours'])
+            nb += job_write(p, cmd, where="jobset9")
+            print(p)
+        return nb
     nb = 0
     #nb += test()
     #nb += jobset1()
@@ -506,5 +551,6 @@ if __name__ == "__main__":
     #nb += jobset5()
     #nb += jobset6()
     #nb += jobset7()
-    nb += jobset8()
+    #nb += jobset8()
+    nb += jobset9()
     print("Total number of jobs added : {}".format(nb))
