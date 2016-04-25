@@ -107,6 +107,15 @@ def zero_masking(x, rng, corruption_level=0.5):
     return x * a
 
 
+def zero_mask(x, rng, corruption_level=0.5):
+    a = rng.binomial(
+        size=x.shape,
+        p=(1 - corruption_level),
+        dtype=theano.config.floatX
+    )
+    return a
+
+
 def mkdir_path(path):
     if not os.access(path, os.F_OK):
         os.makedirs(path)

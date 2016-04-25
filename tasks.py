@@ -21,7 +21,7 @@ from lasagnekit.nnet.capsule import Capsule, make_function
 from lasagnekit.misc.plot_weights import grid_plot, dispims_color, tile_raster_images
 from lasagnekit.easy import get_stat, iterate_minibatches
 import numpy as np
-from helpers import salt_and_pepper, zero_masking
+from helpers import salt_and_pepper, zero_masking, zero_mask
 from data import load_data
 from model import *  # for dill
 from skimage.io import imsave
@@ -198,9 +198,13 @@ def build_capsule_(layers, data, nbl, nbc,
 
     if denoise is not None:
         from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
-        theano_rng = RandomStreams(seed=np.random.randint(0, 999999))
+        from theano.tensor.shared_randomstreams import RandomStreams as RandomStreamsCpu
+        s =  np.random.randint(0, 999999)
+        theano_rng = RandomStreams(seed=s)
+        theano_rng_cpu = RandomStreamsCpu(seed=s)
     else:
         theano_rng = None
+        theano_rng_cpu = None
 
     if report_event is None:
         def report_event(s):
@@ -471,7 +475,10 @@ def build_capsule_(layers, data, nbl, nbc,
         elif noise == "zero_masking":
             Xtilde = zero_masking(X, corruption_level=pr, rng=theano_rng)
         elif noise == "superpose":
-            Xtilde = X * pr + theano_rng.permutation(n=X.shape[0], size=(1,)) * (1 - pr)
+            #mask = zero_mask(X, corruption_level=pr, rng=theano_rng)
+            perm = theano_rng_cpu.permutation(n=X.shape[0])
+            print(perm.ndim)
+            Xtilde = X * pr + X[perm] * (1 - pr)
         return Xtilde
 
     def loss_function(model, tensors):
@@ -480,6 +487,8 @@ def build_capsule_(layers, data, nbl, nbc,
             Xtilde = noisify(X)
             X_pred = stoch_reconstruct(model, Xtilde)
             updates =  [(v, u) for v, u, _, _ in theano_rng.updates()]
+            print(theano_rng_cpu.updates())
+            updates.extend([(v, u) for v, u in theano_rng_cpu.updates()])
         else:
             X_pred = stoch_reconstruct(model, X)
             updates = []

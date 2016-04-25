@@ -11,6 +11,9 @@ import os
 from lightjob.utils import summarize
 
 def test():
+        """
+        small test jobs
+        """
         all_params = (
             build_params(
                 OrderedDict(tied=tied,
@@ -118,7 +121,9 @@ if __name__ == "__main__":
         return params
 
     def jobset1():
-
+        """
+        Exploring params of conv autoenc
+        """
         nb_filters_per_layer = {
             1: [256],
             2: [128, 256],
@@ -185,7 +190,9 @@ if __name__ == "__main__":
         return nb
 
     def jobset2():
-
+        """
+        Exploring various params of fully connected autoenc
+        """
         def build_model_params(nb_layers,
                                use_wta_lifetime,
                                wta_lifetime_perc,
@@ -235,6 +242,9 @@ if __name__ == "__main__":
             nb += job_write(p, cmd, where="jobset2")
         return nb
     def jobset3():
+        """
+        Exploring params of fully connected autoenc
+        """
         all_params = (
             build_params(
                 OrderedDict(tied=tied,
@@ -276,6 +286,9 @@ if __name__ == "__main__":
         return nb
 
     def jobset4():
+        """
+        Exploring params of contraction coef with tiying fully connected autoenc
+        """
         all_params = (
             build_params(
                 OrderedDict(tied=tied,
@@ -318,6 +331,10 @@ if __name__ == "__main__":
         return nb
 
     def jobset5():
+        """
+        Exploring params heavily of contraction coef without tiying fully connected autoenc
+        """
+     
         import numpy as np
         C = np.linspace(0, 1, 50).tolist()
         C.extend(np.linspace(1, 2, 50).tolist())
@@ -326,7 +343,7 @@ if __name__ == "__main__":
         C.extend(np.linspace(10, 100, 50).tolist())
 
         C = sorted(C)
-        print(C)
+
         all_params = (
             build_params(
                 OrderedDict(tied=tied,
@@ -369,6 +386,10 @@ if __name__ == "__main__":
         return nb
 
     def jobset6():
+        """
+        Exploring params of denoising with walkback 
+        """
+     
         import numpy as np
         all_params = (
             build_params(
@@ -411,6 +432,10 @@ if __name__ == "__main__":
             print(p)
         return nb
     def jobset7():
+        """
+        Exploring params of sparsity without contraction 
+        """
+     
         import numpy as np
         C = np.linspace(0, 1, 100)
         all_params = (
@@ -455,6 +480,9 @@ if __name__ == "__main__":
         return nb
 
     def jobset8():
+        """
+        Exploring params of sparsity without contraction (this was en error so it is a duplicate of jobset7 i forgot to make contractive to True)
+        """
         import numpy as np
         C = np.linspace(0, 1, 100)
         all_params = (
@@ -500,6 +528,9 @@ if __name__ == "__main__":
         return nb
 
     def jobset9():
+        """
+        Exploring params of denoising without contraction
+        """
         import numpy as np
         C = np.linspace(0, 1, 30)
         all_params = (
@@ -545,6 +576,9 @@ if __name__ == "__main__":
         return nb
 
     def jobset10():
+        """
+        Exploring params of denoising with contraction=1
+        """
         import numpy as np
         C = np.linspace(0, 1, 30)
         all_params = (
@@ -590,6 +624,9 @@ if __name__ == "__main__":
         return nb
 
     def jobset11():
+        """
+        Exploring params of sparsity with contraction=1
+        """
         import numpy as np
         C = np.linspace(0, 1, 30)
         all_params = (
@@ -633,6 +670,54 @@ if __name__ == "__main__":
             nb += job_write(p, cmd, where="jobset11")
             print(p)
         return nb
+
+    def jobset12():
+        """
+        Exploring params of sparsity with contraction=35.714285714285715
+        """
+        import numpy as np
+        C = np.linspace(0, 1, 30)
+        all_params = (
+            build_params(
+                OrderedDict(tied=tied,
+                            use_wta_lifetime=use_wta_lifetime,
+                            wta_lifetime_perc=wta_lifetime_perc,
+                            nb_hidden_units=nb_hidden_units),
+                denoise,
+                noise,
+                walkback,
+                walkback_jump,
+                autoencoding_loss,
+                contractive,
+                contractive_coef,
+                marginalized,
+                binarize_thresh)
+            for nb_hidden_units in (1000,)
+            for use_wta_lifetime in (True,)
+            for wta_lifetime_perc in C
+            for denoise in (None,)
+            for noise in ("zero_masking",)
+            for walkback in (1,)
+            for walkback_jump in (False,)
+            for autoencoding_loss in ("squared_error",)
+            for contractive in (True,)
+            for tied in (False,)
+            for contractive_coef in (35.714285714285715,)
+            for marginalized in (False,)
+            for binarize_thresh in (None,)
+        )
+        all_params = list(all_params)
+        print(len(all_params))
+        nb = 0
+        for p in all_params:
+            p['model_name'] = 'model57'
+            p['dataset'] = 'digits'
+            p['budget_hours'] = 7
+            p['optimization'] = dict(max_nb_epochs=72180)
+            cmd = build_cmd(model_name="model57", dataset="digits", params=p, budget_hours=p['budget_hours'])
+            nb += job_write(p, cmd, where="jobset12")
+            print(p)
+        return nb
     nb = 0
     #nb += test()
     #nb += jobset1()
@@ -645,5 +730,6 @@ if __name__ == "__main__":
     #nb += jobset8()
     #nb += jobset9()
     #nb += jobset10()
-    nb += jobset11()
+    #nb += jobset11()
+    nb += jobset12()
     print("Total number of jobs added : {}".format(nb))
