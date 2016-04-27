@@ -41,15 +41,21 @@ def compute_stats(job, force=False):
     x = hash_matrix_to_int(hash_matrix)
     stats = j.get("stats", {})
     s = job['summary']
+
     if "mean" not in stats or force:
         logger.info('compute mean of {}'.format(s))
         stats["mean"] = x.mean()
+        stats['mean'] = stats['mean'] / len(hash_matrix)
     if "var" not in stats or force:
         logger.info('compute var of {}'.format(s))
         stats["var"] = x.var(ddof=1)
+        maxvar = ((10000 - 1 + 1)**2 - 1) / 12# variance of max entropy distribution (discrete uniform between 1 and 10000)
+        stats['var'] = stats['var'] / maxvar
+
     if "skew" not in stats or force:
         logger.info('compute skew of {}'.format(s))
         stats["skew"] = skew(x)
+
     #if "neighcorr" not in stats or force:
     #    logger.info('compute neighcorr of {}'.format(s))
     #    stats["neighcorr"] = compute_neighcorr(folder, hash_matrix, formula='mine')
@@ -59,6 +65,9 @@ def compute_stats(job, force=False):
     if "clusdiversity" not in stats or force:
         logger.info('computing diversity score using clustering of {}'.format(s))
         stats["clusdiversity"] = compute_clusdiversity(folder, hash_matrix)
+        maxdist = np.sqrt(784)# we have binary images, so euclidean dist between full zero vector minus full one vector
+        stats["clusdiversity"] = stats["clusdiversity"] / maxdist
+
     #if "nearestneighborsdiversity" not in stats or force:
     #    logger.info('computing nearest neighbors diversity score using clustering of {}'.format(s))
     #    stats["nearestneighborsdiversity"] = compute_nearestneighbours_diversity(folder, hash_matrix)

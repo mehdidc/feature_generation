@@ -3089,6 +3089,57 @@ def model58(nb_filters=64, w=32, h=32, c=1, nb_layers=3, sparsity=True):
     )
     return layers_from_list_to_dict([l_in, l_output])
 
+def model59(nb_filters=64,  w=32, h=32, c=1,
+            use_wta_channel=True,
+            use_wta_spatial=True,
+            nb_filters_mul=1,
+            wta_channel_stride=2,
+            nb_layers=3,
+            filter_size=5):
+    """
+    model55 but mode=same
+    """
+    if type(nb_filters) == int:
+        nb_filters = [nb_filters] * nb_layers
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_convs = []
+    l_conv = l_in
+    for i in range(nb_layers):
+        l_conv = layers.Conv2DLayer(
+                l_conv,
+                num_filters=nb_filters[i] * nb_filters_mul**i,
+                filter_size=(filter_size, filter_size),
+                nonlinearity=rectify,
+                pad='same',
+                W=init.GlorotUniform(),
+                name="conv{}".format(i + 1))
+        l_convs.append(l_conv)
+
+    if use_wta_spatial is True:
+        l_wta1 = layers.NonlinearityLayer(l_conv, wta_spatial, name="wta_spatial")
+    else:
+        l_wta1 = l_conv
+    if use_wta_channel is True:
+        l_wta2 = layers.NonlinearityLayer(l_wta1, wta_channel_strided(stride=wta_channel_stride), name="wta_channel")
+    else:
+        l_wta2 = l_wta1
+
+    #w_out = l_conv.output_shape[2]
+    #w_remaining = w - w_out + 1
+    #print(w_remaining)
+    l_unconv = layers.Conv2DLayer(
+            l_wta2,
+            num_filters=c,
+            filter_size=(filter_size, filter_size),
+            nonlinearity=linear,
+            W=init.GlorotUniform(),
+            pad='same',
+            name='unconv')
+    l_out = layers.NonlinearityLayer(
+            l_unconv,
+            sigmoid, name="output")
+    print(l_out.output_shape)
+    return layers_from_list_to_dict([l_in] + l_convs + [l_wta1, l_wta2, l_unconv, l_out])
 
 build_convnet_simple = model1
 build_convnet_simple_2 = model2

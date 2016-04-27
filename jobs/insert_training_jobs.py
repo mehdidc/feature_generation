@@ -766,6 +766,76 @@ if __name__ == "__main__":
             nb += job_write(p, cmd, where="jobset13")
             print(p)
         return nb
+
+    def jobset14():
+        """
+        Exploring params of conv autoenc v2
+        """
+        nb_filters_per_layer = {
+            1: [64],
+            2: [64, 64],
+            3: [64, 64, 64],
+            4: [64, 64, 64, 64],
+            5: [64, 64, 64, 64, 64],
+        }
+
+        def build_model_params(nb_filters,
+                               nb_layers,
+                               filter_size,
+                               use_wta_spatial, use_wta_channel,
+                               nb_filters_mul,
+                               wta_channel_stride):
+            return OrderedDict(nb_filters=nb_filters,
+                               filter_size=filter_size,
+                               use_wta_channel=use_wta_channel,
+                               use_wta_spatial=use_wta_spatial,
+                               nb_filters_mul=nb_filters_mul,
+                               wta_channel_stride=wta_channel_stride,
+                               nb_layers=nb_layers)
+
+        all_params = (
+            build_params(
+                build_model_params(nb_filters_per_layer[nb_layers],
+                                   nb_layers, filter_size,
+                                   use_wta_spatial, use_wta_channel,
+                                   nb_filters_mul,
+                                   wta_channel_stride),
+                denoise,
+                noise,
+                walkback,
+                walkback_jump,
+                autoencoding_loss,
+                contractive,
+                contractive_coef,
+                marginalized,
+                binarize_thresh)
+                for nb_layers in (1, 2, 3, 4, 5)
+                for filter_size in (5,)
+                for use_wta_spatial in (True,)
+                for use_wta_channel in (True, False)
+                if use_wta_spatial is True or use_wta_channel is True
+                for nb_filters_mul in (1,)
+                for wta_channel_stride in ((1, 2, 3, 4) if use_wta_channel else (1,))
+                for denoise in (None,)
+                for noise in ("zero_masking",)
+                for walkback in ((1, 3, 5) if denoise is not None else (1,))
+                for walkback_jump in (False,)
+                for autoencoding_loss in ("squared_error",)
+                for contractive in (False,)
+                for contractive_coef in (0,)
+                for marginalized in (False,)
+                for binarize_thresh in (None,)
+        )
+        all_params = list(all_params)
+        nb = 0
+        budget_hours = 6 
+        for p in all_params:
+            p['model_name'] = 'model59'
+            p['dataset'] = 'digits'
+            p['budget_hours'] = budget_hours
+            cmd = build_cmd(model_name="model59", dataset="digits", budget_hours=budget_hours, params=p)
+            nb += job_write(p, cmd, where="jobset14")
+        return nb
     nb = 0
     #nb += test()
     #nb += jobset1()
@@ -780,5 +850,6 @@ if __name__ == "__main__":
     #nb += jobset10()
     #nb += jobset11()
     #nb += jobset12()
-    nb += jobset13()
+    #nb += jobset13()
+    nb += jobset14()
     print("Total number of jobs added : {}".format(nb))
