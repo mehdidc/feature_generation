@@ -3089,6 +3089,7 @@ def model58(nb_filters=64, w=32, h=32, c=1, nb_layers=3, sparsity=True):
     )
     return layers_from_list_to_dict([l_in, l_output])
 
+
 def model59(nb_filters=64,  w=32, h=32, c=1,
             use_wta_channel=True,
             use_wta_spatial=True,
@@ -3140,6 +3141,43 @@ def model59(nb_filters=64,  w=32, h=32, c=1,
             sigmoid, name="output")
     print(l_out.output_shape)
     return layers_from_list_to_dict([l_in] + l_convs + [l_wta1, l_wta2, l_unconv, l_out])
+
+
+def model60(nb_filters=64, w=32, h=32, c=1, nb_layers=3, block_size=1, sparsity=True):
+    """
+    Residual Pyramidal auto-encoder 2x
+    """
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_conv = l_in
+    prev = l_conv
+    for i in range(nb_layers):
+        l_conv = layers.Conv2DLayer(
+            l_conv,
+            num_filters=nb_filters,
+            filter_size=(3, 3),
+            pad=1, 
+            nonlinearity=linear,
+            W=init.GlorotUniform(),
+        )
+        if i == 0:
+            prev = l_conv
+        if i % block_size == 0 and i > 0:
+            l_conv_ = l_conv
+            l_conv = layers.NonlinearityLayer(layers.ElemwiseSumLayer([prev, l_conv]),
+                                              nonlinearity=rectify)
+            prev = l_conv_
+        else:
+            l_conv = layers.NonlinearityLayer(l_conv, rectify)
+    l_output = layers.Conv2DLayer(
+        l_conv,
+        num_filters=c,
+        filter_size=(3, 3),
+        pad=1,
+        nonlinearity=linear,
+        W=init.GlorotUniform(),
+        name="output")
+    return layers_from_list_to_dict([l_in, l_output])
+
 
 build_convnet_simple = model1
 build_convnet_simple_2 = model2
