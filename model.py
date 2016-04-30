@@ -8,6 +8,15 @@ import theano.tensor as T
 import numpy as np
 from batch_norm import NormalizeLayer, ScaleAndShiftLayer, DecoderNormalizeLayer, DenoiseLayer, FakeLayer
 
+get_nonlinearity = dict(
+    linear=linear, 
+    sigmoid=sigmoid, 
+    rectify=rectify, 
+    very_leaky_rectify=very_leaky_rectify, 
+    softmax=softmax, 
+    tanh=tanh
+)
+
 def model1(nb_filters=64, w=32, h=32, c=1):
     l_in = layers.InputLayer((None, c, w, h), name="input")
     l_conv = layers.Conv2DLayer(
@@ -3062,10 +3071,12 @@ def model57(nb_filters=64, w=32, h=32, c=1,
     return layers_from_list_to_dict([l_in] + hids + [l_pre_out, l_out])
 
 
-def model58(nb_filters=64, w=32, h=32, c=1, nb_layers=3, sparsity=True):
+def model58(nb_filters=64, w=32, h=32, c=1, filter_size=3, nb_layers=3, sparsity=True):
     """
-    Pyramidal auto-encoder 2x
+    Pyramidal auto-encoder input-input
     """
+    if type(filter_size) == int:
+        filter_size = [filter_size] * (nb_layers + 1)
     l_in = layers.InputLayer((None, c, w, h), name="input")
     #l_in_rescaled = layers.Pool2DLayer(l_in, (2, 2), mode='average_inc_pad')
     l_conv = l_in
@@ -3073,16 +3084,16 @@ def model58(nb_filters=64, w=32, h=32, c=1, nb_layers=3, sparsity=True):
         l_conv = layers.Conv2DLayer(
             l_conv,
             num_filters=nb_filters,
-            filter_size=(3, 3),
-            pad=1, 
+            filter_size=(filter_size[i], filter_size[i]),
+            pad='same', 
             nonlinearity=rectify,
             W=init.GlorotUniform(),
         )
     l_output = layers.Conv2DLayer(
         l_conv,
         num_filters=c,
-        filter_size=(3, 3),
-        pad=1,
+        filter_size=(filter_size[-1], filter_size[-1]),
+        pad='same',
         nonlinearity=linear,
         W=init.GlorotUniform(),
         name="output"
@@ -3143,10 +3154,14 @@ def model59(nb_filters=64,  w=32, h=32, c=1,
     return layers_from_list_to_dict([l_in] + l_convs + [l_wta1, l_wta2, l_unconv, l_out])
 
 
-def model60(nb_filters=64, w=32, h=32, c=1, nb_layers=3, block_size=1, sparsity=True):
+def model60(nb_filters=64, w=32, h=32, c=1, filter_size=3, nb_layers=3, block_size=1, sparsity=True, nonlinearity='rectify'):
     """
-    Residual Pyramidal auto-encoder 2x
+    Residual Pyramidal auto-encoder input-input
     """
+    if type(filter_size) == int:
+        filter_size = [filter_size] * (nb_layers + 1)
+
+    nonlin = get_nonlinearity[nonlinearity]
     l_in = layers.InputLayer((None, c, w, h), name="input")
     l_conv = l_in
     prev = l_conv
@@ -3154,8 +3169,8 @@ def model60(nb_filters=64, w=32, h=32, c=1, nb_layers=3, block_size=1, sparsity=
         l_conv = layers.Conv2DLayer(
             l_conv,
             num_filters=nb_filters,
-            filter_size=(3, 3),
-            pad=1, 
+            filter_size=(filter_size[i], filter_size[i]),
+            pad='same', 
             nonlinearity=linear,
             W=init.GlorotUniform(),
         )
@@ -3164,20 +3179,137 @@ def model60(nb_filters=64, w=32, h=32, c=1, nb_layers=3, block_size=1, sparsity=
         if i % block_size == 0 and i > 0:
             l_conv_ = l_conv
             l_conv = layers.NonlinearityLayer(layers.ElemwiseSumLayer([prev, l_conv]),
-                                              nonlinearity=rectify)
+                                              nonlinearity=nonlin)
             prev = l_conv_
         else:
-            l_conv = layers.NonlinearityLayer(l_conv, rectify)
+            l_conv = layers.NonlinearityLayer(l_conv, nonlin)
     l_output = layers.Conv2DLayer(
         l_conv,
         num_filters=c,
-        filter_size=(3, 3),
-        pad=1,
+        filter_size=(filter_size[-1], filter_size[-1]),
+        pad='same',
         nonlinearity=linear,
         W=init.GlorotUniform(),
         name="output")
     return layers_from_list_to_dict([l_in, l_output])
 
+def model61(nb_filters=64, w=32, h=32, c=1, up=2, filter_size=3, nb_layers=3, block_size=1, sparsity=True, nonlinearity='rectify'):
+    """
+    Residual Pyramidal auto-encoder input Nx
+    """
+    if type(filter_size) == int:
+        filter_size = [filter_size] * (nb_layers + 1)
+
+    nonlin = get_nonlinearity[nonlinearity]
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_conv = l_in
+    prev = l_conv
+    for i in range(nb_layers):
+        l_conv = layers.Conv2DLayer(
+            l_conv,
+            num_filters=nb_filters,
+            filter_size=(filter_size[i], filter_size[i]),
+            pad='same', 
+            nonlinearity=linear,
+            W=init.GlorotUniform(),
+        )
+        if i == 0:
+            prev = l_conv
+        if i % block_size == 0 and i > 0:
+            l_conv_ = l_conv
+            l_conv = layers.NonlinearityLayer(layers.ElemwiseSumLayer([prev, l_conv]),
+                                              nonlinearity=nonlin)
+            prev = l_conv_
+        else:
+            l_conv = layers.NonlinearityLayer(l_conv, nonlin)
+    l_conv = Deconv2DLayer(
+        l_conv,
+        num_filters=nb_filters,
+        filter_size=(filter_size[-1], filter_size[-1]),
+        stride=up,
+        nonlinearity=nonlin,
+        W=init.GlorotUniform()
+    )
+    r = filter_size[-1] - up - 1
+    l_output = layers.Conv2DLayer(
+        l_conv,
+        num_filters=c,
+        filter_size=(r, r),
+        nonlinearity=linear,
+        W=init.GlorotUniform(),
+        name="output")
+    return layers_from_list_to_dict([l_in, l_output])
+
+def model62(nb_filters=64, w=32, h=32, c=1, up=2, filter_size=3, nb_layers=3, sparsity=True):
+    """
+    Pyramidal auto-encoder input-input upscaler
+    """
+    if type(filter_size) == int:
+        filter_size = [filter_size] * (nb_layers + 1)
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    #l_in_rescaled = layers.Pool2DLayer(l_in, (2, 2), mode='average_inc_pad')
+    l_conv = l_in
+    for i in range(nb_layers):
+        l_conv = layers.Conv2DLayer(
+            l_conv,
+            num_filters=nb_filters,
+            filter_size=(filter_size[i], filter_size[i]),
+            pad='same', 
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+        )
+    l_conv = Deconv2DLayer(
+        l_conv,
+        num_filters=nb_filters,
+        filter_size=(filter_size[-1], filter_size[-1]),
+        stride=up,
+        nonlinearity=rectify,
+        W=init.GlorotUniform()
+    )
+    r = filter_size[-1] - up + 1
+    l_output = layers.Conv2DLayer(
+        l_conv,
+        num_filters=c,
+        filter_size=(r, r),
+        nonlinearity=linear,
+        W=init.GlorotUniform(),
+        name="output")
+    return layers_from_list_to_dict([l_in, l_output])
+
+def model63(nb_filters=64, w=32, h=32, c=1, up=2, filter_size=3, nb_layers=3, sparsity=True):
+    """
+    Pyramidal auto-encoder input-input upscaler but begins with upscaling
+    """
+    if type(filter_size) == int:
+        filter_size = [filter_size] * (nb_layers + 1)
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_conv = Deconv2DLayer(
+        l_in,
+        num_filters=nb_filters,
+        filter_size=(filter_size[0], filter_size[0]),
+        stride=up,
+        nonlinearity=rectify,
+        W=init.GlorotUniform()
+    )
+    for i in range(nb_layers):
+        l_conv = layers.Conv2DLayer(
+            l_conv,
+            num_filters=nb_filters,
+            filter_size=(filter_size[i + 1], filter_size[i + 1]),
+            pad='same', 
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+        )
+
+    l_output = layers.Conv2DLayer(
+        l_conv,
+        num_filters=c,
+        filter_size=(filter_size[-1], filter_size[-1]),
+        nonlinearity=linear,
+        pad='same',
+        W=init.GlorotUniform(),
+        name="output")
+    return layers_from_list_to_dict([l_in, l_output])
 
 build_convnet_simple = model1
 build_convnet_simple_2 = model2
