@@ -1,0 +1,22 @@
+{
+    "binarize_thresh": 0.5,
+    "noise": "salt_and_pepper",
+    "contractive_coef": null,
+    "denoise": 0.3,
+    "walkback": 3,
+    "marginalized": false,
+    "autoencoding_loss": "cross_entropy",
+    "walkback_mode": "bengio_without_sampling",
+    "contractive": false,
+    "model_name": "model57",
+    "use_wta_lifetime": false,
+    "nb_hidden_units": 2000,
+
+    "dataset": "digits",
+    "budget_hours": 8,
+    "mode": "minibatch",
+    "optimization": {
+        "algo": "momentum",
+        "initial_lr": 0.001
+    }
+}

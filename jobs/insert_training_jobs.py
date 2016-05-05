@@ -82,6 +82,13 @@ def build_cmd(launcher="scripts/launch_gpu", model_name="model8", dataset="digit
     return cmd
 
 if __name__ == "__main__":
+    import sys
+    
+    if len(sys.argv) == 2 and sys.argv[1] == 'dry':
+        dry = True
+    else:
+        dry = False
+
     budget_hours = 10
     from lightjob.db import DB
     from lightjob.cli import get_dotfolder
@@ -94,6 +101,8 @@ if __name__ == "__main__":
         #db.job_update(summarize(params), dict(where=where))
         #db.job_update(summarize(params), dict(cmd=cmd))
         #return 0
+        if dry:
+            return 0
         return db.safe_add_job(params, type='training', cmd=cmd, where=where)
 
     def build_params(model_params,
@@ -105,7 +114,8 @@ if __name__ == "__main__":
                      contractive,
                      contractive_coef,
                      marginalized,
-                     binarize_thresh):
+                     binarize_thresh,
+                     ):
         params = OrderedDict(
             model_params=model_params,
             denoise=denoise,
@@ -932,7 +942,53 @@ if __name__ == "__main__":
             nb += job_write(p, cmd, where="jobset16")
             print(p)
         return nb
-    
+
+
+    def jobset17():
+        """
+        Exploring params of denoising with walkback (like jobset6 but with the correct walkback used in bengio)
+        """
+        all_params = (
+            OrderedDict(
+                model_params=OrderedDict(tied=tied,
+                                         use_wta_lifetime=use_wta_lifetime,
+                                         wta_lifetime_perc=wta_lifetime_perc,
+                                         nb_hidden_units=nb_hidden_units),
+                denoise=denoise,
+                noise=noise,
+                walkback=walkback,
+                walkback_mode=walkback_mode,
+                autoencoding_loss=autoencoding_loss,
+                contractive=contractive,
+                contractive_coef=contractive_coef,
+                marginalized=marginalized,
+                binarize_thresh=binarize_thresh)
+            for nb_hidden_units in (1000,)
+            for use_wta_lifetime in (False,)
+            for wta_lifetime_perc in (None,)
+            for denoise in (0.1, 0.2, 0.3, 0.4, 0.5)
+            for noise in ("zero_masking",)
+            for walkback in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+            for walkback_mode in ('bengio',)
+            for autoencoding_loss in ("squared_error",)
+            for contractive in (False,)
+            for tied in (False,)
+            for contractive_coef in (None,)
+            for marginalized in (False,)
+            for binarize_thresh in (0.5,)
+        )
+        all_params = list(all_params)
+        print(len(all_params))
+        nb = 0
+        budget_hours = 6
+        for p in all_params:
+            p['model_name'] = 'model57'
+            p['dataset'] = 'digits'
+            p['budget_hours'] = budget_hours
+            cmd = build_cmd(model_name="model57", dataset="digits", params=p, budget_hours=budget_hours)
+            nb += job_write(p, cmd, where="jobset17")
+            print(json.dumps(p, indent=4))
+        return nb
     nb = 0
     #nb += test()
     #nb += jobset1()
@@ -949,5 +1005,6 @@ if __name__ == "__main__":
     #nb += jobset12()
     #nb += jobset13()
     #nb += jobset14()
-    nb += jobset15()
+    #nb += jobset15()
+    nb += jobset17()
     print("Total number of jobs added : {}".format(nb))

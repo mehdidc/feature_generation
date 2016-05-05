@@ -106,6 +106,9 @@ def zero_masking(x, rng, corruption_level=0.5):
     )
     return x * a
 
+def bernoulli_sample(x, rng):
+    xs = rng.uniform(size=x.shape) <= x
+    return xs
 
 def zero_mask(x, rng, corruption_level=0.5):
     a = rng.binomial(

@@ -38,7 +38,11 @@ def load_data(dataset="digits", w=None, h=None, include_test=False, batch_size=1
         data.load()
         w, h = data.img_dim
         if mode == 'random':
+            data_train_whole = data
             data = SubSampled(data, batch_size)
+            data.train = data_train_whole
+        else:
+            data.train = data
         if include_test:
             data.test = MNIST(which='test')
             data.test.load()

@@ -21,7 +21,7 @@ from lasagnekit.nnet.capsule import Capsule, make_function
 from lasagnekit.misc.plot_weights import grid_plot, dispims_color, tile_raster_images
 from lasagnekit.easy import get_stat, iterate_minibatches
 import numpy as np
-from helpers import salt_and_pepper, zero_masking, zero_mask
+from helpers import salt_and_pepper, zero_masking, zero_mask, bernoulli_sample
 from data import load_data
 from model import *  # for dill
 from skimage.io import imsave
@@ -246,9 +246,20 @@ def build_capsule_(layers, data, nbl, nbc,
             out.append(L.get_output(layer, X, determnistic=True))
         return out
 
+    def recons_loss(true, pred):
+        if autoencoding_loss == "squared_error":
+            return ((true - pred) ** 2).sum(axis=(1, 2, 3)).mean()
+        elif autoencoding_loss == "cross_entropy":
+            pred = theano.tensor.clip(pred, 0.001, 0.999)
+            return (T.nnet.binary_crossentropy(pred, true)).sum(axis=(1, 2, 3)).mean()
+    def get_recons_loss(model, X):
+        Xrec = reconstruct(model, X)
+        return recons_loss(X, Xrec)
+
     functions = {
         "reconstruct": make_function(func=reconstruct, params=["X"]),
-        "get_conv_layers": make_function(func=get_conv, params=["X"])
+        "get_conv_layers": make_function(func=get_conv, params=["X"]),
+        "get_recons_loss": make_function(func=get_recons_loss, params=["X"])
     }
     if is_predictive:
         functions.update({
@@ -404,6 +415,8 @@ def build_capsule_(layers, data, nbl, nbc,
 
         N = 1000
         if mode == "minibatch":
+            N = 5
+            """
             t = (t * data.X.shape[0] / batch_size)
             next_ = (t + batch_size) / N
             next_ = next_ * N
@@ -411,9 +424,19 @@ def build_capsule_(layers, data, nbl, nbc,
                 next_ += N
             if next_ >= t and next_ <= t + batch_size:
                 t = next_
+            """
         # each N epochs save reconstructions
         # and how features look like
         if t % N == 0:
+            for name in ("train", "test"):
+                if hasattr(data, name):
+                    dt = getattr(data, name)
+                    rec_errors = []
+                    for batch in iterate_minibatches(dt.X.shape[0], batchsize=1000):
+                        rec_error = capsule.get_recons_loss(capsule.preprocess(dt.X[batch]))
+                        rec_errors.append(rec_error)
+                    rec_error_mean = np.mean(rec_errors)
+                    status["{}_recons_error".format(name)] = rec_error_mean
             report(status)
 
         if (datetime.now() - begin).total_seconds() >= budget_sec:
@@ -444,7 +467,7 @@ def build_capsule_(layers, data, nbl, nbc,
     initial_lr = optim_params["initial_lr"]
     lr_decay = optim_params["lr_decay"]
     lr = theano.shared(np.array(initial_lr, dtype=np.float32))
-    algos = {"adam": updates.adam, "adadelta": updates.adadelta}
+    algos = {"adam": updates.adam, "adadelta": updates.adadelta, "momentum": updates.momentum}
     algo = algos[optim_params["algo"]]
     params = {"learning_rate": lr}
 
@@ -481,33 +504,46 @@ def build_capsule_(layers, data, nbl, nbc,
             Xtilde = X * pr + X[perm] * (1 - pr)
         return Xtilde
 
+    def stoch_reconstruct_and_sample(model, X):
+        Xrec = stoch_reconstruct(model, X)
+        return bernoulli_sample(Xrec, theano_rng)
+    
     def loss_function(model, tensors):
         X = tensors["X"]
         if denoise is not None:
-            Xtilde = noisify(X)
-            X_pred = stoch_reconstruct(model, Xtilde)
-            updates =  [(v, u) for v, u, _, _ in theano_rng.updates()]
-            print(theano_rng_cpu.updates())
-            updates.extend([(v, u) for v, u in theano_rng_cpu.updates()])
-        else:
-            X_pred = stoch_reconstruct(model, X)
-            updates = []
 
-        def recons_loss(true, pred):
-            if autoencoding_loss == "squared_error":
-                return ((true - pred) ** 2).sum(axis=(1, 2, 3)).mean()
-            elif autoencoding_loss == "cross_entropy":
-                return (true * T.log(pred) + (1 - true) * T.log(1 - pred)).sum(axis=(1, 2, 3)).mean()
-
-        if denoise is not None:
-
+            # for backward compatibility, but walkback_jump should not be used
+            # anymore, use walkback_mode only
             if train_params.get("walkback_jump", True) is True:
+                walkback_mode = train_params.get("walkback_mode", "mine2")
+            else:
+                walkback_mode = 'mine'
+
+            if walkback_mode == "mine2":
                 recons = 0
+                Xtilde = noisify(X)
+                X_pred = stoch_reconstruct(model, Xtilde)
                 for i in range(walkback):
                     recons += recons_loss(X, X_pred)
                     X_pred = stoch_reconstruct(model, X_pred)
                 loss = recons
-            else:
+            elif walkback_mode == "bengio_without_sampling":
+                recons = 0
+                Xcur = X
+                for i in range(walkback):
+                    Xcur = noisify(Xcur)
+                    Xcur = stoch_reconstruct(model, Xcur)
+                    recons += recons_loss(X, Xcur)
+                loss = recons
+            elif walkback_mode == "bengio":
+                recons = 0
+                Xcur = X
+                for i in range(walkback):
+                    Xcur = noisify(Xcur)
+                    recons += recons_loss(X, stoch_reconstruct(model, Xcur))
+                    Xcur = stoch_reconstruct_and_sample(model, Xcur)
+                loss = recons
+            elif walkback_mode == "mine":
                 recons = 0
                 Xcur = X
                 for i in range(walkback):
@@ -515,9 +551,16 @@ def build_capsule_(layers, data, nbl, nbc,
                     recons += recons_loss(Xcur, stoch_reconstruct(model, Xcur_tilde))
                     Xcur = Xcur_tilde
                 loss = recons
+            else:
+                raise Exception('no valid walkback mode')
+
+            updates =  [(v, u) for v, u, _, _ in theano_rng.updates()]
+            updates.extend([(v, u) for v, u in theano_rng_cpu.updates()])
         else:
+            X_pred = stoch_reconstruct(model, X)
             recons = recons_loss(X, X_pred)
             loss = recons
+            updates = []
 
         if is_predictive:
             y_pred = predict(model, X)
@@ -580,11 +623,14 @@ def build_capsule_(layers, data, nbl, nbc,
         else:
             return X
 
-    if train_params.get("mode", "random") == "random":
+    mode = train_params.get("mode", "random")
+    if mode == "random":
         batch_iterator = build_batch_iterator(transform)
-    else:
+    elif mode == "minibatch":
         #mode minibatch
         batch_iterator = None
+    else:
+        raise Exception('Unknown mode : {}'.format(mode))
     # put all together
     capsule = Capsule(
         input_variables,
