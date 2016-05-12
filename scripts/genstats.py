@@ -15,6 +15,8 @@ from scipy.stats import skew
 import pickle
 import sys
 import logging
+import intdim_mle
+import manifold
 
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(stream=sys.stdout)
@@ -68,6 +70,12 @@ def compute_stats(job, force=False):
         maxdist = np.sqrt(784)# we have binary images, so euclidean dist between full zero vector minus full one vector
         stats["clusdiversity"] = stats["clusdiversity"] / maxdist
 
+    #if "intdim_mle" not in stats or force:
+    #    logger.info('computing intdim_le of {}'.format(s))
+    #    stats["intdim_mle"] = compute_intdim(folder, hash_matrix, method='mle')
+    if "manifold_dist" not in stats or force:
+        logger.info('computing manifold distance of {}'.format(s))
+        stats['manifold_dist'] = compute_manifold_dist(folder, hash_matrix)
     #if "nearestneighborsdiversity" not in stats or force:
     #    logger.info('computing nearest neighbors diversity score using clustering of {}'.format(s))
     #    stats["nearestneighborsdiversity"] = compute_nearestneighbours_diversity(folder, hash_matrix)
@@ -77,10 +85,7 @@ def compute_stats(job, force=False):
     logger.info('Finished on {}, stats : {}'.format(s, stats))
     return stats
 
-
-def compute_dpgmmclusdiversity(job_folder, hash_matrix):
-    from sklearn.mixture import DPGMM
-
+def construct_data(job_folder, hash_matrix):
     filenames = glob.glob(os.path.join(job_folder, 'final', '*.png'))
     filenames = sorted(filenames)
     indices = unique_indices(hash_matrix)
@@ -93,8 +98,29 @@ def compute_dpgmmclusdiversity(job_folder, hash_matrix):
         X.append([im])
     X = np.concatenate(X, axis=0)
     X = X.reshape((X.shape[0], -1))
+    return X
 
+def compute_manifold_dist(job_folder, hash_matrix):
+    from lasagnekit.datasets.mnist import MNIST
+    import numpy as np
+    np.random.seed(1234)
+    Z = construct_data(job_folder, hash_matrix)
+    data = MNIST()
+    data.load()
+    Y = data.X[np.random.choice(np.arange(len(data.X)), size=len(Z), replace=False)]
+    NN = 100 # nb of  neighbors
+    k = 10 # logk defines the entropy of tau_Y and tau_Z distributions
+    ks = 5
+    dist, _ = manifold.compute_dist(Y, Z, NN=NN, k=k, ks=ks, 
+                                    compute_density=False,
+                                    nb_integrations=1, # repeat if you want to estimate variance of the integral estimation
+                                    nb_iter=100,
+                                    integration_method='monte_carlo')
+    return np.mean(dist)
 
+def compute_dpgmmclusdiversity(job_folder, hash_matrix):
+    from sklearn.mixture import DPGMM
+    X = construct_data(job_folder, hash_matrix)
     clus = DPGMM(n_components=1000, verbose=1)
     clus.fit(X)
     n_components = clus.n_components
@@ -104,19 +130,7 @@ def compute_dpgmmclusdiversity(job_folder, hash_matrix):
 
 def compute_clusdiversity(job_folder, hash_matrix, nb_clusters=1000):
     from sklearn.cluster import KMeans
-
-    filenames = glob.glob(os.path.join(job_folder, 'final', '*.png'))
-    filenames = sorted(filenames)
-    indices = unique_indices(hash_matrix)
-    filenames = [filenames[ind] for ind in indices]
-    if len(filenames) == 0:
-        return None
-    X = []
-    for im in get_images(filenames):
-        X.append([im])
-    X = np.concatenate(X, axis=0)
-    X = X.reshape((X.shape[0], -1))
-
+    X = construct_data(job_folder, hash_matrix)
     if X.shape[0] < nb_clusters:
         nb_clusters = max(X.shape[0] / 10, 1)
     logger.info(str(nb_clusters))
@@ -127,6 +141,19 @@ def compute_clusdiversity(job_folder, hash_matrix, nb_clusters=1000):
     # avg distance of points to their closest cluster center
     return dists.mean()
 
+def compute_intdim(job_folder, hash_matrix, method='mle'):
+    X = construct_data(job_folder, hash_matrix)
+
+    k1 = 10 # start of interval(included)
+    k2 = 20 # end of interval(included)
+    intdim_k_repeated = intdim_mle.repeated(
+        intdim_mle.intrinsic_dim_scale_interval, 
+        X, 
+        mode='bootstrap', 
+        nb_iter=100, # nb_iter for bootstrapping
+        verbose=1, 
+        k1=k1, k2=k2)
+    return intdim_k_repeated.mean()
 
 def compute_nearestneighbours_diversity(job_folder, hash_matrix, nearest_neighbors=100):
     filenames = glob.glob(os.path.join(job_folder, 'final', '*.png'))

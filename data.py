@@ -1,7 +1,7 @@
 import numpy as np
 import os
 from skimage.io import imread
-
+from lasagnekit.datasets.helpers import split
 
 def load_data(dataset="digits", w=None, h=None, include_test=False, batch_size=128, mode='random', **kw):
     nbl, nbc = 10, 10
@@ -112,9 +112,29 @@ def load_data(dataset="digits", w=None, h=None, include_test=False, batch_size=1
         c = 1
         data = load_once(Fonts)(kind='all_64')
         data.load()
-        data = SubSampled(data, batch_size)
-        data = Rescaled(data, (w, h))
-        data.load()
+        if include_test:
+            data_train, data_test = split(data, test_size=0.15, random_state=42)
+        else:
+            data_train = data
+
+        if mode == 'random':
+            data_train = Rescaled(data_train, (w, h))
+            data_train.load()
+            data = SubSampled(data_train, batch_size)
+            data.load()
+            data.train = data_train
+            if include_test:
+                data.test = Rescaled(data_test, (w, h))
+                data.test.load()
+        else:
+            data_train = Rescaled(data_train, (w, h))
+            data_train.load()
+            data = data_train
+            data.train = data_train
+            if include_test:
+                data.test = Rescaled(data_test, (w, h))
+                data.test.load()
+
     elif dataset == "svhn":
         from lasagnekit.datasets.svhn import SVHN
         from lasagnekit.datasets.helpers import load_once
