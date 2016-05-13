@@ -116,7 +116,7 @@ def construct_tau(S, k, NN=5, tau0=1, verbose=1):
         s = s[1:NN + 1]
         def f(tau_sqrt):
             return entropy_p_univariate(s * tau_sqrt**2) - np.log(k)
-        tau_sqrt_i = newton(f, tau0)
+        tau_sqrt_i = newton(f, tau0, maxiter=100)
         tau_i = tau_sqrt_i ** 2
         if verbose > 0:
             print("row {}, entropy:{}, logk={}, tau:{}".format(i, entropy_p_univariate(s * tau_i), np.log(k), tau_i))

@@ -1,6 +1,6 @@
-\
-
+import sys
 import os
+sys.path.append(os.path.dirname(__file__)+"/..")
 import json
 from collections import defaultdict, OrderedDict
 from itertools import product
@@ -43,6 +43,7 @@ def compute_stats(job, force=False):
     x = hash_matrix_to_int(hash_matrix)
     stats = j.get("stats", {})
     s = job['summary']
+    ref_job = j['ref_job']['summary']
 
     if "mean" not in stats or force:
         logger.info('compute mean of {}'.format(s))
@@ -70,12 +71,12 @@ def compute_stats(job, force=False):
         maxdist = np.sqrt(784)# we have binary images, so euclidean dist between full zero vector minus full one vector
         stats["clusdiversity"] = stats["clusdiversity"] / maxdist
 
-    #if "intdim_mle" not in stats or force:
-    #    logger.info('computing intdim_le of {}'.format(s))
-    #    stats["intdim_mle"] = compute_intdim(folder, hash_matrix, method='mle')
-    if "manifold_dist" not in stats or force:
-        logger.info('computing manifold distance of {}'.format(s))
-        stats['manifold_dist'] = compute_manifold_dist(folder, hash_matrix)
+    if "intdim_mle" not in stats or True:
+        logger.info('computing intdim_le of {}'.format(s))
+        stats["intdim_mle"] = compute_intdim(folder, hash_matrix, method='mle')
+    #if "manifold_dist" not in stats or force:
+    #    logger.info('computing manifold distance of {}'.format(s))
+    #    stats['manifold_dist'] = compute_manifold_dist(folder, hash_matrix, ref_job)
     #if "nearestneighborsdiversity" not in stats or force:
     #    logger.info('computing nearest neighbors diversity score using clustering of {}'.format(s))
     #    stats["nearestneighborsdiversity"] = compute_nearestneighbours_diversity(folder, hash_matrix)
@@ -100,18 +101,34 @@ def construct_data(job_folder, hash_matrix):
     X = X.reshape((X.shape[0], -1))
     return X
 
-def compute_manifold_dist(job_folder, hash_matrix):
-    from lasagnekit.datasets.mnist import MNIST
+def compute_manifold_dist(job_folder, hash_matrix, ref_job):
+
     import numpy as np
+    from tasks import check
+    import theano
+    import theano.tensor as T
+    import lasagne
+
+    v = check(what="notebook", 
+              filename="jobs/results/{}/model.pkl".format(ref_job),
+              dataset="digits")
+    capsule, data, layers, w, h, c = v
+
     np.random.seed(1234)
-    Z = construct_data(job_folder, hash_matrix)
-    data = MNIST()
-    data.load()
-    Y = data.X[np.random.choice(np.arange(len(data.X)), size=len(Z), replace=False)]
+    nb = 10000
+    print(data.train.X.shape)
+    Y = data.train.X[np.random.choice(np.arange(len(data.train.X)), size=nb, replace=False)]
+    x = T.tensor4()
+    g = theano.function(
+        [x],
+        lasagne.layers.get_output(layers['hid'], x)
+    )
+    H = g(Y.reshape((Y.shape[0], c, w,h)))
+
     NN = 100 # nb of  neighbors
     k = 10 # logk defines the entropy of tau_Y and tau_Z distributions
     ks = 5
-    dist, _ = manifold.compute_dist(Y, Z, NN=NN, k=k, ks=ks, 
+    dist, _ = manifold.compute_dist(Y, H, NN=NN, k=k, ks=ks, 
                                     compute_density=False,
                                     nb_integrations=1, # repeat if you want to estimate variance of the integral estimation
                                     nb_iter=100,
@@ -142,8 +159,11 @@ def compute_clusdiversity(job_folder, hash_matrix, nb_clusters=1000):
     return dists.mean()
 
 def compute_intdim(job_folder, hash_matrix, method='mle'):
+    import numpy as np
+    np.random.seed(42)
     X = construct_data(job_folder, hash_matrix)
-
+    nb = 100
+    X = X[np.random.choice(np.arange(len(X)), size=nb, replace=False)]
     k1 = 10 # start of interval(included)
     k2 = 20 # end of interval(included)
     intdim_k_repeated = intdim_mle.repeated(
@@ -153,7 +173,8 @@ def compute_intdim(job_folder, hash_matrix, method='mle'):
         nb_iter=100, # nb_iter for bootstrapping
         verbose=1, 
         k1=k1, k2=k2)
-    return intdim_k_repeated.mean()
+    print('Estimate : {} +/- {}'.format(np.mean(np.mean(intdim_k_repeated, axis=1)), np.var(np.mean(intdim_k_repeated, axis=1))))
+    return np.mean(intdim_k_repeated)
 
 def compute_nearestneighbours_diversity(job_folder, hash_matrix, nearest_neighbors=100):
     filenames = glob.glob(os.path.join(job_folder, 'final', '*.png'))

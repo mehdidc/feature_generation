@@ -39,14 +39,15 @@ import numpy as np
 from sklearn.neighbors import NearestNeighbors
 
 def intrinsic_dim_sample_wise(X, k=5):
-    neighb = NearestNeighbors(n_neighbors=k + 1).fit(X)
+    n_neighbors = min(k + 1, X.shape[0])
+    neighb = NearestNeighbors(n_neighbors=n_neighbors).fit(X)
     dist, ind = neighb.kneighbors(X)
     dist = dist[:, 1:]
-    dist = dist[:, 0:k]
-    assert dist.shape == (X.shape[0], k), "expecting shape : {}, shape : {}".format((X.shape[0], k), dist.shape)
+    dist = dist[:, 0:n_neighbors - 1]
+    assert dist.shape == (X.shape[0], n_neighbors - 1), "expecting shape : {}, shape : {}".format((X.shape[0], n_neighbors - 1), dist.shape)
     assert np.all(dist > 0)
-    d = np.log(dist[:, k - 1: k] / dist[:, 0:k-1])
-    d = d.sum(axis=1) / (k - 2)
+    d = np.log(dist[:, n_neighbors - 2: k] / dist[:, 0:n_neighbors])
+    d = d.sum(axis=1) / (n_neighbors - 1)
     d = 1. / d
     intdim_sample = d
     return intdim_sample
