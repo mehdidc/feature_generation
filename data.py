@@ -86,20 +86,29 @@ def load_data(dataset="digits", w=None, h=None, include_test=False, batch_size=1
         c = 1
 
         mode = kw.get("mode", "all")
+        mode = "all"
+        include_test = True
         if mode == "all":
             nb = 38698
         else:
             nb = batch_size
         data = load_once(FlatIcon)(size=(w, h), nb=nb, mode=mode)
         data.load()
+        data.y = None
         def preprocess(X):
             X = X[:, :, :, 0]
             X = X.reshape((X.shape[0], -1))
             return X
         data = Transformed(data, preprocess, per_example=False)
-        if mode == "all":
-            data = SubSampled(data, batch_size)
         data.load()
+        if include_test:
+            data_train, data_test = split(data, test_size=0.15, random_state=42)
+        
+        data = SubSampled(data_train, batch_size)      
+        data.load()  
+        data.train = data_train
+        data.test = data_test
+        
         print(data.X.shape)
 
     elif dataset == "fonts":

@@ -271,6 +271,7 @@ def build_capsule_(layers, data, nbl, nbc,
         ep = status["epoch"]
         X_pred = capsule.reconstruct(preprocess(data.X))
         # save reconstructions
+        print('save recons')
         k = 1
         idx = 0
         fig = plt.figure(figsize=(10, 10))
@@ -304,6 +305,7 @@ def build_capsule_(layers, data, nbl, nbc,
         plt.close(fig)
 
         # save features (raw)
+        print('save features')
         layer_names = layers.keys()
         for layer_name in layer_names:
 
@@ -335,6 +337,8 @@ def build_capsule_(layers, data, nbl, nbc,
             elif 1 in W.shape[0:2]:
                 W = W.reshape((W.shape[0] * W.shape[1],
                                W.shape[2], W.shape[3]))
+                if W.shape[0] > 128:
+                    W = W[0:128]
                 sz = int(np.sqrt(W.shape[0]))
                 print(w, h, W.shape)
                 img = tile_raster_images(W, (W.shape[1], W.shape[2]), (sz, sz),

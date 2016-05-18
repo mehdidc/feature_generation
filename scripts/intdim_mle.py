@@ -1,3 +1,4 @@
+
 """
 Implementation of 'Maximum Likelihood Estimation of Intrinsic Dimension' by Elizaveta Levina and Peter J. Bickel
 
@@ -60,12 +61,15 @@ def intrinsic_dim_scale_interval(X, k1=10, k2=20):
         intdim_k.append(m)
     return intdim_k
 
-def repeated(func, X, nb_iter=100, random_state=None, verbose=0, mode='bootstrap', **func_kw):
+def repeated(func, X, nb_iter=100, random_state=None, verbose=0, mode='bootstrap', nb_examples_bootstrap=None, **func_kw):
+
     if random_state is None:
         rng = np.random
     else:
         rng = np.random.RandomState(random_state)
     nb_examples = X.shape[0]
+    if nb_examples_bootstrap is None:
+        nb_examples_bootstrap = nb_examples
     results = []
 
     iters = range(nb_iter)
@@ -73,7 +77,7 @@ def repeated(func, X, nb_iter=100, random_state=None, verbose=0, mode='bootstrap
         iters = tqdm(iters)    
     for i in iters:
         if mode == 'bootstrap':
-            Xr = X[rng.randint(0, nb_examples, size=nb_examples)]
+            Xr = X[rng.randint(0, nb_examples, size=nb_examples_bootstrap)]
         elif mode == 'shuffle':
             ind = np.arange(nb_examples)
             rng.shuffle(ind)
