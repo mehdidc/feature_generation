@@ -71,7 +71,7 @@ def compute_stats(job, force=False):
         maxdist = np.sqrt(784)# we have binary images, so euclidean dist between full zero vector minus full one vector
         stats["clusdiversity"] = stats["clusdiversity"] / maxdist
 
-    if "intdim_mle" not in stats or True:
+    if "intdim_mle" not in stats:
         logger.info('computing intdim_le of {}'.format(s))
         stats["intdim_mle"] = compute_intdim(folder, hash_matrix, method='mle')
     #if "manifold_dist" not in stats or force:

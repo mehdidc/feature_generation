@@ -12,12 +12,15 @@ if __name__ == "__main__":
     parser.add_argument('-f', '--force', type=bool, required=False)
     parser.add_argument('-w', '--where', default=None, type=str, required=False)
     parser.add_argument('-t', '--type', default=None, type=str, required=False)
+    parser.add_argument('-s', '--sequential', default=False, required=False, action='store_true')
+    
     args = parser.parse_args()
     nb = args.nb
     force = args.force
     l = args.list
     where = args.where
     type_ = args.type
+    is_seq = args.sequential
 
     folder = get_dotfolder()
     db = DB()
@@ -43,5 +46,7 @@ if __name__ == "__main__":
         cmd = j["cmd"]
         print(cmd)
         db.modify_state_of(j['summary'], PENDING)
+        if is_seq:
+            cmd = cmd[cmd.find('invoke'):]
         subprocess.call(cmd, shell=True)
         time.sleep(1)
