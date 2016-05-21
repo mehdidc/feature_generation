@@ -19,15 +19,21 @@ if __name__ == "__main__":
                         help='-1 to use one page per  model')
     parser.add_argument('--limit', type=int, default=None, required=False)
     parser.add_argument('--njobs', type=int, default=-1, required=False)
+    parser.add_argument('--show_freqs', default=False, action='store_true', required=False)
+    parser.add_argument('--force', default=False, action='store_true', required=False)
+
     parser.add_argument('action', type=str, default='gallery')
+
 
     args = parser.parse_args()
     action = args.action
     out_folder = args.folder
     nbpages = args.nbpages
     limit = args.limit
+    force = args.force
     where = args.where
     n_jobs = args.njobs
+    show_freqs = args.show_freqs
     folder = get_dotfolder()
     db = DB()
     db.load(folder)
@@ -55,6 +61,8 @@ if __name__ == "__main__":
                    limit=limit,
                    use_filtering=True,
                    out_folder=out_folder,
-                   nbpages=nbpages, where=where)
+                   nbpages=nbpages, where=where,
+                   show_freqs=show_freqs,
+                   force=force)
     elif action == 'computestats':
         genstats(jobs, db, n_jobs=n_jobs)

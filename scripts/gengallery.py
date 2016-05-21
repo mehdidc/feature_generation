@@ -40,7 +40,7 @@ def call(cmd, shell=True):
     logger.info(cmd)
     subprocess.call(cmd, shell=shell)
 
-def gengallery(jobs, limit=None, use_filtering=True, out_folder='gallery', nbpages=-1, where='jobset1'):
+def gengallery(jobs, limit=None, use_filtering=True, out_folder='gallery', nbpages=-1, where='jobset1', show_freqs=True, force=False):
     images = []
     plots = []
     captions = []
@@ -74,14 +74,19 @@ def gengallery(jobs, limit=None, use_filtering=True, out_folder='gallery', nbpag
             filenames = sorted(filenames)
             filenames = [filenames[ind] for ind in indices]
             texts = ["{:.2f}".format(100. * cnt[hm[ind]]) for ind in indices]
-            filenames = ["\( {} -set label '{}' \)".format(img, txt)
-                         for img, txt in zip(filenames, texts)]
+            if show_freqs:
+                filenames = ["\( {} -set label '{}' \)".format(img, txt)
+                             for img, txt in zip(filenames, texts)]
+                border = "-geometry +4+4"
+            else:
+                border = "-geometry +0+0"
+
             filenames = " ".join(filenames)
 
             img_filename = os.path.join(folder, "final{}.png".format(limit))
-            if not os.path.exists(img_filename):
-                cmd = "montage {} -pointsize 8.5 -geometry +4+4 {}"
-                cmd = cmd.format(filenames, img_filename)
+            if not os.path.exists(img_filename) or force:
+                cmd = "montage {} -pointsize 8.5 {} {}"
+                cmd = cmd.format(filenames, border, img_filename)
                 commands.append(cmd)
 
         plot_dict = {}
