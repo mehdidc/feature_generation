@@ -989,6 +989,55 @@ if __name__ == "__main__":
             nb += job_write(p, cmd, where="jobset17")
             print(json.dumps(p, indent=4))
         return nb
+
+
+    def jobset19():
+        """
+        Exploring params of denoising with walkback (like jobset6 but with the correct walkback used in bengio)
+        """
+        all_params = (
+            OrderedDict(
+                model_params=OrderedDict(
+                                         use_wta_lifetime=use_wta_lifetime,
+                                         wta_lifetime_perc=wta_lifetime_perc,
+                                         nb_layers=nb_layers,
+                                         nb_hidden_units=nb_hidden_units),
+                denoise=denoise,
+                noise=noise,
+                walkback=walkback,
+                walkback_mode=walkback_mode,
+                autoencoding_loss=autoencoding_loss,
+                contractive=contractive,
+                contractive_coef=contractive_coef,
+                marginalized=marginalized,
+                binarize_thresh=binarize_thresh)
+            for nb_hidden_units in (100, 500, 600, 700, 800, 1000, 1200, 1600, 2000, 3000, 4000)
+            for nb_layers in (1, 2, 3, 4)
+            for use_wta_lifetime in (False,)
+            for wta_lifetime_perc in (None,)
+            for denoise in (0.5,)
+            for noise in ("salt_and_pepper",)
+            for walkback in (1,)
+            for walkback_mode in ('bengio_without_sampling',)
+            for autoencoding_loss in ("squared_error",)
+            for contractive in (False,)
+            for contractive_coef in (None,)
+            for marginalized in (False,)
+            for binarize_thresh in (0.5,)
+        )
+        all_params = list(all_params)
+        print(len(all_params))
+        nb = 0
+        budget_hours = 6
+        for p in all_params:
+            p['model_name'] = 'model56'
+            p['dataset'] = 'digits'
+            p['budget_hours'] = budget_hours
+            cmd = build_cmd(model_name="model56", dataset="digits", params=p, budget_hours=budget_hours)
+            nb += job_write(p, cmd, where="jobset19")
+            print(json.dumps(p, indent=4))
+        return nb
+
     nb = 0
     #nb += test()
     #nb += jobset1()
@@ -1006,5 +1055,7 @@ if __name__ == "__main__":
     #nb += jobset13()
     #nb += jobset14()
     #nb += jobset15()
-    nb += jobset17()
+    #nb += jobset16()
+    #nb += jobset17()
+    nb += jobset19()
     print("Total number of jobs added : {}".format(nb))
