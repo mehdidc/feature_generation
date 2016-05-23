@@ -3,6 +3,8 @@ import json
 import os
 import subprocess
 import sys
+import re
+
 from collections import Counter, OrderedDict, defaultdict
 from joblib import Parallel, delayed
 
@@ -49,13 +51,13 @@ def gengallery(jobs, limit=None, use_filtering=True, out_folder='gallery', nbpag
         ref_job = j['ref_job']
         model_details = ref_job['content']
         folder = "jobs/results/{}".format(j['summary'])
-        iterations = map(lambda name: int(name.split(".")[0]),
-                         os.listdir(os.path.join(folder, "iterations")))
-        iteration = max(iterations)
         hash_matrix_filename = os.path.join(folder, "csv", "hashmatrix.npy")
 
         if limit is None:
             # if not limit consider all images
+            iterations = map(lambda name: int(name.split(".")[0]),
+            os.listdir(os.path.join(folder, "iterations")))
+            iteration = max(iterations)
             img_filename = os.path.join(
                 folder, "iterations", "{:04d}.png".format(iteration))
         else:
@@ -150,10 +152,15 @@ def gengallery(jobs, limit=None, use_filtering=True, out_folder='gallery', nbpag
         per_page = len(images) / nbpages
     first = 0
     pg = 1
-    mkdir_path(os.path.join(out_folder, where, "generated"))
+
+    prefix, nb, _ = re.split('(\d+)', where)
+    nb = int(nb)
+    where_nicer = '{}{:03d}'.format(prefix, nb)
+
+    mkdir_path(os.path.join(out_folder, where_nicer, "generated"))
     plot_names = plots[0].keys()
     for a in plot_names:
-        mkdir_path(os.path.join(out_folder, where, a))
+        mkdir_path(os.path.join(out_folder, where_nicer, a))
     nb = len(images)
 
     def save_imgs(first, last, pg=0, w=1500, h=1500, wp=800, hp=800):
@@ -163,7 +170,7 @@ def gengallery(jobs, limit=None, use_filtering=True, out_folder='gallery', nbpag
                       for img, caption in zip(cur_images, cur_captions)]
         cur_images = " ".join(cur_images)
         out = os.path.join(
-            out_folder, where,
+            out_folder, where_nicer,
             "generated",
             "page{:04d}".format(pg))
         if w is not None and h is not None:
@@ -181,7 +188,7 @@ def gengallery(jobs, limit=None, use_filtering=True, out_folder='gallery', nbpag
             cur_images = ["\( {} -set label '{}' \)".format(img[p], caption)
                           for img, caption in zip(cur_plots, cur_captions)]
             cur_images = " ".join(cur_images)
-            out = os.path.join(out_folder, where, p, "page{:04d}".format(pg))
+            out = os.path.join(out_folder, where_nicer, p, "page{:04d}".format(pg))
             if wp is not None and hp is not None:
                 sz = '-geometry {}x{}'.format(wp, hp)
             else:

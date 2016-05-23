@@ -162,7 +162,7 @@ def compute_intdim(job_folder, hash_matrix, method='mle'):
     import numpy as np
     np.random.seed(42)
     X = construct_data(job_folder, hash_matrix)
-    nb = 100
+    nb = min(100, X.shape[0])
     X = X[np.random.choice(np.arange(len(X)), size=nb, replace=False)]
     k1 = 10 # start of interval(included)
     k2 = 20 # end of interval(included)

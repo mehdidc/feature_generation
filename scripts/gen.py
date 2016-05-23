@@ -7,42 +7,46 @@ from genstats import genstats
 if os.getenv("DISPLAY") is None:  # NOQA
     mpl.use('Agg')  # NOQA
 
-if __name__ == "__main__":
-    from lightjob.db import DB, SUCCESS
-    from lightjob.cli import get_dotfolder
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, required=False, default=None)
-    parser.add_argument('--where', type=str, required=True)
-    parser.add_argument('--folder', type=str, default='gallery')
-    parser.add_argument('--nbpages', type=int, default=1, required=False,
-                        help='-1 to use one page per  model')
-    parser.add_argument('--limit', type=int, default=None, required=False)
-    parser.add_argument('--njobs', type=int, default=-1, required=False)
-    parser.add_argument('--show_freqs', default=False, action='store_true', required=False)
-    parser.add_argument('--force', default=False, action='store_true', required=False)
-
-    parser.add_argument('action', type=str, default='gallery')
+import click
+from lightjob.cli import load_db
+from lightjob.db import SUCCESS
 
 
-    args = parser.parse_args()
-    action = args.action
-    out_folder = args.folder
-    nbpages = args.nbpages
-    limit = args.limit
-    force = args.force
-    where = args.where
-    n_jobs = args.njobs
-    show_freqs = args.show_freqs
-    folder = get_dotfolder()
-    db = DB()
-    db.load(folder)
+@click.group()
+def main():
+    pass
 
-    images = []
-    plots = []
-    captions = []
-    model_name = args.model
+@click.command()
+@click.option('--model', help='model', required=False, default=None)
+@click.option('--where', help='where', required=True)
+@click.option('--folder', help='folder', required=False, default='gallery')
+@click.option('--nbpages', help='nbpages', required=False, default=-1)
+@click.option('--limit', help='limit', required=False, default=None)
+@click.option('--show_freqs', help='show_freqs', required=False, default=False)
+@click.option('--force', help='force', required=False, default=False)
+def gallery(model, where, folder, nbpages, limit, show_freqs, force): 
+   jobs = load_jobs(model, where)
+   limit = int(limit)
+   gengallery(jobs,
+              limit=limit,
+              use_filtering=True,
+              out_folder=folder,
+              nbpages=nbpages, where=where,
+              show_freqs=show_freqs,
+              force=force)
 
+@click.command()
+@click.option('--model', help='model', required=False, default=None)
+@click.option('--where', help='where', required=True)
+@click.option('--n_jobs', help='n_jobs', required=False, default=1)
+def stats(model, where, n_jobs): 
+    jobs = load_jobs(model, where)
+    db = load_db()
+    genstats(jobs, db, n_jobs=n_jobs)
+
+
+def load_jobs(model_name, where):
+    db = load_db()
     jobs = []
     for j in db.jobs_with(state=SUCCESS, type="generation"):
         j = dict(j)
@@ -55,14 +59,9 @@ if __name__ == "__main__":
         if model_name and model_details['model_name'] != model_name:
             continue
         jobs.append(j)
+    return jobs
 
-    if action == 'gallery':
-        gengallery(jobs,
-                   limit=limit,
-                   use_filtering=True,
-                   out_folder=out_folder,
-                   nbpages=nbpages, where=where,
-                   show_freqs=show_freqs,
-                   force=force)
-    elif action == 'computestats':
-        genstats(jobs, db, n_jobs=n_jobs)
+if __name__ == "__main__":
+    main.add_command(stats)
+    main.add_command(gallery)
+    main()
