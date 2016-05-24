@@ -496,13 +496,14 @@ def build_capsule_(layers, data, nbl, nbc,
 
     def noisify(X):
         pr = float(denoise)
+        if pr == 0:
+            return X
         noise = train_params.get("noise", "zero_masking")
         if noise == "salt_and_pepper":
             Xtilde = salt_and_pepper(X, corruption_level=pr, rng=theano_rng, backend='theano')
         elif noise == "zero_masking":
             Xtilde = zero_masking(X, corruption_level=pr, rng=theano_rng)
         elif noise == "superpose":
-            #mask = zero_mask(X, corruption_level=pr, rng=theano_rng)
             perm = theano_rng_cpu.permutation(n=X.shape[0])
             print(perm.ndim)
             Xtilde = X * pr + X[perm] * (1 - pr)

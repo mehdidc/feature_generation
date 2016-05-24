@@ -1078,12 +1078,127 @@ if __name__ == "__main__":
         print(len(all_params))
         nb = 0
         budget_hours = 6
+        model_name = 'model57'
+        dataset = 'digits'
+        jobset_name = "jobset21"
         for p in all_params:
-            p['model_name'] = 'model57'
-            p['dataset'] = 'digits'
+            p['model_name'] = model_name
+            p['dataset'] = dataset
             p['budget_hours'] = budget_hours
-            cmd = build_cmd(model_name="model57", dataset="digits", params=p, budget_hours=budget_hours)
-            nb += job_write(p, cmd, where="jobset20")
+            cmd = build_cmd(model_name=model_name, dataset=dataset, params=p, budget_hours=budget_hours)
+            nb += job_write(p, cmd, where=jobset_name)
+            print(json.dumps(p, indent=4))
+        return nb
+
+    def jobset21():
+        """
+        Exploring nb of filters around the best conv archi (in jobset1)
+        """ 
+        nb_filters_per_layer = {
+            3: [[2**x, 2**(x+1), 2**(x+2)] for x in range(3, 9)],
+            4: [[2**x, 2**(x+1), 2**(x+1), 2**(x+2)] for x in range(3, 9)],
+            5: [[2**x, 2**x, 2**(x+1), 2**(x+1), 2**(x+2)] for x in range(3, 9)]
+        }
+        all_params = (
+            OrderedDict(
+                model_params=OrderedDict(nb_filters=nb_filters,
+                                         filter_size=filter_size,
+                                         use_wta_channel=use_wta_channel,
+                                         use_wta_spatial=use_wta_spatial,
+                                         nb_filters_mul=nb_filters_mul,
+                                         wta_channel_stride=wta_channel_stride,
+                                         nb_layers=nb_layers),
+                denoise=denoise,
+                noise=noise,
+                walkback=walkback,
+                walkback_mode=walkback_mode,
+                autoencoding_loss=autoencoding_loss,
+                contractive=contractive,
+                contractive_coef=contractive_coef,
+                marginalized=marginalized,
+                binarize_thresh=binarize_thresh)
+            for nb_filters_mul in (1,)
+            for filter_size in (5,)
+            for nb_layers in (3, 4, 5)
+            for nb_filters in nb_filters_per_layer[nb_layers]
+            for use_wta_channel in (True,)
+            for use_wta_spatial in (False,)
+            for wta_channel_stride in (2, 4)
+            for denoise in (None,)
+            for noise in ("zero_masking",)
+            for walkback in (1,)
+            for walkback_mode in ('bengio_without_sampling',)
+            for autoencoding_loss in ("squared_error",)
+            for contractive in (False,)
+            for contractive_coef in (None,)
+            for marginalized in (False,)
+            for binarize_thresh in (None,)
+        )
+        all_params = list(all_params)
+        print(len(all_params))
+        nb = 0
+        budget_hours = 6
+        model_name = 'model55'
+        dataset = 'digits'
+        jobset_name = "jobset21"
+        for p in all_params:
+            p['model_name'] = model_name
+            p['dataset'] = dataset
+            p['budget_hours'] = budget_hours
+            cmd = build_cmd(model_name=model_name, dataset=dataset, params=p, budget_hours=budget_hours)
+            nb += job_write(p, cmd, where=jobset_name)
+            print(json.dumps(p, indent=4))
+        return nb
+
+    def jobset22():
+        """
+        like jobset20 but with limitation in nb of epochs to obtain exact same result of the 'good' contraction coef case
+        """ 
+        import numpy as np
+        C = np.linspace(0, 1, 10)
+        all_params = (
+            OrderedDict(
+                model_params=OrderedDict(tied=tied,
+                                         use_wta_lifetime=use_wta_lifetime,
+                                         wta_lifetime_perc=wta_lifetime_perc,
+                                         nb_hidden_units=nb_hidden_units),
+                denoise=denoise,
+                noise=noise,
+                walkback=walkback,
+                walkback_mode=walkback_mode,
+                autoencoding_loss=autoencoding_loss,
+                contractive=contractive,
+                contractive_coef=contractive_coef,
+                marginalized=marginalized,
+                binarize_thresh=binarize_thresh)
+            for nb_hidden_units in (500, 1000, 3000, 4000)
+            for use_wta_lifetime in (False,)
+            for wta_lifetime_perc in (None,)
+            for denoise in C
+            for noise in ("zero_masking",)
+            for walkback in (1,)
+            for walkback_mode in ('bengio_without_sampling',)
+            for autoencoding_loss in ("squared_error",)
+            for contractive in (True,)
+            for tied in (False,)
+            for contractive_coef in (1.,)
+            for marginalized in (False,)
+            for binarize_thresh in (None,)
+        )
+        all_params = list(all_params)
+        print(len(all_params))
+        nb = 0
+        budget_hours = 7
+        model_name = 'model57'
+        dataset = 'digits'
+        jobset_name = "jobset22"
+        for p in all_params:
+            p['model_name'] = model_name
+            p['dataset'] = dataset
+            p['budget_hours'] = budget_hours
+            p['optimization'] = dict(max_nb_epochs=72180)
+            cmd = build_cmd(model_name=model_name, dataset=dataset, params=p, budget_hours=budget_hours)
+            nb += job_write(p, cmd, where=jobset_name)
             print(json.dumps(p, indent=4))
         return nb
 
@@ -1107,5 +1222,6 @@ if __name__ == "__main__":
     #nb += jobset16()
     #nb += jobset17()
     #nb += jobset19()
-    nb += jobset20()
+    #nb += jobset20()
+    nb += jobset21()
     print("Total number of jobs added : {}".format(nb))

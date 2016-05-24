@@ -22,8 +22,8 @@ def main():
 @click.option('--folder', help='folder', required=False, default='gallery')
 @click.option('--nbpages', help='nbpages', required=False, default=-1)
 @click.option('--limit', help='limit', required=False, default=None)
-@click.option('--show_freqs', help='show_freqs', required=False, default=False)
-@click.option('--force', help='force', required=False, default=False)
+@click.option('--show-freqs/--no-show-freqs', help='show_freqs', required=False, default=False)
+@click.option('--force/--no-force', help='force', required=False, default=False)
 def gallery(model, where, folder, nbpages, limit, show_freqs, force): 
    jobs = load_jobs(model, where)
    limit = int(limit)

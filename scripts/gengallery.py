@@ -82,7 +82,6 @@ def gengallery(jobs, limit=None, use_filtering=True, out_folder='gallery', nbpag
                 border = "-geometry +4+4"
             else:
                 border = "-geometry +0+0"
-
             filenames = " ".join(filenames)
 
             img_filename = os.path.join(folder, "final{}.png".format(limit))
