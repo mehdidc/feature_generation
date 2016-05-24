@@ -993,7 +993,7 @@ if __name__ == "__main__":
 
     def jobset19():
         """
-        Exploring params of denoising with walkback (like jobset6 but with the correct walkback used in bengio)
+        Exploring params of denoising with hidden layers and nb of hidden units
         """
         all_params = (
             OrderedDict(
@@ -1038,6 +1038,55 @@ if __name__ == "__main__":
             print(json.dumps(p, indent=4))
         return nb
 
+
+    def jobset20():
+        """
+        Exploring params of denoising and nb hidden units with contraction=1
+        """ 
+        import numpy as np
+        C = np.linspace(0, 1, 10)
+        all_params = (
+            OrderedDict(
+                model_params=OrderedDict(tied=tied,
+                                         use_wta_lifetime=use_wta_lifetime,
+                                         wta_lifetime_perc=wta_lifetime_perc,
+                                         nb_hidden_units=nb_hidden_units),
+                denoise=denoise,
+                noise=noise,
+                walkback=walkback,
+                walkback_mode=walkback_mode,
+                autoencoding_loss=autoencoding_loss,
+                contractive=contractive,
+                contractive_coef=contractive_coef,
+                marginalized=marginalized,
+                binarize_thresh=binarize_thresh)
+            for nb_hidden_units in (500, 1000, 3000, 4000)
+            for use_wta_lifetime in (False,)
+            for wta_lifetime_perc in (None,)
+            for denoise in C
+            for noise in ("zero_masking",)
+            for walkback in (1,)
+            for walkback_mode in ('bengio_without_sampling',)
+            for autoencoding_loss in ("squared_error",)
+            for contractive in (True,)
+            for tied in (False,)
+            for contractive_coef in (1.,)
+            for marginalized in (False,)
+            for binarize_thresh in (None,)
+        )
+        all_params = list(all_params)
+        print(len(all_params))
+        nb = 0
+        budget_hours = 6
+        for p in all_params:
+            p['model_name'] = 'model57'
+            p['dataset'] = 'digits'
+            p['budget_hours'] = budget_hours
+            cmd = build_cmd(model_name="model57", dataset="digits", params=p, budget_hours=budget_hours)
+            nb += job_write(p, cmd, where="jobset20")
+            print(json.dumps(p, indent=4))
+        return nb
+
     nb = 0
     #nb += test()
     #nb += jobset1()
@@ -1057,5 +1106,6 @@ if __name__ == "__main__":
     #nb += jobset15()
     #nb += jobset16()
     #nb += jobset17()
-    nb += jobset19()
+    #nb += jobset19()
+    nb += jobset20()
     print("Total number of jobs added : {}".format(nb))

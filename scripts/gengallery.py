@@ -153,6 +153,7 @@ def gengallery(jobs, limit=None, use_filtering=True, out_folder='gallery', nbpag
     first = 0
     pg = 1
 
+    print(where)
     prefix, nb, _ = re.split('(\d+)', where)
     nb = int(nb)
     where_nicer = '{}{:03d}'.format(prefix, nb)
