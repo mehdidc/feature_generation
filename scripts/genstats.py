@@ -1,6 +1,7 @@
 import sys
 import os
 sys.path.append(os.path.dirname(__file__)+"/..")
+from sklearn.cluster import MeanShift
 import json
 from collections import defaultdict, OrderedDict
 from itertools import product
@@ -72,13 +73,17 @@ def compute_stats(job, force=False):
         stats["clusdiversity"] = stats["clusdiversity"] / maxdist
 
 
-    if "intdim_mle" not in stats:
+    if "intdim_mle" not in stats or force:
         logger.info('computing intdim_le of {}'.format(s))
         stats["intdim_mle"] = compute_intdim(folder, hash_matrix, method='mle')
     
-    if "convergencespeed" not in stats or True:
+    if "convergence_speed" not in stats or force:
         logger.info('computing convergence speed of {}'.format(s))
         stats['convergence_speed'] = compute_convergence_speed(folder, j)
+
+    if "nb_almost_uniques" not in stats or force:
+        logger.info('computing nb  of almost uniques of {} (with meanshift)'.format(s))
+        stats['nb_almost_uniques'] = compute_almost_uniq(folder, hash_matrix)
 
     #if "manifold_dist" not in stats or force:
     #    logger.info('computing manifold distance of {}'.format(s))
@@ -112,6 +117,17 @@ def compute_convergence_speed(job_folder, job):
     speed = 1. - (len(open(os.path.join(job_folder, "csv", "iterations.csv")).readlines()) - 1) / max_nb_iterations
     # speed = 0 (worst) 1(best)
     return speed
+
+def compute_almost_uniq(folder, hash_matrix):
+    bandwidth = None # meaning it is estimated from data
+    X = construct_data(folder, hash_matrix)
+    try:
+        ms = MeanShift(bandwidth=bandwidth)
+        ms.fit(X)
+        return len(ms.cluster_centers_) / float(len(X))
+    except Exception:
+        return np.nan
+
 
 def compute_manifold_dist(job_folder, hash_matrix, ref_job):
 

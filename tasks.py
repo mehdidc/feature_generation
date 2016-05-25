@@ -18,14 +18,15 @@ from lasagnekit.easy import (
     build_batch_iterator)
 from lasagne import layers as L
 from lasagnekit.nnet.capsule import Capsule, make_function
-from lasagnekit.misc.plot_weights import grid_plot, dispims_color, tile_raster_images
+from lasagnekit.misc.plot_weights import dispims_color, tile_raster_images
 from lasagnekit.easy import get_stat, iterate_minibatches
 import numpy as np
-from helpers import salt_and_pepper, zero_masking, zero_mask, bernoulli_sample
+from helpers import salt_and_pepper, zero_masking, bernoulli_sample, minibatcher
 from data import load_data
 from model import *  # for dill
 from skimage.io import imsave
 import logging
+
 
 sys.setrecursionlimit(10000)
 
@@ -98,10 +99,12 @@ def train(dataset="digits", prefix="",
     mode = params.get("mode", "random")
 
     batch_size = params.get("batch_size", 128)
+    data_kw = params.get("data_params", {})
     data, w, h, c, nbl, nbc = load_data(
         dataset=dataset, w=w, h=h, include_test=True,
         batch_size=batch_size,
-        mode=mode)
+        mode=mode,
+        **data_kw)
     # nbl and nbc are just used to show couple of nblxnbc reconstructed
     # vs true samples
     model_params = params.get("model_params", {})
@@ -160,6 +163,8 @@ def train(dataset="digits", prefix="",
     elif mode == 'minibatch':
         V = {"X": capsule.preprocess(data.X)}
         # y not handled for now
+    else:
+        raise Exception('not supported mode {}'.format(mode))
 
     logger.info("Start training!")
     try:
@@ -234,18 +239,6 @@ def build_capsule_(layers, data, nbl, nbc,
     def predict(model, X):
         return L.get_output(layers["y"], X, deterministic=True)
 
-    def is_conv_layer(name):
-        return name.startswith("conv1")
-    conv_layer_names = filter(is_conv_layer, layers.keys())
-    conv_layer_names += ["output"]
-    conv_layers = map(lambda name: layers[name], conv_layer_names)
-
-    def get_conv(model, X):
-        out = []
-        for layer in conv_layers:
-            out.append(L.get_output(layer, X, determnistic=True))
-        return out
-
     def recons_loss(true, pred):
         if autoencoding_loss == "squared_error":
             return ((true - pred) ** 2).sum(axis=(1, 2, 3)).mean()
@@ -258,7 +251,7 @@ def build_capsule_(layers, data, nbl, nbc,
 
     functions = {
         "reconstruct": make_function(func=reconstruct, params=["X"]),
-        "get_conv_layers": make_function(func=get_conv, params=["X"]),
+        #"get_conv_layers": make_function(func=get_conv, params=["X"]),
         "get_recons_loss": make_function(func=get_recons_loss, params=["X"])
     }
     if is_predictive:
@@ -269,50 +262,31 @@ def build_capsule_(layers, data, nbl, nbc,
     def report(status):
         c, w, h = layers["input"].output_shape[1:]
         ep = status["epoch"]
-        X_pred = capsule.reconstruct(preprocess(data.X))
+
+        rec = capsule.reconstruct
         # save reconstructions
         print('save recons')
-        k = 1
-        idx = 0
-        fig = plt.figure(figsize=(10, 10))
-        for row in range(nbl):
-            for col in range(nbc):
-                plt.subplot(nbl, nbc * 2, k)
-                plt.axis('off')
-                if idx >= len(data.X):
-                    break
-                if layers['input'].output_shape[1] != 3:
-                    plt.imshow(1 - data.X[idx].reshape((w, h)),
-                               cmap="gray", interpolation='none')
-                else:
-                    img = data.X[idx].reshape((3, w, h))
-                    img = img.transpose((1, 2, 0))
-                    plt.imshow(img, interpolation='none')
-                k += 1
-                plt.subplot(nbl, nbc * 2, k)
-                plt.axis('off')
-                if layers['input'].output_shape[1] != 3:
-                    plt.imshow(1 - X_pred[idx][0],
-                               cmap="gray", interpolation='none')
-                else:
-                    img = X_pred[idx].reshape((3, w, h))
-                    img = img.transpose((1, 2, 0))
-                    plt.imshow(img, interpolation='none')
-
-                k += 1
-                idx += 1
-        plt.savefig("{}/recons/{}.png".format(prefix, ep))
-        plt.close(fig)
-
+        X_orig = data.X[0:nbl * nbc]
+        print(X_orig.max())
+        X_pred = rec(preprocess(X_orig))
+        if layers['input'].output_shape[1] == 3:
+            X_orig = X_orig.reshape((X_orig.shape[0], 3, w, h)).transpose((0, 2, 3, 1))
+            img_orig = dispims_color(X_orig, border=1)
+            X_pred = X_pred.reshape((X_pred.shape[0], 3, w, h)).transpose((0, 2, 3, 1))
+            img_pred = dispims_color(X_pred, border=1)
+            img = np.concatenate((img_orig, img_pred), axis=1)
+        elif layers['input'].output_shape[1] == 1:
+            X_orig = (X_orig.reshape((X_orig.shape[0], 1, w, h)) * np.ones((1, 3, 1, 1))).transpose((0, 2, 3, 1))
+            img_orig = dispims_color(X_orig, border=1)
+            X_pred = (X_pred.reshape((X_pred.shape[0], 1, w, h)) * np.ones((1, 3, 1, 1))).transpose((0, 2, 3, 1))
+            img_pred = dispims_color(X_pred, border=1)
+            img = np.concatenate((img_orig, img_pred), axis=1)
+        imsave("{}/recons/{:08d}.png".format(prefix, ep), img)
         # save features (raw)
         print('save features')
         layer_names = layers.keys()
         for layer_name in layer_names:
-
-            filename = "{}/features/{}-{}.png".format(prefix, ep, layer_name)
-
-            fig = plt.figure()
-            fig.patch.set_facecolor('gray')
+            filename = "{}/features/{:08d}-{}.png".format(prefix, ep, layer_name)
             if not hasattr(layers[layer_name], "W"):
                 continue
             try:
@@ -330,6 +304,8 @@ def build_capsule_(layers, data, nbl, nbc,
                     W = W.transpose((1, 2, 3, 0))  # F w h col
                 elif W.shape[1] == 3:
                     W = W.transpose((0, 2, 3, 1))  # F w h col
+                if W.shape[0] > 512:
+                    W = W[0:512]
                 img = dispims_color(W, border=1, shape=(11, 11))
                 imsave(filename, img)
                 #plt.axis('off')
@@ -337,37 +313,37 @@ def build_capsule_(layers, data, nbl, nbc,
             elif 1 in W.shape[0:2]:
                 W = W.reshape((W.shape[0] * W.shape[1],
                                W.shape[2], W.shape[3]))
-                if W.shape[0] > 128:
-                    W = W[0:128]
+                if W.shape[0] > 512:
+                    W = W[0:512]
                 sz = int(np.sqrt(W.shape[0]))
                 print(w, h, W.shape)
                 img = tile_raster_images(W, (W.shape[1], W.shape[2]), (sz, sz),
                                          scale_rows_to_unit_interval=True,
                                          output_pixel_vals=True,
                                          tile_spacing=(1, 1))
-                #plt.axis('off')
-                #plt.imshow(img, cmap='gray', interpolation='none')
                 imsave(filename, img)
-                #opt = dict(cmap='gray', interpolation='none')
-                    #grid_plot(W, imshow_options=opt, fig=fig)
-                    #plt.axis('off')
-                    #plt.savefig(filename, facecolor=fig.get_facecolor(), transparent=True)
             else:
                 continue
-            plt.close(fig)
 
-        # learning curve
         stats = capsule.batch_optimizer.stats
+
+        df = pd.DataFrame(stats)
+        df.to_csv("{}/out/stats.csv".format(prefix))
+        # learning curve
         epoch = get_stat("epoch", stats)
-        avg_loss = get_stat("avg_loss_train_fix", stats)
+        if mode == 'random':
+            avg_loss = get_stat("avg_loss_train_fix", stats)
+            pd.Series(avg_loss).to_csv("{}/out/avg_loss.csv".format(prefix))
+
         loss = get_stat("loss_train", stats)
-        pd.Series(avg_loss).to_csv("{}/out/avg_loss.csv".format(prefix))
         pd.Series(loss).to_csv("{}/out/loss.csv".format(prefix))
         if is_predictive:
             acc = [s["acc_test"] for s in stats if "acc_test" in s]
             pd.Series(acc).to_csv("{}/out/acc.sv".format(prefix))
+
         fig = plt.figure()
-        plt.plot(epoch, avg_loss, label="avg_loss")
+        if mode == 'random':
+            plt.plot(epoch, avg_loss, label="avg_loss")
         plt.plot(epoch, loss, label="loss")
         plt.xlabel("x")
         plt.ylabel("loss")
@@ -382,6 +358,8 @@ def build_capsule_(layers, data, nbl, nbc,
     # called each epoch for monitoring
 
     def update_status(self, status):
+        status['duration'] =  (datetime.now() - self.last_checkpoint).total_seconds()
+        self.last_checkpoint = datetime.now()
         t = status["epoch"]
         cur_lr = lr.get_value()
 
@@ -397,17 +375,18 @@ def build_capsule_(layers, data, nbl, nbc,
         new_lr = np.array(new_lr, dtype="float32")
         lr.set_value(new_lr)
 
-        B = 0.9  # moving window param for estimating loss_train
-        loss = "loss_train"
-        loss_avg = "avg_{}".format(loss)
-        if len(self.stats) == 1:
-            last_avg = 0
-        else:
-            last_avg = self.stats[-2][loss_avg]
-        status["avg_loss_train"] = B * last_avg + (1 - B) * status[loss]
-        fix = 1 - B ** (1 + t)
-        status["avg_loss_train_fix"] = status["avg_loss_train"] / fix
-
+        if mode == 'random':
+            B = 0.9  # moving window param for estimating loss_train
+            loss = "loss_train"
+            loss_avg = "avg_{}".format(loss)
+            if len(self.stats) == 1:
+                last_avg = 0
+            else:
+                last_avg = self.stats[-2][loss_avg]
+            status["avg_loss_train"] = B * last_avg + (1 - B) * status[loss]
+            fix = 1 - B ** (1 + t)
+            status["avg_loss_train_fix"] = status["avg_loss_train"] / fix
+        
         N = 200
         if is_predictive and hasattr(data, "test") and t % N == 0:
             preds = []
@@ -417,18 +396,12 @@ def build_capsule_(layers, data, nbl, nbc,
             acc = (np.concatenate(preds, axis=0)).mean()
             status["acc_test"] = acc
 
-        N = 1000
         if mode == "minibatch":
             N = 5
-            """
-            t = (t * data.X.shape[0] / batch_size)
-            next_ = (t + batch_size) / N
-            next_ = next_ * N
-            if next_ >= (t + batch_size):
-                next_ += N
-            if next_ >= t and next_ <= t + batch_size:
-                t = next_
-            """
+        elif mode == 'random':
+            N = 1000
+        else:
+            raise Exception('wtf how come mode is not valid and it happens here')
         # each N epochs save reconstructions
         # and how features look like
         if t % N == 0:
@@ -441,15 +414,16 @@ def build_capsule_(layers, data, nbl, nbc,
                         rec_errors.append(rec_error)
                     rec_error_mean = np.mean(rec_errors)
                     status["{}_recons_error".format(name)] = rec_error_mean
+        if t % N == 0:
             report(status)
-
         if (datetime.now() - begin).total_seconds() >= budget_sec:
             logger.info("Budget finished.quit.")
             raise KeyboardInterrupt("Budget finished.quit.")
-
         return status
 
     # Initialize the optimization algorithm
+    mode = train_params.get("mode", "random")
+
     optim_params_default = dict(
         lr_decay_method="none",
         initial_lr=0.1,
@@ -459,10 +433,10 @@ def build_capsule_(layers, data, nbl, nbc,
         beta1=0.95,
         beta2=0.95,
         epsilon=1e-8,
-        max_nb_epochs=100000,
-        patience_stat='avg_loss_train_fix',
-        patience_nb_epochs=800,
-        min_nb_epochs=250000,
+        max_nb_epochs=100000 if mode=='random' else 213, # approx 213 nb of epochs corresponds to nb of epochs to do 100000 with batchsize 128 on training data of size 60000
+        patience_stat='avg_loss_train_fix' if mode == 'random' else 'loss_train',
+        patience_nb_epochs=800 if mode == 'random' else 20,
+        min_nb_epochs=5000 if mode == 'random' else 10,
         batch_size=batch_size,
     )
     optim_params = optim_params_default.copy()
@@ -490,10 +464,12 @@ def build_capsule_(layers, data, nbl, nbc,
         patience_nb_epochs=optim_params["patience_nb_epochs"],
         min_nb_epochs=optim_params["min_nb_epochs"],
         batch_size=batch_size,
+        whole_dataset_in_device=train_params.get('whole_dataset_in_device', False),
         verbose=1)
     batch_optimizer.lr = lr
     batch_optimizer.optim_params = optim_params
-
+    batch_optimizer.last_checkpoint = datetime.now()
+    
     def noisify(X):
         pr = float(denoise)
         if pr == 0:
@@ -628,10 +604,11 @@ def build_capsule_(layers, data, nbl, nbc,
             return X
 
     mode = train_params.get("mode", "random")
+    if batch_optimizer.whole_dataset_in_device is True:
+        assert mode == 'minibatch'
     if mode == "random":
         batch_iterator = build_batch_iterator(transform)
     elif mode == "minibatch":
-        #mode minibatch
         batch_iterator = None
     else:
         raise Exception('Unknown mode : {}'.format(mode))

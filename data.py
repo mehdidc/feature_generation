@@ -22,6 +22,26 @@ def load_data(dataset="digits", w=None, h=None, include_test=False, batch_size=1
 
         data = Random((batch_size, c, w, h))
         data.load()
+    elif dataset == 'fonts_big':
+        import h5py
+        from lasagnekit.datasets.manual import Manual
+        from lasagnekit.datasets.subsampled import SubSampled
+        from lasagnekit.datasets.rescaled import Rescaled
+        from lasagnekit.datasets.transformed import Transformed
+        if w is None and h is None:
+            w, h = 64, 64
+        c = 1
+        DATA_PATH = os.getenv('DATA_PATH')
+        filename = os.path.join(DATA_PATH, 'fonts_big', 'fonts.hdf5')
+        hf = h5py.File(filename)
+        X = hf['fonts']
+        data = Manual(X=X)
+        data = SubSampled(data, batch_size, mode='batch', shuffle=False)
+        data = Transformed(data, lambda X: 1 - X[:, 30, :, :]/255., per_example=False)
+        data.img_dim = (64, 64)
+        data = Rescaled(data, (w, h))
+        data.load()
+        print(data.X.shape)
 
     if dataset == "digits":
         from lasagnekit.datasets.mnist import MNIST
@@ -36,16 +56,32 @@ def load_data(dataset="digits", w=None, h=None, include_test=False, batch_size=1
             which = 'all'
         data = load_once(MNIST)(which=which)
         data.load()
+        if 'train_classes' in kw:
+            included = np.zeros((len(data.X),)).astype(np.bool)
+            for cl in kw['train_classes']:
+                included[data.y == cl] = True
+            data.X = data.X[included]
+            data.y = data.y[included]
+
         w, h = data.img_dim
         if mode == 'random':
             data_train_whole = data
             data = SubSampled(data, batch_size)
             data.train = data_train_whole
-        else:
+        elif mode == 'minibatch':
             data.train = data
+        else:
+            raise('Unknown mode {}'.format(mode))
         if include_test:
             data.test = MNIST(which='test')
             data.test.load()
+
+            if 'test_classes' in kw:
+                included = np.zeros((len(data.test.X),)).astype(np.bool)
+                for cl in kw['test_classes']:
+                    included[data.test.y == cl] = True
+                data.test.X = data.test.X[included]
+                data.test.y = data.test.y[included]
 
     if dataset == "olivetti":
         from sklearn.datasets import fetch_olivetti_faces

@@ -2,6 +2,7 @@ import theano.tensor as T
 import numpy as np
 import theano
 import os
+from lasagnekit.easy import iterate_minibatches
 
 
 def wta_spatial(X):
@@ -122,3 +123,30 @@ def zero_mask(x, rng, corruption_level=0.5):
 def mkdir_path(path):
     if not os.access(path, os.F_OK):
         os.makedirs(path)
+
+
+def minibatcher(fn, batchsize=1000):
+    def f(X):
+        results = []
+        for sl in iterate_minibatches(len(X), batchsize):
+            results.append(fn(X[sl]))
+        return np.concatenate(results, axis=0)
+    return f
+
+
+class MultiSubSampled(object):
+
+    def __init__(self, dataset, nb, random_state=2):
+        self.dataset = dataset
+        self.nb = nb
+        self.rng = np.random.RandomState(random_state)
+
+    def load(self):
+        self.dataset.load()
+        indices_ax0 = self.rng.randint(0, self.dataset.X.shape[0], size=self.nb)
+        indices_ax1 = self.rng.randint(0, self.dataset.X.shape[1], size=self.nb)
+        self.X = self.dataset.X[indices_ax0, indices_ax1, :, :]
+        if hasattr(self.dataset, "img_dim"):
+            self.img_dim = self.dataset.img_dim
+        if hasattr(self.dataset, "output_dim"):
+            self.output_dim = self.dataset.output_dim
