@@ -516,7 +516,6 @@ def build_capsule_(layers, data, nbl, nbc,
     def loss_function(model, tensors):
         X = tensors["X"]
         if denoise is not None:
-
             # for backward compatibility, but walkback_jump should not be used
             # anymore, use walkback_mode only
             if train_params.get("walkback_jump", True) is True:

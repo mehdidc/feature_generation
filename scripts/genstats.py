@@ -71,9 +71,15 @@ def compute_stats(job, force=False):
         maxdist = np.sqrt(784)# we have binary images, so euclidean dist between full zero vector minus full one vector
         stats["clusdiversity"] = stats["clusdiversity"] / maxdist
 
+
     if "intdim_mle" not in stats:
         logger.info('computing intdim_le of {}'.format(s))
         stats["intdim_mle"] = compute_intdim(folder, hash_matrix, method='mle')
+    
+    if "convergencespeed" not in stats or True:
+        logger.info('computing convergence speed of {}'.format(s))
+        stats['convergence_speed'] = compute_convergence_speed(folder, j)
+
     #if "manifold_dist" not in stats or force:
     #    logger.info('computing manifold distance of {}'.format(s))
     #    stats['manifold_dist'] = compute_manifold_dist(folder, hash_matrix, ref_job)
@@ -100,6 +106,12 @@ def construct_data(job_folder, hash_matrix):
     X = np.concatenate(X, axis=0)
     X = X.reshape((X.shape[0], -1))
     return X
+
+def compute_convergence_speed(job_folder, job):
+    max_nb_iterations = 100.
+    speed = 1. - (len(open(os.path.join(job_folder, "csv", "iterations.csv")).readlines()) - 1) / max_nb_iterations
+    # speed = 0 (worst) 1(best)
+    return speed
 
 def compute_manifold_dist(job_folder, hash_matrix, ref_job):
 
