@@ -242,6 +242,8 @@ def build_capsule_(layers, data, nbl, nbc,
     def recons_loss(true, pred):
         if autoencoding_loss == "squared_error":
             return ((true - pred) ** 2).sum(axis=(1, 2, 3)).mean()
+        elif autoencoding_loss == "mean_squared_error":
+            return ((true - pred) ** 2).mean()
         elif autoencoding_loss == "cross_entropy":
             pred = theano.tensor.clip(pred, 0.001, 0.999)
             return (T.nnet.binary_crossentropy(pred, true)).sum(axis=(1, 2, 3)).mean()
@@ -373,7 +375,6 @@ def build_capsule_(layers, data, nbl, nbc,
 
         new_lr = np.array(new_lr, dtype="float32")
         lr.set_value(new_lr)
-
         if mode == 'random':
             B = 0.9  # moving window param for estimating loss_train
             loss = "loss_train"
@@ -435,11 +436,12 @@ def build_capsule_(layers, data, nbl, nbc,
         max_nb_epochs=100000 if mode=='random' else 213, # approx 213 nb of epochs corresponds to nb of epochs to do 100000 with batchsize 128 on training data of size 60000
         patience_stat='avg_loss_train_fix' if mode == 'random' else 'loss_train',
         patience_nb_epochs=800 if mode == 'random' else 20,
-        min_nb_epochs=100000 if mode=='random' else 213,
+        min_nb_epochs=100000 if mode=='random' else 213, # no early stopping actually
         batch_size=batch_size,
     )
     optim_params = optim_params_default.copy()
     optim_params.update(train_params.get("optimization", {}))
+    print(optim_params)
     lr_decay_method = optim_params["lr_decay_method"]
     initial_lr = optim_params["initial_lr"]
     lr_decay = optim_params["lr_decay"]

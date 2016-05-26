@@ -1,0 +1,31 @@
+{
+    "binarize_thresh": null,
+    "noise": "zero_masking",
+    "contractive_coef": null,
+    "denoise": null,
+    "model_params": {
+        "wta_channel_stride": 4,
+        "use_wta_spatial": false,
+        "nb_filters": [
+            256,
+            256,
+            512,
+            512,
+            1024
+        ],
+        "filter_size": 5,
+        "nb_filters_mul": 1,
+        "nb_layers": 5,
+        "use_wta_channel": true
+    },
+    "walkback": 1,
+    "marginalized": false,
+    "autoencoding_loss": "squared_error",
+    "walkback_mode": "bengio_without_sampling",
+    "contractive": false,
+    "model_name": "model55",
+    "dataset": "digits",
+    "mode": "minibatch",
+    "budget_hours": 6,
+    "whole_dataset_in_device": true
+}

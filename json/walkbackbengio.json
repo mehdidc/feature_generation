@@ -9,15 +9,15 @@
     "walkback_mode": "bengio_without_sampling",
     "contractive": false,
     "model_name": "model57",
-    "use_wta_lifetime": false,
-    "nb_hidden_units": 1000,
-
+    "model_params": {
+        "use_wta_lifetime": false,
+        "nb_hidden_units": 1000
+    },
     "dataset": "digits",
     "budget_hours": 8,
-    "mode": "random",
+    "mode": "minibatch",
     "optimization": {
-        "algo": "adam",
-        "initial_lr": 0.1,
-        "max_epochs": 500
+        "algo": "adadelta",
+        "initial_lr": 0.1
     }
 }

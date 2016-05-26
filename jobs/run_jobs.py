@@ -11,6 +11,7 @@ if __name__ == "__main__":
     parser.add_argument('-l', '--list', nargs='+', required=False)
     parser.add_argument('-f', '--force', type=bool, required=False)
     parser.add_argument('-w', '--where', default=None, type=str, required=False)
+    parser.add_argument('-rw', '--ref_where', default=None, type=str, required=False)
     parser.add_argument('-t', '--type', default=None, type=str, required=False)
     parser.add_argument('-s', '--sequential', default=False, required=False, action='store_true')
     
@@ -21,7 +22,7 @@ if __name__ == "__main__":
     where = args.where
     type_ = args.type
     is_seq = args.sequential
-
+    ref_where = args.ref_where
     folder = get_dotfolder()
     db = DB()
     db.load(folder)
@@ -43,6 +44,14 @@ if __name__ == "__main__":
     nb = len(jobs)
     print("Number of jobs to run : {}".format(nb))
     for j in jobs:
+        if ref_where is not None and 'model_summary' in j['content']:
+            print(ref_where)
+            jref = db.get_job_by_summary(j['content']['model_summary'])
+            if jref['where'] != ref_where:
+                print('Skipping {} because its ref is not in {}'.format(j['summary'], ref_where))
+                continue
+            else:
+                print('ok not skipping')
         cmd = j["cmd"]
         print(cmd)
         db.modify_state_of(j['summary'], PENDING)
