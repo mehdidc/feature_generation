@@ -305,8 +305,8 @@ def build_capsule_(layers, data, nbl, nbc,
                     W = W.transpose((1, 2, 3, 0))  # F w h col
                 elif W.shape[1] == 3:
                     W = W.transpose((0, 2, 3, 1))  # F w h col
-                if W.shape[0] > 1024:
-                    W = W[0:1024]
+                #if W.shape[0] > 1024:
+                #    W = W[0:1024]
                 img = dispims_color(W, border=1, shape=(11, 11))
                 imsave(filename, img)
                 #plt.axis('off')
@@ -314,8 +314,8 @@ def build_capsule_(layers, data, nbl, nbc,
             elif 1 in W.shape[0:2]:
                 W = W.reshape((W.shape[0] * W.shape[1],
                                W.shape[2], W.shape[3]))
-                if W.shape[0] > 1024:
-                    W = W[0:1024]
+                #if W.shape[0] > 1024:
+                #    W = W[0:1024]
                 sz = int(np.sqrt(W.shape[0]))
                 print(w, h, W.shape)
                 img = tile_raster_images(W, (W.shape[1], W.shape[2]), (sz, sz),

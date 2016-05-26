@@ -2,7 +2,7 @@
     "binarize_thresh": null,
     "noise": "zero_masking",
     "contractive_coef": null,
-    "denoise": 0.5,
+    "denoise": null,
     "model_params": {
         "wta_channel_stride": 4,
         "use_wta_spatial": false,
@@ -23,6 +23,6 @@
     "contractive": false,
     "model_name": "model55",
     "dataset": "digits",
-    "mode": "minibatch",
+    "mode": "random",
     "budget_hours": 10
 }
