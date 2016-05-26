@@ -22,7 +22,7 @@ def load_data(dataset="digits", w=None, h=None, include_test=False, batch_size=1
 
         data = Random((batch_size, c, w, h))
         data.load()
-    elif dataset == 'fonts_big':
+    if dataset == 'fonts_big':
         import h5py
         from lasagnekit.datasets.manual import Manual
         from lasagnekit.datasets.subsampled import SubSampled

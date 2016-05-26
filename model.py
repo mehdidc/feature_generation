@@ -7,6 +7,7 @@ from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_c
 import theano.tensor as T
 import numpy as np
 from batch_norm import NormalizeLayer, ScaleAndShiftLayer, DecoderNormalizeLayer, DenoiseLayer, FakeLayer
+from lasagne.layers import batch_norm
 
 get_nonlinearity = dict(
     linear=linear, 

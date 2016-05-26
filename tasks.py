@@ -267,7 +267,6 @@ def build_capsule_(layers, data, nbl, nbc,
         # save reconstructions
         print('save recons')
         X_orig = data.X[0:nbl * nbc]
-        print(X_orig.max())
         X_pred = rec(preprocess(X_orig))
         if layers['input'].output_shape[1] == 3:
             X_orig = X_orig.reshape((X_orig.shape[0], 3, w, h)).transpose((0, 2, 3, 1))
@@ -304,8 +303,8 @@ def build_capsule_(layers, data, nbl, nbc,
                     W = W.transpose((1, 2, 3, 0))  # F w h col
                 elif W.shape[1] == 3:
                     W = W.transpose((0, 2, 3, 1))  # F w h col
-                if W.shape[0] > 512:
-                    W = W[0:512]
+                if W.shape[0] > 1024:
+                    W = W[0:1024]
                 img = dispims_color(W, border=1, shape=(11, 11))
                 imsave(filename, img)
                 #plt.axis('off')
@@ -313,8 +312,8 @@ def build_capsule_(layers, data, nbl, nbc,
             elif 1 in W.shape[0:2]:
                 W = W.reshape((W.shape[0] * W.shape[1],
                                W.shape[2], W.shape[3]))
-                if W.shape[0] > 512:
-                    W = W[0:512]
+                if W.shape[0] > 1024:
+                    W = W[0:1024]
                 sz = int(np.sqrt(W.shape[0]))
                 print(w, h, W.shape)
                 img = tile_raster_images(W, (W.shape[1], W.shape[2]), (sz, sz),
@@ -436,7 +435,7 @@ def build_capsule_(layers, data, nbl, nbc,
         max_nb_epochs=100000 if mode=='random' else 213, # approx 213 nb of epochs corresponds to nb of epochs to do 100000 with batchsize 128 on training data of size 60000
         patience_stat='avg_loss_train_fix' if mode == 'random' else 'loss_train',
         patience_nb_epochs=800 if mode == 'random' else 20,
-        min_nb_epochs=5000 if mode == 'random' else 10,
+        min_nb_epochs=100000 if mode=='random' else 213,
         batch_size=batch_size,
     )
     optim_params = optim_params_default.copy()
@@ -634,6 +633,7 @@ def build_capsule_(layers, data, nbl, nbc,
             capsule._build(dummyvars)
         elif mode == "minibatch":
             V = {"X": capsule.preprocess(data.X)}
+            print(data.X.shape)
             capsule._build(V)
     elif compile_ == "functions_only":
         capsule._build_functions()

@@ -1,5 +1,5 @@
 {
-    "binarize_thresh": 0.5,
+    "binarize_thresh": null,
     "noise": "salt_and_pepper",
     "contractive_coef": null,
     "denoise": null,
@@ -14,9 +14,10 @@
 
     "dataset": "digits",
     "budget_hours": 8,
-    "mode": "minibatch",
+    "mode": "random",
     "optimization": {
-        "algo": "adadelta",
-        "initial_lr": 0.1
+        "algo": "adam",
+        "initial_lr": 0.1,
+        "max_epochs": 500
     }
 }
