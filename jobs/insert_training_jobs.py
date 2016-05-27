@@ -55,18 +55,22 @@ def test():
         return nb
 
 
-def build_cmd(launcher="scripts/launch_gpu", model_name="model8", dataset="digits", params=None, prefix=None, budget_hours=None):
+def build_cmd(launcher="scripts/launch_gpu", model_name="model8", dataset="digits", params=None, prefix=None, budget_hours=None, force_w=None, force_h=None):
     summarized_name = summarize(params)
     if params is None:
         params = {}
     if prefix is None:
         prefix = "jobs/results/{}".format(summarized_name)
-    name = "jobs/params/{}.json".format(summarized_name)
 
     output = "jobs/outputs/{}".format(summarized_name)
-    extra = ""
+    extra = []
     if budget_hours is not None:
-        extra = "--budget-hours={}".format(budget_hours)
+        extra.append("--budget-hours={} ".format(budget_hours))
+    if force_w is not None:
+        extra.append("--force-w={}".format(force_w))
+    if force_h is not None:
+        extra.append("--force-h={}".format(force_h))
+    extra = " ".join(extra)
     cmd = "sbatch --time={} --output={} --error={} {} invoke train --update-db=1 --dataset={} --model-name={} --prefix={} --params={} {}"
     cmd = cmd.format(
         int(budget_hours * 60) + 15,
@@ -1202,6 +1206,63 @@ if __name__ == "__main__":
             print(json.dumps(p, indent=4))
         return nb
 
+    def jobset23():
+        """
+        Exactly jobset5 but for fonts
+        """
+     
+        import numpy as np
+        C = np.linspace(0, 10, 30).tolist()
+        C.extend(np.linspace(10, 100, 10).tolist())
+
+        C = sorted(C)
+
+        all_params = (
+            build_params(
+                OrderedDict(tied=tied,
+                            use_wta_lifetime=use_wta_lifetime,
+                            wta_lifetime_perc=wta_lifetime_perc,
+                            nb_hidden_units=nb_hidden_units),
+                denoise,
+                noise,
+                walkback,
+                walkback_jump,
+                autoencoding_loss,
+                contractive,
+                contractive_coef,
+                marginalized,
+                binarize_thresh)
+            for nb_hidden_units in (1000,)
+            for use_wta_lifetime in (False,)
+            for wta_lifetime_perc in (None,)
+            for denoise in (None,)
+            for noise in ("zero_masking",)
+            for walkback in (1,)
+            for walkback_jump in (False,)
+            for autoencoding_loss in ("squared_error",)
+            for contractive in (True,)
+            for tied in (False,)
+            for contractive_coef in (C if contractive is True else (None,))
+            for marginalized in (False,)
+            for binarize_thresh in (None,)
+        )
+        all_params = list(all_params)
+        print(len(all_params))
+        nb = 0
+        budget_hours = 6
+        for p in all_params:
+            p['model_name'] = 'model57'
+            p['dataset'] = 'fonts'
+            p['force_w'] = 28
+            p['force_h'] = 28
+            p['mode'] = 'minibatch'
+            p['budget_hours'] = budget_hours
+            p['optimization'] = dict(max_nb_epochs=1000)
+            cmd = build_cmd(model_name="model57", dataset="fonts", params=p, budget_hours=budget_hours, force_w=28, force_h=28)
+            nb += job_write(p, cmd, where="jobset23")
+            print(p)
+        return nb
+
     nb = 0
     #nb += test()
     #nb += jobset1()
@@ -1224,5 +1285,6 @@ if __name__ == "__main__":
     #nb += jobset19()
     #nb += jobset20()
     #nb += jobset21()
-    nb += jobset22()
+    #nb += jobset22()
+    nb += jobset23()
     print("Total number of jobs added : {}".format(nb))

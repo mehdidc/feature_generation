@@ -57,6 +57,7 @@ def train(dataset="digits", prefix="",
     mkdir_path("{}/features".format(prefix))
     mkdir_path("{}/recons".format(prefix))
     mkdir_path("{}/out".format(prefix))
+    mkdir_path("{}/csv".format(prefix))
 
     if type(params) == dict:
         pass
@@ -329,18 +330,18 @@ def build_capsule_(layers, data, nbl, nbc,
         stats = capsule.batch_optimizer.stats
 
         df = pd.DataFrame(stats)
-        df.to_csv("{}/out/stats.csv".format(prefix))
+        df.to_csv("{}/csv/stats.csv".format(prefix))
         # learning curve
         epoch = get_stat("epoch", stats)
         if mode == 'random':
             avg_loss = get_stat("avg_loss_train_fix", stats)
-            pd.Series(avg_loss).to_csv("{}/out/avg_loss.csv".format(prefix))
+            pd.Series(avg_loss).to_csv("{}/csv/avg_loss.csv".format(prefix))
 
         loss = get_stat("loss_train", stats)
-        pd.Series(loss).to_csv("{}/out/loss.csv".format(prefix))
+        pd.Series(loss).to_csv("{}/csv/loss.csv".format(prefix))
         if is_predictive:
             acc = [s["acc_test"] for s in stats if "acc_test" in s]
-            pd.Series(acc).to_csv("{}/out/acc.sv".format(prefix))
+            pd.Series(acc).to_csv("{}/csv/acc.sv".format(prefix))
 
         fig = plt.figure()
         if mode == 'random':
@@ -661,14 +662,19 @@ def check(filename="out.pkl",
     import traceback
     import analyze
     logger.info("Loading data...")
+
     if force_w is not None:
         w = force_w
     else:
-        w = None
+        layers, model_params = load_(filename)#if w not specified take the one in the model
+        w = layers['input'].output_shape[2]
+        print(w)
     if force_h is not None:
         h = force_h
     else:
-        h = None
+        layers, model_params = load_(filename)#if h not specified take the one in the model
+        h = layers['input'].output_shape[3]
+        print(h)
     if kw_load_data is None:
         kw_load_data = {}
     data, w, h, c, nbl, nbc = load_data(dataset=dataset, w=w, h=h, batch_size=batch_size, **kw_load_data)
