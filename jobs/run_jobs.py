@@ -45,8 +45,8 @@ if __name__ == "__main__":
     print("Number of jobs to run : {}".format(nb))
     for j in jobs:
         if ref_where is not None and 'model_summary' in j['content']:
-            print(ref_where)
             jref = db.get_job_by_summary(j['content']['model_summary'])
+            print(jref['where'], ref_where)
             if jref['where'] != ref_where:
                 print('Skipping {} because its ref is not in {}'.format(j['summary'], ref_where))
                 continue

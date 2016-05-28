@@ -437,7 +437,7 @@ def build_capsule_(layers, data, nbl, nbc,
         max_nb_epochs=100000 if mode=='random' else 213, # approx 213 nb of epochs corresponds to nb of epochs to do 100000 with batchsize 128 on training data of size 60000
         patience_stat='avg_loss_train_fix' if mode == 'random' else 'loss_train',
         patience_nb_epochs=800 if mode == 'random' else 20,
-        min_nb_epochs=100000 if mode=='random' else 213, # no early stopping actually
+        min_nb_epochs=100000 if mode=='random' else 213, # no early stopping actually by default
         batch_size=batch_size,
     )
     optim_params = optim_params_default.copy()

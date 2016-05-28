@@ -1210,7 +1210,6 @@ if __name__ == "__main__":
         """
         Exactly jobset5 but for fonts
         """
-     
         import numpy as np
         C = np.linspace(0, 10, 30).tolist()
         C.extend(np.linspace(10, 100, 10).tolist())
@@ -1263,6 +1262,62 @@ if __name__ == "__main__":
             print(p)
         return nb
 
+    def jobset24():
+        """
+        Exploring nb of filters around the best conv archi (in jobset21 : 7fce...)
+        """ 
+        from itertools import product
+        all_nb_filters = list(product([32, 64, 128], repeat=3))
+        all_params = (
+            OrderedDict(
+                model_params=OrderedDict(nb_filters=nb_filters,
+                                         filter_size=filter_size,
+                                         use_wta_channel=use_wta_channel,
+                                         use_wta_spatial=use_wta_spatial,
+                                         nb_filters_mul=nb_filters_mul,
+                                         wta_channel_stride=wta_channel_stride,
+                                         nb_layers=nb_layers),
+                denoise=denoise,
+                noise=noise,
+                walkback=walkback,
+                walkback_mode=walkback_mode,
+                autoencoding_loss=autoencoding_loss,
+                contractive=contractive,
+                contractive_coef=contractive_coef,
+                marginalized=marginalized,
+                binarize_thresh=binarize_thresh)
+            for nb_filters_mul in (1,)
+            for filter_size in (5,)
+            for nb_layers in (3,)
+            for nb_filters in all_nb_filters
+            for use_wta_channel in (True, False)
+            for use_wta_spatial in (False,)
+            for wta_channel_stride in (4,)
+            for denoise in (None,)
+            for noise in ("zero_masking",)
+            for walkback in (1,)
+            for walkback_mode in ('bengio_without_sampling',)
+            for autoencoding_loss in ("squared_error",)
+            for contractive in (False,)
+            for contractive_coef in (None,)
+            for marginalized in (False,)
+            for binarize_thresh in (None,)
+        )
+        all_params = list(all_params)
+        print(len(all_params))
+        nb = 0
+        budget_hours = 6
+        model_name = 'model55'
+        dataset = 'digits'
+        jobset_name = "jobset24"
+        for p in all_params:
+            p['model_name'] = model_name
+            p['dataset'] = dataset
+            p['budget_hours'] = budget_hours
+            cmd = build_cmd(model_name=model_name, dataset=dataset, params=p, budget_hours=budget_hours)
+            nb += job_write(p, cmd, where=jobset_name)
+            print(json.dumps(p, indent=4))
+        return nb
     nb = 0
     #nb += test()
     #nb += jobset1()
@@ -1286,5 +1341,6 @@ if __name__ == "__main__":
     #nb += jobset20()
     #nb += jobset21()
     #nb += jobset22()
-    nb += jobset23()
+    #nb += jobset23()
+    nb += jobset24()
     print("Total number of jobs added : {}".format(nb))
