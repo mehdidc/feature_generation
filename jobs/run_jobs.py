@@ -4,7 +4,7 @@ import time
 if __name__ == "__main__":
     import argparse
     from lightjob.db import DB, AVAILABLE, PENDING
-    from lightjob.cli import get_dotfolder
+    from lightjob.cli import load_db
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--nb', default=1, type=int, required=False)
@@ -23,9 +23,7 @@ if __name__ == "__main__":
     type_ = args.type
     is_seq = args.sequential
     ref_where = args.ref_where
-    folder = get_dotfolder()
-    db = DB()
-    db.load(folder)
+    db = load_db()
 
     if l is not None:
         jobs = []
@@ -58,4 +56,4 @@ if __name__ == "__main__":
         if is_seq:
             cmd = cmd[cmd.find('invoke'):]
         subprocess.call(cmd, shell=True)
-        time.sleep(1)
+        time.sleep(0.5)

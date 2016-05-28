@@ -36,10 +36,9 @@ handler = logging.StreamHandler(stream=sys.stdout)
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
-from lightjob.cli import get_dotfolder
+from lightjob.cli import load_db
 from lightjob.db import DB, SUCCESS, RUNNING, AVAILABLE, ERROR, PENDING
 
-db_folder = get_dotfolder()
 
 def mkdir_path(path):
     if not os.access(path, os.F_OK):
@@ -67,8 +66,7 @@ def train(dataset="digits", prefix="",
         elif params.endswith(".json"):
             params = json.load(open(params))
         else:
-            db = DB()
-            db.load(db_folder)
+            db = load_db()
             job_summary = params
             job = db.get_job_by_summary(params)
             db.close()
@@ -77,8 +75,7 @@ def train(dataset="digits", prefix="",
             assert params is not None
     params["job_id"] = os.getenv("SLURM_JOBID")
     if update_db:
-        db = DB()
-        db.load(db_folder)
+        db = load_db()
         state = db.get_state_of(job_summary)
         if state != PENDING:
             logger.error("state of the job is not pending, state is : {}".format(state))
@@ -175,8 +172,7 @@ def train(dataset="digits", prefix="",
         pass
     except Exception:
         if update_db:
-            db = DB()
-            db.load(db_folder)
+            db = load_db()
             db.modify_state_of(job_summary, ERROR)
             db.close()
         raise
@@ -185,8 +181,7 @@ def train(dataset="digits", prefix="",
     capsule.report(capsule.batch_optimizer.stats[-1])
     print("Ok finished training")
     if update_db:
-        db = DB()
-        db.load(db_folder)
+        db = load_db()
         db.modify_state_of(job_summary, SUCCESS)
         db.close()
 
@@ -696,8 +691,7 @@ def check(filename="out.pkl",
         params = [json.load(open(params))]
     else:
         job_summary = params
-        db = DB()
-        db.load(db_folder)
+        db = load_db()
         job = db.get_job_by_summary(params)
         db.close()
         assert job, "Job does not exist : {}".format(params)
@@ -707,8 +701,7 @@ def check(filename="out.pkl",
         params = [params]
 
     if update_db:
-        db = DB()
-        db.load(db_folder)
+        db = load_db()
         state = db.get_state_of(job_summary)
         if state != PENDING:
             logger.error("state of the job is not pending, state is : {}".format(state))
@@ -733,8 +726,7 @@ def check(filename="out.pkl",
             traceback.print_exception(exc_type, exc_value, exc_traceback,
                                       limit=5, file=sys.stdout)
             if update_db:
-                db = DB()
-                db.load(db_folder)
+                db = load_db()
                 db.modify_state_of(job_summary, ERROR)
                 db.close()
                 return None
@@ -742,8 +734,7 @@ def check(filename="out.pkl",
                 return None
 
     if update_db:
-        db = DB()
-        db.load(db_folder)
+        db = load_db()
         db.modify_state_of(job_summary, SUCCESS)
         db.close()
     return ret
