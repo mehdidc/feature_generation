@@ -36,7 +36,7 @@ def imgs_to_video(imgs, out='out.mp4', framerate=20, rate=20, verbose=0):
     )
     cmd = cmd_tpl.format(**params)
     if verbose > 0:
-        stdout = sys.stdout
+        stdout = None
         print(cmd)
     else:
         stdout = open(os.devnull, 'w')

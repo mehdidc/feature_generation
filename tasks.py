@@ -46,17 +46,14 @@ def mkdir_path(path):
 
 
 @task
-def train(dataset="digits", prefix="",
-          model_name="model8",
+def train(dataset=None, 
+          prefix=None,
+          model_name=None,
           budget_hours=np.inf,
           update_db=None,
           force_w=None, force_h=None,
           params=None):
     import json
-    mkdir_path("{}/features".format(prefix))
-    mkdir_path("{}/recons".format(prefix))
-    mkdir_path("{}/out".format(prefix))
-    mkdir_path("{}/csv".format(prefix))
 
     if type(params) == dict:
         pass
@@ -83,17 +80,32 @@ def train(dataset="digits", prefix="",
         db.modify_state_of(job_summary, RUNNING)
         db.job_update(job_summary, {'slurm_job_id': os.getenv('SLURM_JOBID')})
         db.close()
-    if force_w is not None:
+
+    if force_w is None:
+        w = params.get('force_w', None)
+    else:
         w = int(force_w)
+
+    if force_h is None:
+        h = params.get('force_h', None)
     else:
-        w = None
-    if force_h is not None:
         h = int(force_h)
-    else:
-        h = None
     state = 2
     np.random.seed(state)
+    if prefix is None:
+        prefix = params.get('prefix', '')
+    mkdir_path("{}/features".format(prefix))
+    mkdir_path("{}/recons".format(prefix))
+    mkdir_path("{}/out".format(prefix))
+    mkdir_path("{}/csv".format(prefix))
+
+    if dataset is None:
+        dataset = params.get('dataset', 'digits')
+    if model_name is None:
+        model_name = params.get('model_name', 'model8')
     logger.info("Loading data...")
+
+
     mode = params.get("mode", "random")
 
     batch_size = params.get("batch_size", 128)
@@ -103,8 +115,7 @@ def train(dataset="digits", prefix="",
         batch_size=batch_size,
         mode=mode,
         **data_kw)
-    w, h, c = data.w, data.h, data.c
-
+    w, h, c, = data.w, data.h, data.c
     nbl, nbc = 10, 10
     # nbl and nbc are just used to show couple of nblxnbc reconstructed
     # vs true samples
@@ -647,7 +658,7 @@ def build_capsule_(layers, data, nbl, nbc,
 @task
 def check(filename="out.pkl",
           what="filters",
-          dataset="fonts",
+          dataset='digits',
           prefix="",
           force_w=None,
           force_h=None,
@@ -659,6 +670,7 @@ def check(filename="out.pkl",
     import json
     import traceback
     import analyze
+   
     logger.info("Loading data...")
 
     if force_w is not None:
