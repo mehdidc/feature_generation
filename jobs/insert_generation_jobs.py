@@ -3,13 +3,9 @@ import json
 
 if __name__ == "__main__":
     from lightjob.db import DB, SUCCESS
+    from lightjob.cli import load_db
     from lightjob.utils import summarize
-    from lightjob.cli import get_dotfolder
-    db = DB()
-    folder = get_dotfolder()
-    assert os.path.exists(folder)
-    db.load(folder)
-
+    db = load_db()
     jobs = db.jobs_with(state=SUCCESS, type="training")
     print("Number of jobs : {}".format(len(jobs)))
     nb = 0
