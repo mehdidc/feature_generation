@@ -4,8 +4,6 @@ from skimage.io import imread
 from lasagnekit.datasets.helpers import split
 
 def load_data(dataset="digits", w=None, h=None, include_test=False, batch_size=128, mode='random', **kw):
-    nbl, nbc = 10, 10
-
     if dataset == 'random':
         c = 1
         w, h = 28, 28
@@ -43,6 +41,26 @@ def load_data(dataset="digits", w=None, h=None, include_test=False, batch_size=1
         data.load()
         print(data.X.shape)
 
+    if dataset == 'chinese_icdar':
+        import h5py
+        from lasagnekit.datasets.manual import Manual
+        from lasagnekit.datasets.subsampled import SubSampled
+        from lasagnekit.datasets.rescaled import Rescaled
+        from lasagnekit.datasets.transformed import Transformed
+        if w is None and h is None:
+            w, h = 64, 64
+        c = 1
+        DATA_PATH = os.getenv('DATA_PATH')
+        filename = os.path.join(DATA_PATH, 'chinese', 'HWDB1.1subset.hdf5')
+        hf = h5py.File(filename)
+        X = hf['trn/x']
+        data = Manual(X=X)
+        data = SubSampled(data, batch_size, mode='batch', shuffle=False)
+        data = Transformed(data, lambda X: 1 - X/255., per_example=False)
+        data = Transformed(data, lambda X: X[:, 0], per_example=False)
+        data.img_dim = (64, 64)
+        data = Rescaled(data, (w, h))
+        data.load()
     if dataset == "digits":
         from lasagnekit.datasets.mnist import MNIST
         from lasagnekit.datasets.subsampled import SubSampled
@@ -392,4 +410,7 @@ def load_data(dataset="digits", w=None, h=None, include_test=False, batch_size=1
         data.img_dim = (w, h)
 
     data.load()
-    return data, w, h, c, nbl, nbc
+    data.w = w
+    data.h = h
+    data.c = c
+    return data

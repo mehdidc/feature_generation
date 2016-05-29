@@ -98,11 +98,14 @@ def train(dataset="digits", prefix="",
 
     batch_size = params.get("batch_size", 128)
     data_kw = params.get("data_params", {})
-    data, w, h, c, nbl, nbc = load_data(
+    data = load_data(
         dataset=dataset, w=w, h=h, include_test=True,
         batch_size=batch_size,
         mode=mode,
         **data_kw)
+    w, h, c = data.w, data.h, data.c
+
+    nbl, nbc = 10, 10
     # nbl and nbc are just used to show couple of nblxnbc reconstructed
     # vs true samples
     model_params = params.get("model_params", {})
@@ -672,7 +675,9 @@ def check(filename="out.pkl",
         print(h)
     if kw_load_data is None:
         kw_load_data = {}
-    data, w, h, c, nbl, nbc = load_data(dataset=dataset, w=w, h=h, batch_size=batch_size, **kw_load_data)
+    data = load_data(dataset=dataset, w=w, h=h, batch_size=batch_size, **kw_load_data)
+    w, h, c = data.w, data.h, data.c
+    nbl, nbc = 10, 10
     logger.info("Loading the model...")
     layers, model_params = load_(filename, w=w, h=h)
     logger.info("Compiling the model...")
