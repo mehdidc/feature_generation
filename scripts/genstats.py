@@ -149,7 +149,7 @@ def compute_rec_error(job, dataset, ref_job):
     for batch in iterate_minibatches(X.shape[0], batchsize=1000):
         rec_error = ((capsule.preprocess(X[batch]) - capsule.reconstruct(capsule.preprocess(X[batch])))**2).mean(axis=(1, 2, 3))
         rec_errors.append(rec_error)
-    return np.concatenate(rec_errors, axis=0).mean()
+    return float(np.concatenate(rec_errors, axis=0).mean())
 
 
 
