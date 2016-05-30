@@ -25,8 +25,8 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
 
-def genstats(jobs, db, force=False, n_jobs=-1):
-    stats = Parallel(n_jobs=n_jobs)(delayed(compute_stats)(dict(j), force=force)
+def genstats(jobs, db, force=False, n_jobs=-1, filter_stats=None):
+    stats = Parallel(n_jobs=n_jobs)(delayed(compute_stats)(dict(j), force=force, filter_stats=filter_stats)
                                     for j in jobs)
     for j, s in zip(jobs, stats):
         update_stats(j, s, db)
@@ -36,54 +36,74 @@ def update_stats(job, stats, db):
     db.job_update(job["summary"], dict(stats=stats))
 
 
-def compute_stats(job, force=False):
+def compute_stats(job, force=False, filter_stats=None):
     j = job
     folder = "jobs/results/{}".format(j['summary'])
     hash_matrix_filename = os.path.join(folder, "csv", "hashmatrix.npy")
     hash_matrix = np.load(hash_matrix_filename)
     x = hash_matrix_to_int(hash_matrix)
     stats = j.get("stats", {})
+    if stats is None:
+        stats = {}
     s = job['summary']
     ref_job = j['ref_job']['summary']
 
-    if "mean" not in stats or force:
+    if filter_stats is not None:
+        filter_stats = set(filter_stats.split(','))
+    def should_compute(s, stats):
+        if force:
+            return True
+        if s in stats:
+            return False
+        if filter_stats is None:
+            return True
+        else:
+            if s in filter_stats:
+                return True
+            else:
+                return False
+
+
+    if should_compute('mean', stats):
         logger.info('compute mean of {}'.format(s))
         stats["mean"] = x.mean()
         stats['mean'] = stats['mean'] / len(hash_matrix)
-    if "var" not in stats or force:
+    if should_compute('var', stats):
         logger.info('compute var of {}'.format(s))
         stats["var"] = x.var(ddof=1)
         maxvar = ((10000 - 1 + 1)**2 - 1) / 12# variance of max entropy distribution (discrete uniform between 1 and 10000)
         stats['var'] = stats['var'] / maxvar
 
-    if "skew" not in stats or force:
+    if should_compute('skew', stats):
         logger.info('compute skew of {}'.format(s))
         stats["skew"] = skew(x)
 
-    #if "neighcorr" not in stats or force:
-    #    logger.info('compute neighcorr of {}'.format(s))
-    #    stats["neighcorr"] = compute_neighcorr(folder, hash_matrix, formula='mine')
-    if "multiplecorrelation" not in stats or force:
+    if should_compute('multiplecorrelation', stats):
         logger.info('compute multiplecorrelation of {}'.format(s))
         stats["multiplecorrelation"] = compute_neighcorr(folder, hash_matrix, formula='multiplecorrelation')
-    if "clusdiversity" not in stats or force:
+
+    if should_compute('clusdiversity', stats):
         logger.info('computing diversity score using clustering of {}'.format(s))
         stats["clusdiversity"] = compute_clusdiversity(folder, hash_matrix)
         maxdist = np.sqrt(784)# we have binary images, so euclidean dist between full zero vector minus full one vector
         stats["clusdiversity"] = stats["clusdiversity"] / maxdist
 
-
-    if "intdim_mle" not in stats or force:
+    if should_compute('intdim_mle', stats):
         logger.info('computing intdim_le of {}'.format(s))
         stats["intdim_mle"] = compute_intdim(folder, hash_matrix, method='mle')
     
-    if "convergence_speed" not in stats or force:
+    if should_compute('convergence_speed', stats):
         logger.info('computing convergence speed of {}'.format(s))
         stats['convergence_speed'] = compute_convergence_speed(folder, j)
 
-    if "nb_almost_uniques" not in stats or force:
-        logger.info('computing nb  of almost uniques of {} (with meanshift)'.format(s))
-        stats['nb_almost_uniques'] = compute_almost_uniq(folder, hash_matrix)
+    if should_compute('fonts_rec_error', stats):
+        logger.info('computing reconstruction error on fonts'.format(s))
+        stats['fonts_rec_error'] = compute_rec_error(j, 'fonts', ref_job)
+
+
+    #if "nb_almost_uniques" not in stats or force:
+    #    logger.info('computing nb  of almost uniques of {} (with meanshift)'.format(s))
+    #    stats['nb_almost_uniques'] = compute_almost_uniq(folder, hash_matrix)
 
     #if "manifold_dist" not in stats or force:
     #    logger.info('computing manifold distance of {}'.format(s))
@@ -96,6 +116,7 @@ def compute_stats(job, force=False):
     #    stats["dpgmmnbclus"] = compute_dpgmmclusdiversity(folder, hash_matrix)
     logger.info('Finished on {}, stats : {}'.format(s, stats))
     return stats
+
 
 def construct_data(job_folder, hash_matrix):
     filenames = glob.glob(os.path.join(job_folder, 'final', '*.png'))
@@ -111,6 +132,28 @@ def construct_data(job_folder, hash_matrix):
     X = np.concatenate(X, axis=0)
     X = X.reshape((X.shape[0], -1))
     return X
+
+def compute_rec_error(job, dataset, ref_job):
+    from tasks import check
+    from data import load_data
+    from lasagnekit.easy import iterate_minibatches
+
+    v = check(what="notebook", 
+              filename="jobs/results/{}/model.pkl".format(ref_job),
+              dataset='digits') # any would work, we dont care
+    capsule, data, layers, w, h, c = v
+    data = load_data(dataset, w=w, h=h)
+    assert hasattr(data, 'train')
+    X = data.train.X
+    rec_errors = []
+    for batch in iterate_minibatches(X.shape[0], batchsize=1000):
+        rec_error = ((capsule.preprocess(X[batch]) - capsule.reconstruct(capsule.preprocess(X[batch])))**2).mean(axis=(1, 2, 3))
+        rec_errors.append(rec_error)
+    return np.concatenate(rec_errors, axis=0).mean()
+
+
+
+  
 
 def compute_convergence_speed(job_folder, job):
     max_nb_iterations = 100.

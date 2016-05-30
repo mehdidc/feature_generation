@@ -39,10 +39,12 @@ def gallery(model, where, folder, nbpages, limit, show_freqs, force):
 @click.option('--model', help='model', required=False, default=None)
 @click.option('--where', help='where', required=True)
 @click.option('--n_jobs', help='n_jobs', required=False, default=1)
-def stats(model, where, n_jobs): 
+@click.option('--stats', help='stats to compute (otherwise will compute everything) separeted by commas', required=False, default=None)
+@click.option('--force', help='force', required=False, default=False)
+def stats(model, where, n_jobs, stats, force): 
     jobs = load_jobs(model, where)
     db = load_db()
-    genstats(jobs, db, n_jobs=n_jobs)
+    genstats(jobs, db, n_jobs=n_jobs, force=force, filter_stats=stats)
 
 
 def load_jobs(model_name, where):
