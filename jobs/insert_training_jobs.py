@@ -1379,6 +1379,61 @@ if __name__ == "__main__":
             nb += job_write(p, cmd, where=jobset_name)
             print(json.dumps(p, indent=4))
         return nb
+
+
+    def jobset26():
+        """
+        Exactly jobset5 but for chinese
+        """
+        import numpy as np
+        C = np.linspace(0, 10, 30).tolist()
+        C.extend(np.linspace(10, 100, 10).tolist())
+
+        C = sorted(C)
+
+        all_params = (
+            build_params(
+                OrderedDict(tied=tied,
+                            use_wta_lifetime=use_wta_lifetime,
+                            wta_lifetime_perc=wta_lifetime_perc,
+                            nb_hidden_units=nb_hidden_units),
+                denoise,
+                noise,
+                walkback,
+                walkback_jump,
+                autoencoding_loss,
+                contractive,
+                contractive_coef,
+                marginalized,
+                binarize_thresh)
+            for nb_hidden_units in (1000,)
+            for use_wta_lifetime in (False,)
+            for wta_lifetime_perc in (None,)
+            for denoise in (None,)
+            for noise in ("zero_masking",)
+            for walkback in (1,)
+            for walkback_jump in (False,)
+            for autoencoding_loss in ("squared_error",)
+            for contractive in (True,)
+            for tied in (False,)
+            for contractive_coef in (C if contractive is True else (None,))
+            for marginalized in (False,)
+            for binarize_thresh in (None,)
+        )
+        all_params = list(all_params)
+        print(len(all_params))
+        nb = 0
+        budget_hours = 6
+        for p in all_params:
+            p['model_name'] = 'model57'
+            p['dataset'] = 'chinese_icdar'
+            p['force_w'] = 28
+            p['force_h'] = 28
+            p['budget_hours'] = budget_hours
+            cmd = build_cmd(model_name="model57", dataset="chinese_icdar", params=p, budget_hours=budget_hours, force_w=28, force_h=28)
+            nb += job_write(p, cmd, where="jobset26")
+            print(p)
+        return nb
     nb = 0
     #nb += test()
     #nb += jobset1()
@@ -1404,5 +1459,6 @@ if __name__ == "__main__":
     #nb += jobset22()
     #nb += jobset23()
     #nb += jobset24()
-    nb += jobset25()
+    #nb += jobset25()
+    nb += jobset26()
     print("Total number of jobs added : {}".format(nb))
