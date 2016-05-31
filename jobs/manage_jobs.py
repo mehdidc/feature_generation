@@ -56,10 +56,10 @@ def do(action, where, type, ref_where, state, dontcare):
 			return
 		for j in jobs:
 			print('Deleting {}'.format(j['summary']))
-			db.delete(dict(j))
+			db.delete(dict(summary=j['summary']))
 	print('Total nb of jobs processed : {}'.format(len(jobs)))
 
 if __name__ == '__main__':
 	main.add_command(do)
 	main()
-    
+
