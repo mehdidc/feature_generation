@@ -1434,6 +1434,58 @@ if __name__ == "__main__":
             nb += job_write(p, cmd, where="jobset26")
             print(p)
         return nb
+
+
+    def jobset27():
+        """
+        same than jobset20 but with sparsity
+        """ 
+        import numpy as np
+        C = np.linspace(0.5, 1, 6)
+        all_params = (
+            OrderedDict(
+                model_params=OrderedDict(tied=tied,
+                                         use_wta_lifetime=use_wta_lifetime,
+                                         wta_lifetime_perc=wta_lifetime_perc,
+                                         nb_hidden_units=nb_hidden_units),
+                denoise=denoise,
+                noise=noise,
+                walkback=walkback,
+                walkback_mode=walkback_mode,
+                autoencoding_loss=autoencoding_loss,
+                contractive=contractive,
+                contractive_coef=contractive_coef,
+                marginalized=marginalized,
+                binarize_thresh=binarize_thresh)
+            for nb_hidden_units in (500, 1000, 3000, 4000)
+            for use_wta_lifetime in (True,)
+            for wta_lifetime_perc in C
+            for denoise in (None,)
+            for noise in ("zero_masking",)
+            for walkback in (1,)
+            for walkback_mode in ('bengio_without_sampling',)
+            for autoencoding_loss in ("squared_error",)
+            for contractive in (True, False)
+            for tied in (False,)
+            for contractive_coef in (1.,)
+            for marginalized in (False,)
+            for binarize_thresh in (None,)
+        )
+        all_params = list(all_params)
+        print(len(all_params))
+        nb = 0
+        budget_hours = 6
+        model_name = 'model57'
+        dataset = 'digits'
+        jobset_name = "jobset27"
+        for p in all_params:
+            p['model_name'] = model_name
+            p['dataset'] = dataset
+            p['budget_hours'] = budget_hours
+            cmd = build_cmd(model_name=model_name, dataset=dataset, params=p, budget_hours=budget_hours)
+            nb += job_write(p, cmd, where=jobset_name)
+            print(json.dumps(p, indent=4))
+        return nb
     nb = 0
     #nb += test()
     #nb += jobset1()
@@ -1460,5 +1512,6 @@ if __name__ == "__main__":
     #nb += jobset23()
     #nb += jobset24()
     #nb += jobset25()
-    nb += jobset26()
+    #nb += jobset26()
+    nb += jobset27()
     print("Total number of jobs added : {}".format(nb))
