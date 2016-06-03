@@ -62,4 +62,4 @@ def do(action, where, type, ref_where, state, dontcare):
 if __name__ == '__main__':
 	main.add_command(do)
 	main()
-
+    

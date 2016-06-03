@@ -94,7 +94,6 @@ if __name__ == "__main__":
         dry = False
 
     budget_hours = 10
-    from lightjob.db import DB
     from lightjob.cli import load_db
     db = load_db()
 
@@ -344,7 +343,7 @@ if __name__ == "__main__":
 
     def jobset5():
         """
-        Exploring params heavily of contraction coef without tiying fully connected autoenc
+        Exploring contraction coef heavily without tiying fully connected autoenc
         """
      
         import numpy as np
@@ -401,8 +400,6 @@ if __name__ == "__main__":
         """
         Exploring params of denoising with walkback 
         """
-     
-        import numpy as np
         all_params = (
             build_params(
                 OrderedDict(tied=tied,
@@ -494,6 +491,7 @@ if __name__ == "__main__":
     def jobset8():
         """
         Exploring params of sparsity without contraction (this was en error so it is a duplicate of jobset7 i forgot to make contractive to True)
+        so forget about this jobset
         """
         import numpy as np
         C = np.linspace(0, 1, 100)
@@ -995,7 +993,7 @@ if __name__ == "__main__":
 
     def jobset19():
         """
-        Exploring params of denoising with hidden layers and nb of hidden units
+        Exploring params of denoising fixed to 0.5 but  with varying hidden layers and nb of hidden units
         """
         all_params = (
             OrderedDict(
@@ -1094,7 +1092,7 @@ if __name__ == "__main__":
 
     def jobset21():
         """
-        Exploring nb of filters around the best conv archi (in jobset1)
+        Exploring nb of filters around the best conv archi found in jobset1 (checkeed visually)
         """ 
         nb_filters_per_layer = {
             3: [[2**x, 2**(x+1), 2**(x+2)] for x in range(3, 9)],
@@ -1262,7 +1260,7 @@ if __name__ == "__main__":
 
     def jobset24():
         """
-        Exploring nb of filters around the best conv archi (in jobset21 : 7fce...)
+        Exploring nb of filters around the best conv archi found in jobset21 : id of the best conv archi starts by '7fce'
         """ 
         from itertools import product
         all_nb_filters = list(product([32, 64, 128], repeat=3))
@@ -1320,7 +1318,7 @@ if __name__ == "__main__":
 
     def jobset25():
         """
-        for chinese
+        exactly jobset21 but for chinese_icdar
         """ 
         nb_filters_per_layer = {
             3: [[2**x, 2**(x+1), 2**(x+2)] for x in range(3, 9)],
@@ -1486,6 +1484,57 @@ if __name__ == "__main__":
             nb += job_write(p, cmd, where=jobset_name)
             print(json.dumps(p, indent=4))
         return nb
+
+    def jobset28():
+        """
+        same than jobset27 but different range of params and wihtout contraction
+        """ 
+        import numpy as np
+        C = np.linspace(0, 0.3, 10)
+        all_params = (
+            OrderedDict(
+                model_params=OrderedDict(tied=tied,
+                                         use_wta_lifetime=use_wta_lifetime,
+                                         wta_lifetime_perc=wta_lifetime_perc,
+                                         nb_hidden_units=nb_hidden_units),
+                denoise=denoise,
+                noise=noise,
+                walkback=walkback,
+                walkback_mode=walkback_mode,
+                autoencoding_loss=autoencoding_loss,
+                contractive=contractive,
+                contractive_coef=contractive_coef,
+                marginalized=marginalized,
+                binarize_thresh=binarize_thresh)
+            for nb_hidden_units in (500, 1000, 3000, 4000)
+            for use_wta_lifetime in (True,)
+            for wta_lifetime_perc in C
+            for denoise in (None,)
+            for noise in ("zero_masking",)
+            for walkback in (1,)
+            for walkback_mode in ('bengio_without_sampling',)
+            for autoencoding_loss in ("squared_error",)
+            for contractive in (False,)
+            for tied in (False,)
+            for contractive_coef in (1.,)
+            for marginalized in (False,)
+            for binarize_thresh in (None,)
+        )
+        all_params = list(all_params)
+        print(len(all_params))
+        nb = 0
+        budget_hours = 10
+        model_name = 'model57'
+        dataset = 'digits'
+        jobset_name = "jobset28"
+        for p in all_params:
+            p['model_name'] = model_name
+            p['dataset'] = dataset
+            p['budget_hours'] = budget_hours
+            cmd = build_cmd(model_name=model_name, dataset=dataset, params=p, budget_hours=budget_hours)
+            nb += job_write(p, cmd, where=jobset_name)
+            print(json.dumps(p, indent=4))
+        return nb
     nb = 0
     #nb += test()
     #nb += jobset1()
@@ -1513,5 +1562,6 @@ if __name__ == "__main__":
     #nb += jobset24()
     #nb += jobset25()
     #nb += jobset26()
-    nb += jobset27()
+    #nb += jobset27()
+    nb += jobset28()
     print("Total number of jobs added : {}".format(nb))
