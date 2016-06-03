@@ -1535,6 +1535,59 @@ if __name__ == "__main__":
             nb += job_write(p, cmd, where=jobset_name)
             print(json.dumps(p, indent=4))
         return nb
+
+
+    def jobset29():
+        """
+        same than jobset28 but with another optimization algo (adam, was verified experimentally that it leads to better features)
+        """ 
+        import numpy as np
+        C = np.linspace(0, 0.3, 10)
+        all_params = (
+            OrderedDict(
+                model_params=OrderedDict(tied=tied,
+                                         use_wta_lifetime=use_wta_lifetime,
+                                         wta_lifetime_perc=wta_lifetime_perc,
+                                         nb_hidden_units=nb_hidden_units),
+                denoise=denoise,
+                noise=noise,
+                walkback=walkback,
+                walkback_mode=walkback_mode,
+                autoencoding_loss=autoencoding_loss,
+                contractive=contractive,
+                contractive_coef=contractive_coef,
+                marginalized=marginalized,
+                binarize_thresh=binarize_thresh)
+            for nb_hidden_units in (1000, 3000, 4000)
+            for use_wta_lifetime in (True,)
+            for wta_lifetime_perc in C
+            for denoise in (None,)
+            for noise in ("zero_masking",)
+            for walkback in (1,)
+            for walkback_mode in ('bengio_without_sampling',)
+            for autoencoding_loss in ("squared_error",)
+            for contractive in (False,)
+            for tied in (False,)
+            for contractive_coef in (1.,)
+            for marginalized in (False,)
+            for binarize_thresh in (None,)
+        )
+        all_params = list(all_params)
+        print(len(all_params))
+        nb = 0
+        budget_hours = 2
+        model_name = 'model57'
+        dataset = 'digits'
+        jobset_name = "jobset29"
+        for p in all_params:
+            p['model_name'] = model_name
+            p['dataset'] = dataset
+            p['budget_hours'] = budget_hours
+            p['optimization'] = dict(algo='adam', initial_lr=0.01)
+            cmd = build_cmd(model_name=model_name, dataset=dataset, params=p, budget_hours=budget_hours)
+            nb += job_write(p, cmd, where=jobset_name)
+            print(json.dumps(p, indent=4))
+        return nb
     nb = 0
     #nb += test()
     #nb += jobset1()
@@ -1563,5 +1616,6 @@ if __name__ == "__main__":
     #nb += jobset25()
     #nb += jobset26()
     #nb += jobset27()
-    nb += jobset28()
+    #nb += jobset28()
+    nb += jobset29()
     print("Total number of jobs added : {}".format(nb))

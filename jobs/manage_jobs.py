@@ -14,7 +14,8 @@ def main():
 @click.option('--ref_where', default=None, help='ref_where', required=False)
 @click.option('--state', default=None, help='state', required=False)
 @click.option('--dontcare', default=False, help='dont care if delete', required=False)
-def do(action, where, type, ref_where, state, dontcare):
+@click.option('--details', default=False, help='show details', required=False)
+def do(action, where, type, ref_where, state, dontcare, details):
 	db = load_db()
 	kw = {}
 	if where:
@@ -46,7 +47,10 @@ def do(action, where, type, ref_where, state, dontcare):
 	if action == 'show':
 		for j in jobs:
 			j = dict(j)
-			print(json.dumps(j, indent=4))
+			if details:
+				print(json.dumps(j, indent=4))
+			else:
+				print(j['summary'])
 	if action == 'delete':
 		if dontcare is None:
 			print('Please specify that you dont care if you want to delete...')
