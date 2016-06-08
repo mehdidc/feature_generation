@@ -3,7 +3,9 @@ from lasagnekit.easy import layers_from_list_to_dict
 from lasagne.nonlinearities import (
         linear, sigmoid, rectify, very_leaky_rectify, softmax, tanh)
 from lasagnekit.layers import Deconv2DLayer, Depool2DLayer
-from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime
+from helpers import Deconv2DLayer as deconv2d
+
+from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse
 import theano.tensor as T
 import numpy as np
 from batch_norm import NormalizeLayer, ScaleAndShiftLayer, DecoderNormalizeLayer, DenoiseLayer, FakeLayer
@@ -3019,7 +3021,9 @@ def model56(nb_filters=64, w=32, h=32, c=1,
             nb_layers=3,
             use_wta_lifetime=True,
             wta_lifetime_perc=0.1,
-            nb_hidden_units=1000):
+            nb_hidden_units=1000,
+            out_nonlin='sigmoid'):
+
     """
     Generalization of "Generalized Denoising Auto-Encoders as Generative
     Models"
@@ -3036,7 +3040,8 @@ def model56(nb_filters=64, w=32, h=32, c=1,
         l_hid = layers.NonlinearityLayer(l_hid, wta_fc_lifetime(wta_lifetime_perc), name="hid{}sparse".format(i))
         hids.append(l_hid)
     l_pre_out = layers.DenseLayer(l_hid, num_units=c*w*h, nonlinearity=linear, name="pre_output")
-    l_out = layers.NonlinearityLayer(l_pre_out, sigmoid, name="output")
+    nonlin = {'sigmoid': sigmoid, 'tanh': tanh}[out_nonlin]
+    l_out = layers.NonlinearityLayer(l_pre_out, nonlin, name="output")
     l_out = layers.ReshapeLayer(l_out, ([0], c, w, h), name="output")
     print(l_out.output_shape)
     return layers_from_list_to_dict([l_in] + hids + [l_pre_out, l_out])
@@ -3045,7 +3050,9 @@ def model57(nb_filters=64, w=32, h=32, c=1,
             use_wta_lifetime=True,
             wta_lifetime_perc=0.1,
             nb_hidden_units=1000,
-            tied=False):
+            tied=False,
+            out_nonlin='sigmoid'):
+
     """
     Generalization of "Generalized Denoising Auto-Encoders as Generative
     Models"
@@ -3066,7 +3073,8 @@ def model57(nb_filters=64, w=32, h=32, c=1,
     else:
         W = init.GlorotUniform()
     l_pre_out = layers.DenseLayer(l_hid, num_units=c*w*h, W=W, nonlinearity=linear, name="pre_output")
-    l_out = layers.NonlinearityLayer(l_pre_out, sigmoid, name="output")
+    nonlin = {'sigmoid': sigmoid, 'tanh': tanh}[out_nonlin]
+    l_out = layers.NonlinearityLayer(l_pre_out, nonlin, name="output")
     l_out = layers.ReshapeLayer(l_out, ([0], c, w, h), name="output")
     print(l_out.output_shape)
     return layers_from_list_to_dict([l_in] + hids + [l_pre_out, l_out])
@@ -3277,7 +3285,7 @@ def model62(nb_filters=64, w=32, h=32, c=1, up=2, filter_size=3, nb_layers=3, sp
         name="output")
     return layers_from_list_to_dict([l_in, l_output])
 
-def model63(nb_filters=64, w=32, h=32, c=1, up=2, filter_size=3, nb_layers=3, sparsity=True):
+def model63(nb_filters=64, w=32, h=32, c=1, up=2, filter_size=3, nb_layers=3, sparsity=True, use_batch_norm=False):
     """
     Pyramidal auto-encoder input-input upscaler but begins with upscaling
     """
@@ -3292,6 +3300,8 @@ def model63(nb_filters=64, w=32, h=32, c=1, up=2, filter_size=3, nb_layers=3, sp
         nonlinearity=rectify,
         W=init.GlorotUniform()
     )
+    if use_batch_norm:
+        l_conv = batch_norm(l_conv)
     for i in range(nb_layers):
         l_conv = layers.Conv2DLayer(
             l_conv,
@@ -3301,6 +3311,8 @@ def model63(nb_filters=64, w=32, h=32, c=1, up=2, filter_size=3, nb_layers=3, sp
             nonlinearity=rectify,
             W=init.GlorotUniform(),
         )
+        if use_batch_norm:
+            l_conv = batch_norm(l_conv)
 
     l_output = layers.Conv2DLayer(
         l_conv,
@@ -3310,6 +3322,95 @@ def model63(nb_filters=64, w=32, h=32, c=1, up=2, filter_size=3, nb_layers=3, sp
         pad='same',
         W=init.GlorotUniform(),
         name="output")
+    return layers_from_list_to_dict([l_in, l_output])
+
+
+def model64(nb_filters=64, w=32, h=32, c=1,
+            nb_layers=3,
+            use_wta_sparse=True,
+            wta_sparse_perc=0.1,
+            nb_hidden_units=1000,
+            out_nonlin='sigmoid',
+            use_batch_norm=False):
+
+    """
+    Generalization of "Generalized Denoising Auto-Encoders as Generative
+    Models"
+    """
+    if type(nb_hidden_units) == int:
+        nb_hidden_units = [nb_hidden_units] * nb_layers
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    hids = []
+    l_hid = l_in
+    for i in range(nb_layers):
+        l_hid = layers.DenseLayer(l_hid, nb_hidden_units[i], nonlinearity=rectify, name="hid{}".format(i + 1))
+        hids.append(l_hid)
+        if use_batch_norm:
+            l_hid = batch_norm(l_hid)
+    if use_wta_sparse is True:
+        l_hid = layers.NonlinearityLayer(l_hid, wta_fc_sparse(wta_sparse_perc), name="hid{}sparse".format(i))
+        hids.append(l_hid)
+    l_pre_out = layers.DenseLayer(l_hid, num_units=c*w*h, nonlinearity=linear, name="pre_output")
+    nonlin = {'sigmoid': sigmoid, 'tanh': tanh}[out_nonlin]
+    l_out = layers.NonlinearityLayer(l_pre_out, nonlin, name="output")
+    l_out = layers.ReshapeLayer(l_out, ([0], c, w, h), name="output")
+    print(l_out.output_shape)
+    return layers_from_list_to_dict([l_in] + hids + [l_pre_out, l_out])
+
+
+
+def model65(nb_filters=64, filter_size=3, w=32, h=32, c=1, down=2, 
+            block_size=3, use_batch_norm=False, residual=False):
+    """
+    Pyramidal auto-encoder
+    """
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_in_rescaled = layers.Pool2DLayer(l_in, (down, down), mode='average_inc_pad')
+    nb_layers = int(np.log2(down))
+    l = l_in_rescaled
+
+    if type(nb_filters) == int:
+        nb_filters = [nb_filters] * nb_layers
+
+    for i in range(nb_layers):
+        nb_filters_cur = nb_filters[i]
+        l = deconv2d(
+            l,
+            num_filters=nb_filters_cur,
+            filter_size=filter_size,
+            pad=(filter_size - 1) / 2,
+            stride=2,
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            name='deconv{}'.format(i),
+        )
+        if use_batch_norm:
+            l = batch_norm(l)
+        first = l
+        for j in range(block_size):
+            l = layers.Conv2DLayer(
+                l,
+                num_filters=nb_filters_cur,
+                filter_size=filter_size,
+                pad='same',
+                nonlinearity=rectify,
+                W=init.GlorotUniform(),
+                name='deconv{}_{}'.format(i, j)
+            )
+            if use_batch_norm:
+                l = batch_norm(l)
+            if residual:
+                l = layers.ElemwiseSumLayer([first, l])
+
+    l_output = layers.Conv2DLayer(
+        l,
+        num_filters=c,
+        filter_size=(3, 3),
+        pad=1,
+        nonlinearity=sigmoid,
+        W=init.GlorotUniform(),
+        name="output"
+    )
     return layers_from_list_to_dict([l_in, l_output])
 
 build_convnet_simple = model1

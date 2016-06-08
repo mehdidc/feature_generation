@@ -3,7 +3,11 @@ import os
 from skimage.io import imread
 from lasagnekit.datasets.helpers import split
 
-def load_data(dataset="digits", w=None, h=None, include_test=False, batch_size=128, mode='random', **kw):
+def load_data(dataset="digits", 
+              w=None, h=None, 
+              include_test=False,
+              batch_size=128,
+              mode='random', **kw):
     if dataset == 'random':
         c = 1
         w, h = 28, 28

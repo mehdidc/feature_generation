@@ -46,7 +46,7 @@ def mkdir_path(path):
 
 
 @task
-def train(dataset=None, 
+def train(dataset=None,
           prefix=None,
           model_name=None,
           budget_hours=np.inf,
@@ -317,7 +317,7 @@ def build_capsule_(layers, data, nbl, nbc,
                     W = W.transpose((0, 2, 3, 1))  # F w h col
                 #if W.shape[0] > 1024:
                 #    W = W[0:1024]
-                img = dispims_color(W, border=1, shape=(11, 11))
+                img = dispims_color(W, border=1)
                 imsave(filename, img)
                 #plt.axis('off')
                 #plt.imshow(img, interpolation='none')
@@ -396,7 +396,7 @@ def build_capsule_(layers, data, nbl, nbc,
             status["avg_loss_train"] = B * last_avg + (1 - B) * status[loss]
             fix = 1 - B ** (1 + t)
             status["avg_loss_train_fix"] = status["avg_loss_train"] / fix
-        
+
         N = 200
         if is_predictive and hasattr(data, "test") and t % N == 0:
             preds = []
@@ -419,7 +419,7 @@ def build_capsule_(layers, data, nbl, nbc,
                 if hasattr(data, name):
                     dt = getattr(data, name)
                     rec_errors = []
-                    for batch in iterate_minibatches(dt.X.shape[0], batchsize=1000):
+                    for batch in iterate_minibatches(dt.X.shape[0], batchsize=256):
                         rec_error = capsule.get_recons_loss(capsule.preprocess(dt.X[batch]))
                         rec_errors.append(rec_error)
                     rec_error_mean = np.mean(rec_errors)
@@ -480,7 +480,7 @@ def build_capsule_(layers, data, nbl, nbc,
     batch_optimizer.lr = lr
     batch_optimizer.optim_params = optim_params
     batch_optimizer.last_checkpoint = datetime.now()
-    
+
     def noisify(X):
         pr = float(denoise)
         if pr == 0:
@@ -492,14 +492,13 @@ def build_capsule_(layers, data, nbl, nbc,
             Xtilde = zero_masking(X, corruption_level=pr, rng=theano_rng)
         elif noise == "superpose":
             perm = theano_rng_cpu.permutation(n=X.shape[0])
-            print(perm.ndim)
-            Xtilde = X * pr + X[perm] * (1 - pr)
+            Xtilde = X - X[perm]
         return Xtilde
 
     def stoch_reconstruct_and_sample(model, X):
         Xrec = stoch_reconstruct(model, X)
         return bernoulli_sample(Xrec, theano_rng)
-    
+
     def loss_function(model, tensors):
         X = tensors["X"]
         if denoise is not None:
@@ -662,15 +661,17 @@ def check(filename="out.pkl",
           prefix="",
           force_w=None,
           force_h=None,
+          force_c=None,
           params=None,
           folder=None,
           update_db=None,
           batch_size=128,
-          kw_load_data=None):
+          kw_load_data=None,
+          force_model_params=None):
     import json
     import traceback
     import analyze
-   
+
     logger.info("Loading data...")
 
     if force_w is not None:
@@ -685,13 +686,25 @@ def check(filename="out.pkl",
         layers, model_params = load_(filename)#if h not specified take the one in the model
         h = layers['input'].output_shape[3]
         print(h)
+
+
     if kw_load_data is None:
         kw_load_data = {}
-    data = load_data(dataset=dataset, w=w, h=h, batch_size=batch_size, **kw_load_data)
-    w, h, c = data.w, data.h, data.c
+
+    if dataset is None:
+        data = None
+        w, h, c = force_w, force_h, force_c
+    else:
+        data = load_data(dataset=dataset, w=w, h=h, batch_size=batch_size, **kw_load_data)
+        w, h, c = data.w, data.h, data.c
+
     nbl, nbc = 10, 10
     logger.info("Loading the model...")
-    layers, model_params = load_(filename, w=w, h=h)
+
+    p = {}
+    if force_model_params is not None:
+        p.update(force_model_params)
+    layers, model_params = load_(filename, w=w, h=h, **p)
     logger.info("Compiling the model...")
     capsule = build_capsule_(
             layers, data, nbl, nbc,
