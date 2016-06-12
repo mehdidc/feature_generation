@@ -9,6 +9,8 @@ from collections import Counter, OrderedDict, defaultdict
 from joblib import Parallel, delayed
 
 import numpy as np
+import pandas as pd
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -47,8 +49,13 @@ def gengallery(jobs, limit=None, use_filtering=True, out_folder='gallery', nbpag
     plots = []
     captions = []
     commands = []
+
+    id_jobs = []
+    id_ref_jobs = []
     for j in jobs:
+        id_jobs.append(j['summary'])
         ref_job = j['ref_job']
+        id_ref_jobs.append(ref_job)
         model_details = ref_job['content']
         folder = "jobs/results/{}".format(j['summary'])
         hash_matrix_filename = os.path.join(folder, "csv", "hashmatrix.npy")
@@ -163,10 +170,14 @@ def gengallery(jobs, limit=None, use_filtering=True, out_folder='gallery', nbpag
         mkdir_path(os.path.join(out_folder, where_nicer, a))
     nb = len(images)
 
+
+    df = pd.DataFrame({'jobs': id_jobs, 'ref_jobs': id_ref_jobs})
+    df.to_csv('{}/{}/order.csv'.format(out_folder, where_nicer))
+
     def save_imgs(first, last, pg=0, w=1500, h=1500, wp=800, hp=800):
         cur_images = images[first:last]
         cur_captions = captions[first:last]
-        cur_images = ["\( {} -set label '{}' \)".format(img, caption) 
+        cur_images = ["\( {} -set label '{}' \)".format(img, caption)
                       for img, caption in zip(cur_images, cur_captions)]
         cur_images = " ".join(cur_images)
         out = os.path.join(

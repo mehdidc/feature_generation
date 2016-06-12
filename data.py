@@ -78,10 +78,8 @@ def load_data(dataset="digits",
         DATA_PATH = os.getenv('DATA_PATH')
         filename = os.path.join(DATA_PATH, 'chinese', 'data.hdf5')
         hf = h5py.File(filename)
-        X = hf['trn/bitmap']
-        y = hf['trn/tagcode']
-
-        data = Manual(X=X, y=y)
+        X = hf['tst/bitmap']
+        data = Manual(X=X)
         data = SubSampled(data, batch_size, mode='batch', shuffle=False)
         data = Transformed(data, lambda X: 1 - X/255., per_example=False)
         data = Transformed(data, lambda X: X[:, 0], per_example=False)

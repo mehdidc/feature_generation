@@ -51,19 +51,20 @@ def compute_stats(job, force=False, filter_stats=None):
     if filter_stats is not None:
         filter_stats = set(filter_stats.split(','))
     def should_compute(s, stats):
-        if force:
-            return True
-        if s in stats:
-            return False
         if filter_stats is None:
+            if force:
+                return True
+            if s in stats:
+                return False
             return True
         else:
-            if s in filter_stats:
-                return True
-            else:
+            if s not in filter_stats:
                 return False
-
-
+            if force:
+                return True
+            if s in stats:
+                return False
+            return True
     if should_compute('mean', stats):
         logger.info('compute mean of {}'.format(s))
         stats["mean"] = x.mean()
@@ -91,7 +92,7 @@ def compute_stats(job, force=False, filter_stats=None):
     if should_compute('intdim_mle', stats):
         logger.info('computing intdim_le of {}'.format(s))
         stats["intdim_mle"] = compute_intdim(folder, hash_matrix, method='mle')
-    
+
     if should_compute('convergence_speed', stats):
         logger.info('computing convergence speed of {}'.format(s))
         stats['convergence_speed'] = compute_convergence_speed(folder, j)
@@ -100,6 +101,17 @@ def compute_stats(job, force=False, filter_stats=None):
         logger.info('computing reconstruction error on fonts'.format(s))
         stats['fonts_rec_error'] = compute_rec_error(j, 'fonts', ref_job)
 
+    if should_compute('fontness', stats):
+        logger.info('compute fontness of generated data')
+        scores = compute_modelness(folder, j, 'discriminators/fonts_32x32.pkl')
+        stats['fontness'] = {
+            'mean': float(scores.mean()),
+            'std': float(scores.std()),
+            'min': float(scores.min()),
+            'max': float(scores.max()),
+            '10per': float(np.percentile(scores, 10)),
+            '90per': float(np.percentile(scores, 90))
+        }
 
     #if "nb_almost_uniques" not in stats or force:
     #    logger.info('computing nb  of almost uniques of {} (with meanshift)'.format(s))
@@ -118,27 +130,72 @@ def compute_stats(job, force=False, filter_stats=None):
     return stats
 
 
-def construct_data(job_folder, hash_matrix):
+def construct_data(job_folder, hash_matrix, transform=lambda x:x):
     filenames = glob.glob(os.path.join(job_folder, 'final', '*.png'))
     filenames = sorted(filenames)
     indices = unique_indices(hash_matrix)
     filenames = [filenames[ind] for ind in indices]
     if len(filenames) == 0:
         return None
-    
+
     X = []
     for im in get_images(filenames):
-        X.append([im])
+        X.append([transform(im)])
     X = np.concatenate(X, axis=0)
     X = X.reshape((X.shape[0], -1))
     return X
+
+def compute_modelness(job_folder, hash_matrix, model_path):
+    import pickle
+    from lasagne import layers
+    import theano.tensor as T
+    from skimage.transform import resize
+    import theano
+    print('load data...')
+    data = pickle.load(open(model_path))
+    discr = data['discriminator']
+    discr_weights = data['discriminator_weights']
+    layers.set_all_param_values(discr, discr_weights)
+
+    print('compile function...')
+    X = T.tensor4()
+
+    get_score = theano.function([X], layers.get_output(discr,X))
+
+    input_layer = layers.get_all_layers(discr)[0]
+    def transform(x):
+        c, w, h = input_layer.output_shape[1:]
+        if x.shape[1] != w or x.shape[2] != h:
+            return resize(x, (w, h), preserve_range=True)
+        else:
+            return x
+    print('create data...')
+    imgs = construct_data(job_folder, hash_matrix, transform=transform)
+    imgs -= imgs.min()
+    imgs /= imgs.max()
+    print(imgs.max(), imgs.min())
+    shape = (imgs.shape[0],) + input_layer.output_shape[1:]
+    imgs = imgs.reshape(shape)
+    imgs = imgs.astype(np.float32)
+    print('compute scores...')
+    scores = minibatcher(imgs, get_score, size=1000)[:, 0]
+    return scores
+
+
+def minibatcher(X, f, size=128):
+    from lasagnekit.easy import iterate_minibatches
+    res = []
+    for sl in iterate_minibatches(X.shape[0], size):
+        r = f(X[sl])
+        res.append(r)
+    return np.concatenate(res, axis=0)
 
 def compute_rec_error(job, dataset, ref_job):
     from tasks import check
     from data import load_data
     from lasagnekit.easy import iterate_minibatches
 
-    v = check(what="notebook", 
+    v = check(what="notebook",
               filename="jobs/results/{}/model.pkl".format(ref_job),
               dataset='digits') # any would work, we dont care
     capsule, data, layers, w, h, c = v
@@ -150,10 +207,6 @@ def compute_rec_error(job, dataset, ref_job):
         rec_error = ((capsule.preprocess(X[batch]) - capsule.reconstruct(capsule.preprocess(X[batch])))**2).mean(axis=(1, 2, 3))
         rec_errors.append(rec_error)
     return float(np.concatenate(rec_errors, axis=0).mean())
-
-
-
-  
 
 def compute_convergence_speed(job_folder, job):
     max_nb_iterations = 100.
@@ -180,7 +233,7 @@ def compute_manifold_dist(job_folder, hash_matrix, ref_job):
     import theano.tensor as T
     import lasagne
 
-    v = check(what="notebook", 
+    v = check(what="notebook",
               filename="jobs/results/{}/model.pkl".format(ref_job),
               dataset="digits")
     capsule, data, layers, w, h, c = v
@@ -199,7 +252,7 @@ def compute_manifold_dist(job_folder, hash_matrix, ref_job):
     NN = 100 # nb of  neighbors
     k = 10 # logk defines the entropy of tau_Y and tau_Z distributions
     ks = 5
-    dist, _ = manifold.compute_dist(Y, H, NN=NN, k=k, ks=ks, 
+    dist, _ = manifold.compute_dist(Y, H, NN=NN, k=k, ks=ks,
                                     compute_density=False,
                                     nb_integrations=1, # repeat if you want to estimate variance of the integral estimation
                                     nb_iter=100,
@@ -238,11 +291,11 @@ def compute_intdim(job_folder, hash_matrix, method='mle'):
     k1 = 10 # start of interval(included)
     k2 = 20 # end of interval(included)
     intdim_k_repeated = intdim_mle.repeated(
-        intdim_mle.intrinsic_dim_scale_interval, 
-        X, 
-        mode='bootstrap', 
+        intdim_mle.intrinsic_dim_scale_interval,
+        X,
+        mode='bootstrap',
         nb_iter=100, # nb_iter for bootstrapping
-        verbose=1, 
+        verbose=1,
         k1=k1, k2=k2)
     print('Estimate : {} +/- {}'.format(np.mean(np.mean(intdim_k_repeated, axis=1)), np.var(np.mean(intdim_k_repeated, axis=1))))
     return np.mean(intdim_k_repeated)
