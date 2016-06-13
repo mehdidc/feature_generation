@@ -207,7 +207,7 @@ def load_data(dataset="digits",
             data_train = data
 
         if mode == 'random':
-            data_train = Rescaled(data_train, (w, h))
+            data_train = load_once(Rescaled)(data_train, (w, h))
             data_train.load()
             data = SubSampled(data_train, batch_size)
             data.load()

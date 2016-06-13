@@ -433,7 +433,7 @@ def build_capsule_(layers, data, nbl, nbc,
 
     # Initialize the optimization algorithm
     mode = train_params.get("mode", "random")
-
+    print(mode, train_params)
     optim_params_default = dict(
         lr_decay_method="none",
         initial_lr=0.1,

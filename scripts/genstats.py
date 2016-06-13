@@ -103,7 +103,7 @@ def compute_stats(job, force=False, filter_stats=None):
 
     if should_compute('fontness', stats):
         logger.info('compute fontness of generated data')
-        scores = compute_modelness(folder, j, 'discriminators/fonts_32x32.pkl')
+        scores = compute_modelness(folder, j, 'discriminators/fonts_64x64.pkl')
         stats['fontness'] = {
             'mean': float(scores.mean()),
             'std': float(scores.std()),
