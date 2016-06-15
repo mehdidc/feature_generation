@@ -87,7 +87,7 @@ def build_cmd(launcher="scripts/launch_gpu", model_name="model8", dataset="digit
 
 if __name__ == "__main__":
     import sys
-    
+
     if len(sys.argv) == 2 and sys.argv[1] == 'dry':
         dry = True
     else:
@@ -345,7 +345,7 @@ if __name__ == "__main__":
         """
         Exploring contraction coef heavily without tiying fully connected autoenc
         """
-     
+
         import numpy as np
         C = np.linspace(0, 1, 50).tolist()
         C.extend(np.linspace(1, 2, 50).tolist())
@@ -398,7 +398,7 @@ if __name__ == "__main__":
 
     def jobset6():
         """
-        Exploring params of denoising with walkback 
+        Exploring params of denoising with walkback
         """
         all_params = (
             build_params(
@@ -442,9 +442,9 @@ if __name__ == "__main__":
         return nb
     def jobset7():
         """
-        Exploring params of sparsity without contraction 
+        Exploring params of sparsity without contraction
         """
-     
+
         import numpy as np
         C = np.linspace(0, 1, 100)
         all_params = (
@@ -838,7 +838,7 @@ if __name__ == "__main__":
         )
         all_params = list(all_params)
         nb = 0
-        budget_hours = 6 
+        budget_hours = 6
         for p in all_params:
             p['model_name'] = 'model59'
             p['dataset'] = 'digits'
@@ -1042,7 +1042,7 @@ if __name__ == "__main__":
     def jobset20():
         """
         Exploring params of denoising and nb hidden units with contraction=1
-        """ 
+        """
         import numpy as np
         C = np.linspace(0, 1, 10)
         all_params = (
@@ -1093,7 +1093,7 @@ if __name__ == "__main__":
     def jobset21():
         """
         Exploring nb of filters around the best conv archi found in jobset1 (checkeed visually)
-        """ 
+        """
         nb_filters_per_layer = {
             3: [[2**x, 2**(x+1), 2**(x+2)] for x in range(3, 9)],
             4: [[2**x, 2**(x+1), 2**(x+1), 2**(x+2)] for x in range(3, 9)],
@@ -1153,7 +1153,7 @@ if __name__ == "__main__":
     def jobset22():
         """
         like jobset20 but with limitation in nb of epochs to obtain exact same result of the 'good' contraction coef case
-        """ 
+        """
         import numpy as np
         C = np.linspace(0, 1, 10)
         all_params = (
@@ -1261,7 +1261,7 @@ if __name__ == "__main__":
     def jobset24():
         """
         Exploring nb of filters around the best conv archi found in jobset21 : id of the best conv archi starts by '7fce'
-        """ 
+        """
         from itertools import product
         all_nb_filters = list(product([32, 64, 128], repeat=3))
         all_params = (
@@ -1319,7 +1319,7 @@ if __name__ == "__main__":
     def jobset25():
         """
         exactly jobset21 but for chinese_icdar
-        """ 
+        """
         nb_filters_per_layer = {
             3: [[2**x, 2**(x+1), 2**(x+2)] for x in range(3, 9)],
             4: [[2**x, 2**(x+1), 2**(x+1), 2**(x+2)] for x in range(3, 9)],
@@ -1437,7 +1437,7 @@ if __name__ == "__main__":
     def jobset27():
         """
         same than jobset20 but with sparsity
-        """ 
+        """
         import numpy as np
         C = np.linspace(0.5, 1, 6)
         all_params = (
@@ -1488,7 +1488,7 @@ if __name__ == "__main__":
     def jobset28():
         """
         same than jobset27 but different range of params and wihtout contraction
-        """ 
+        """
         import numpy as np
         C = np.linspace(0, 0.3, 10)
         all_params = (
@@ -1540,7 +1540,7 @@ if __name__ == "__main__":
     def jobset29():
         """
         same than jobset28 but with another optimization algo (adam, was verified experimentally that it leads to better features)
-        """ 
+        """
         import numpy as np
         C = np.linspace(0, 0.3, 10)
         all_params = (
@@ -1640,7 +1640,7 @@ if __name__ == "__main__":
 
     def jobset31():
         """
-        """ 
+        """
         import numpy as np
         C = np.linspace(0, 1, 20)
         all_params = (
@@ -1691,6 +1691,82 @@ if __name__ == "__main__":
         return nb
 
 
+    def jobset32():
+        """
+        jobset1 for fonts
+        """
+        nb_filters_per_layer = {
+            1: [256],
+            2: [128, 256],
+            3: [64, 128, 256],
+            4: [64, 128, 128, 256],
+            5: [64, 64, 128, 128, 256],
+        }
+
+        def build_model_params(nb_filters,
+                               nb_layers,
+                               filter_size,
+                               use_wta_spatial, use_wta_channel,
+                               nb_filters_mul,
+                               wta_channel_stride):
+            return OrderedDict(nb_filters=nb_filters,
+                               filter_size=filter_size,
+                               use_wta_channel=use_wta_channel,
+                               use_wta_spatial=use_wta_spatial,
+                               nb_filters_mul=nb_filters_mul,
+                               wta_channel_stride=wta_channel_stride,
+                               nb_layers=nb_layers)
+
+        all_params = (
+            build_params(
+                build_model_params(nb_filters_per_layer[nb_layers],
+                                   nb_layers, filter_size,
+                                   use_wta_spatial, use_wta_channel,
+                                   nb_filters_mul,
+                                   wta_channel_stride),
+                denoise,
+                noise,
+                walkback,
+                walkback_jump,
+                autoencoding_loss,
+                contractive,
+                contractive_coef,
+                marginalized,
+                binarize_thresh)
+                for nb_layers in (3,)
+                for filter_size in (3, 5)
+                for use_wta_spatial in (True, False)
+                for use_wta_channel in (True, False)
+                if use_wta_spatial is True or use_wta_channel is True
+                for nb_filters_mul in (1,)
+                for wta_channel_stride in ((2, 4) if use_wta_channel else (1,))
+                for denoise in (None, 0.5)
+                for noise in ("zero_masking",)
+                for walkback in ((1, 3, 5) if denoise is not None else (1,))
+                for walkback_jump in ((True, False) if walkback is True else (False,))
+                for autoencoding_loss in ("squared_error",)
+                for contractive in (False,)
+                for contractive_coef in (0,)
+                for marginalized in (False,)
+                for binarize_thresh in (None, 0.5)
+        )
+        all_params = list(all_params)
+        nb = 0
+        budget_hours = 10
+        for p in all_params:
+            p['model_name'] = 'model55'
+            p['budget_hours'] = budget_hours
+            p['dataset'] = 'fonts'
+            p['force_w'] = 28
+            p['force_h'] = 28
+            p['mode'] = 'minibatch'
+            p['budget_hours'] = budget_hours
+            cmd = build_cmd(model_name="model55", dataset="fonts", params=p, budget_hours=budget_hours, force_w=28, force_h=28)
+            nb += job_write(p, cmd, where="jobset32")
+            print(p)
+
+        return nb
+
     nb = 0
     #nb += test()
     #nb += jobset1()
@@ -1722,5 +1798,6 @@ if __name__ == "__main__":
     #nb += jobset28()
     #nb += jobset29()
     #nb += jobset30()
-    nb += jobset31()
+    #nb += jobset31()
+    nb += jobset32()
     print("Total number of jobs added : {}".format(nb))

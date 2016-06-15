@@ -113,6 +113,24 @@ def compute_stats(job, force=False, filter_stats=None):
             '90per': float(np.percentile(scores, 90))
         }
 
+    if should_compute('aa_fontness', stats):
+        logger.info('compute auto-encoder fontness')
+        scores = compute_aa_modelness(folder, j, 'training/fonts/fonts9/model.pkl')
+        baseline = 9.29135704041 / (28.*28.)
+        scores /= baseline
+        stats['aa_fontness'] = {
+            'mean': float(scores.mean()),
+            'std': float(scores.std()),
+            'min': float(scores.min()),
+            'max': float(scores.max()),
+            '10per': float(np.percentile(scores, 10)),
+            '90per': float(np.percentile(scores, 90))
+        }
+
+
+    if should_compute('tsne', stats):
+        logger.info('compute tsne...')
+        stats['tsne'] = compute_tsne(folder, hash_matrix)
     #if "nb_almost_uniques" not in stats or force:
     #    logger.info('computing nb  of almost uniques of {} (with meanshift)'.format(s))
     #    stats['nb_almost_uniques'] = compute_almost_uniq(folder, hash_matrix)
@@ -144,6 +162,8 @@ def construct_data(job_folder, hash_matrix, transform=lambda x:x):
     X = np.concatenate(X, axis=0)
     X = X.reshape((X.shape[0], -1))
     return X
+
+
 
 def compute_modelness(job_folder, hash_matrix, model_path):
     import pickle
@@ -181,6 +201,35 @@ def compute_modelness(job_folder, hash_matrix, model_path):
     scores = minibatcher(imgs, get_score, size=1000)[:, 0]
     return scores
 
+def compute_aa_modelness(job_folder, hash_matrix, model_path):
+    import pickle
+    from lasagne import layers
+    import theano.tensor as T
+    from skimage.transform import resize
+    import theano
+
+    from tasks import check
+    from data import load_data
+    from lasagnekit.easy import iterate_minibatches
+
+    v = check(what="notebook",
+              filename=model_path,
+              dataset=None,
+              force_w=28,
+              force_h=28,
+              force_c=1)
+    capsule, data, layers, w, h, c = v
+
+    imgs = construct_data(job_folder, hash_matrix)
+    imgs -= imgs.min()
+    imgs /= imgs.max()
+    shape = (imgs.shape[0], c, w, h)
+    print(shape)
+    imgs = imgs.reshape(shape)
+    imgs = imgs.astype(np.float32)
+    print('compute scores...')
+    scores = minibatcher(imgs, lambda x:((capsule.reconstruct(x)-x)**2).mean(axis=(1, 2, 3)), size=1000)
+    return scores
 
 def minibatcher(X, f, size=128):
     from lasagnekit.easy import iterate_minibatches
@@ -189,6 +238,37 @@ def minibatcher(X, f, size=128):
         r = f(X[sl])
         res.append(r)
     return np.concatenate(res, axis=0)
+
+def compute_tsne(job_folder , hash_matrix):
+    from tasks import check
+    from data import load_data
+    from lasagnekit.easy import iterate_minibatches
+    from sklearn.manifold import TSNE
+    from lasagne.layers.helper import get_output
+    import pandas as pd
+    filenames = []
+    # input space
+    X = construct_data(job_folder, hash_matrix)
+    tsne = TSNE(perplexity=30, early_exaggeration=4., verbose=1, n_components=2)
+    X_2d = tsne.fit_transform(X)
+    filename = '{}/tsne_input.csv'.format(job_folder)
+    filenames.append(filename)
+    pd.DataFrame(X_2d).to_csv(filename)
+    # latent space
+    v = check(what="notebook",
+              filename="models/model_E.pkl",
+              dataset='digits') # any would work, we dont care
+    capsule, data, layers, _, _, _ = v
+    x = T.tensor4()
+    fn = theano.function([x], get_output(layers['conv3'], x))
+    feats = fn(X.reshape((X.shape[0], 1, 28, 28)))
+    feats.reshape((feats.shape[0], -1))
+    tsne = TSNE(perplexity=30, early_exaggeration=4., verbose=1, n_components=2)
+    X_2d = tsne.fit_transform(feats)
+    filename = '{}/tsne_latent.csv'.format(job_folder)
+    filenames.append(filename)
+    pd.DataFrame(X_2d).to_csv(filename)
+    return filenames
 
 def compute_rec_error(job, dataset, ref_job):
     from tasks import check
@@ -206,7 +286,8 @@ def compute_rec_error(job, dataset, ref_job):
     for batch in iterate_minibatches(X.shape[0], batchsize=1000):
         rec_error = ((capsule.preprocess(X[batch]) - capsule.reconstruct(capsule.preprocess(X[batch])))**2).mean(axis=(1, 2, 3))
         rec_errors.append(rec_error)
-    return float(np.concatenate(rec_errors, axis=0).mean())
+    baseline = 9.29135704041 / (28.*28.)
+    return float(np.concatenate(rec_errors, axis=0).mean()) / baseline
 
 def compute_convergence_speed(job_folder, job):
     max_nb_iterations = 100.

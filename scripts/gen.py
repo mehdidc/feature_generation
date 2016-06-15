@@ -24,7 +24,7 @@ def main():
 @click.option('--limit', help='limit', required=False, default=None)
 @click.option('--show-freqs/--no-show-freqs', help='show_freqs', required=False, default=False)
 @click.option('--force/--no-force', help='force', required=False, default=False)
-def gallery(model, where, folder, nbpages, limit, show_freqs, force): 
+def gallery(model, where, folder, nbpages, limit, show_freqs, force):
    jobs = load_jobs(model, where)
    limit = int(limit)
    gengallery(jobs,
@@ -37,11 +37,13 @@ def gallery(model, where, folder, nbpages, limit, show_freqs, force):
 
 @click.command()
 @click.option('--model', help='model', required=False, default=None)
-@click.option('--where', help='where', required=True)
+@click.option('--where', default='', help='where', required=False)
 @click.option('--n_jobs', help='n_jobs', required=False, default=1)
 @click.option('--stats', help='stats to compute (otherwise will compute everything) separeted by commas', required=False, default=None)
-@click.option('--force', help='force', required=False, default=False)
-def stats(model, where, n_jobs, stats, force): 
+@click.option('--force/--no-force', help='force', required=False, default=False)
+def stats(model, where, n_jobs, stats, force):
+    if where == '':
+        where = None
     jobs = load_jobs(model, where)
     db = load_db()
     genstats(jobs, db, n_jobs=n_jobs, force=force, filter_stats=stats)
@@ -56,7 +58,7 @@ def load_jobs(model_name, where):
         ref_job = db.get_job_by_summary(s)
         model_details = ref_job['content']
         j['ref_job'] = dict(ref_job)
-        if ref_job['where'] != where:
+        if where is not None and ref_job['where'] != where:
             continue
         if model_name and model_details['model_name'] != model_name:
             continue

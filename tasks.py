@@ -264,7 +264,8 @@ def build_capsule_(layers, data, nbl, nbc,
     functions = {
         "reconstruct": make_function(func=reconstruct, params=["X"]),
         #"get_conv_layers": make_function(func=get_conv, params=["X"]),
-        "get_recons_loss": make_function(func=get_recons_loss, params=["X"])
+        "get_recons_loss": make_function(func=get_recons_loss, params=["X"]),
+        #"get_hid":  make_function(func=lambda model, X: L.get_output(layers['hid'], X), params=["X"])
     }
     if is_predictive:
         functions.update({
@@ -272,6 +273,10 @@ def build_capsule_(layers, data, nbl, nbc,
 
 
     def report(status):
+        #h = capsule.get_hid(capsule.preprocess(data.X))
+        #print(h.mean(axis=0))
+        #print(sorted(h[0])[::-1])
+        #print(h.mean())
         c, w, h = layers["input"].output_shape[1:]
         ep = status["epoch"]
 
@@ -433,7 +438,7 @@ def build_capsule_(layers, data, nbl, nbc,
 
     # Initialize the optimization algorithm
     mode = train_params.get("mode", "random")
-    print(mode, train_params)
+    #print(mode, train_params)
     optim_params_default = dict(
         lr_decay_method="none",
         initial_lr=0.1,
@@ -565,6 +570,22 @@ def build_capsule_(layers, data, nbl, nbc,
                     mu = train_params.get("mu", 10.)
                     loss += mu * cross_correlation(L.get_output(layer, X), y_pred)
         print(train_params)
+        if train_params.get('sparse_mean', None) is not None:
+            sparse_mean = train_params.get('sparse_mean', {})
+            sparse_coef = train_params.get('sparse_coef', 1)
+            sparse_layers = sparse_mean.keys()
+            for layername in sparse_layers:
+                layer = layers[layername]
+                hid = L.get_output(layer, X)
+                hid_mean = hid.mean(axis=0)
+                print(sparse_mean[layername], sparse_coef)
+                kl_term = (
+                    sparse_mean[layername] * T.log(sparse_mean[layername]) -
+                    sparse_mean[layername] * T.log(hid_mean) +
+                    (1 - sparse_mean[layername]) * T.log(1 - sparse_mean[layername]) -
+                    (1 - sparse_mean[layername]) * T.log(1 - hid_mean))
+                loss += sparse_coef * kl_term.mean()
+
         if train_params.get("contractive", False) is True:
             from lasagne import nonlinearities
             contcoef = train_params.get("contractive_coef", 0.1)
@@ -727,7 +748,6 @@ def check(filename="out.pkl",
         assert job, "Job does not exist : {}".format(params)
         params = job['content']['check']['params']
         assert params is not None
-        print(params)
         params = [params]
 
     if update_db:
@@ -748,7 +768,7 @@ def check(filename="out.pkl",
             state = p.get("seed", 2)
             np.random.seed(state)
             p["seed"] = state
-            print(p)
+            #print(p)
             ret = func(capsule, data, layers, w, h, c, folder, **p)
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()

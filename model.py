@@ -12,11 +12,11 @@ from batch_norm import NormalizeLayer, ScaleAndShiftLayer, DecoderNormalizeLayer
 from lasagne.layers import batch_norm
 
 get_nonlinearity = dict(
-    linear=linear, 
-    sigmoid=sigmoid, 
-    rectify=rectify, 
-    very_leaky_rectify=very_leaky_rectify, 
-    softmax=softmax, 
+    linear=linear,
+    sigmoid=sigmoid,
+    rectify=rectify,
+    very_leaky_rectify=very_leaky_rectify,
+    softmax=softmax,
     tanh=tanh
 )
 
@@ -3094,7 +3094,7 @@ def model58(nb_filters=64, w=32, h=32, c=1, filter_size=3, nb_layers=3, sparsity
             l_conv,
             num_filters=nb_filters,
             filter_size=(filter_size[i], filter_size[i]),
-            pad='same', 
+            pad='same',
             nonlinearity=rectify,
             W=init.GlorotUniform(),
         )
@@ -3179,7 +3179,7 @@ def model60(nb_filters=64, w=32, h=32, c=1, filter_size=3, nb_layers=3, block_si
             l_conv,
             num_filters=nb_filters,
             filter_size=(filter_size[i], filter_size[i]),
-            pad='same', 
+            pad='same',
             nonlinearity=linear,
             W=init.GlorotUniform(),
         )
@@ -3218,7 +3218,7 @@ def model61(nb_filters=64, w=32, h=32, c=1, up=2, filter_size=3, nb_layers=3, bl
             l_conv,
             num_filters=nb_filters,
             filter_size=(filter_size[i], filter_size[i]),
-            pad='same', 
+            pad='same',
             nonlinearity=linear,
             W=init.GlorotUniform(),
         )
@@ -3263,7 +3263,7 @@ def model62(nb_filters=64, w=32, h=32, c=1, up=2, filter_size=3, nb_layers=3, sp
             l_conv,
             num_filters=nb_filters,
             filter_size=(filter_size[i], filter_size[i]),
-            pad='same', 
+            pad='same',
             nonlinearity=rectify,
             W=init.GlorotUniform(),
         )
@@ -3307,7 +3307,7 @@ def model63(nb_filters=64, w=32, h=32, c=1, up=2, filter_size=3, nb_layers=3, sp
             l_conv,
             num_filters=nb_filters,
             filter_size=(filter_size[i + 1], filter_size[i + 1]),
-            pad='same', 
+            pad='same',
             nonlinearity=rectify,
             W=init.GlorotUniform(),
         )
@@ -3359,7 +3359,7 @@ def model64(nb_filters=64, w=32, h=32, c=1,
 
 
 
-def model65(nb_filters=64, filter_size=3, w=32, h=32, c=1, down=2, 
+def model65(nb_filters=64, filter_size=3, w=32, h=32, c=1, down=2,
             block_size=3, use_batch_norm=False, residual=False):
     """
     Pyramidal auto-encoder
