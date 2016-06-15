@@ -246,6 +246,7 @@ def compute_tsne(job_folder , hash_matrix):
     from sklearn.manifold import TSNE
     from lasagne.layers.helper import get_output
     import pandas as pd
+    import theano.tensor as T
     filenames = []
     # input space
     X = construct_data(job_folder, hash_matrix)

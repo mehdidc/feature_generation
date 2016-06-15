@@ -14,7 +14,7 @@ if __name__ == "__main__":
     parser.add_argument('-rw', '--ref_where', default=None, type=str, required=False)
     parser.add_argument('-t', '--type', default=None, type=str, required=False)
     parser.add_argument('-s', '--sequential', default=False, required=False, action='store_true')
-    
+
     args = parser.parse_args()
     nb = args.nb
     force = args.force
@@ -38,15 +38,16 @@ if __name__ == "__main__":
         if type_ is not None:
             extra["type"] = type_
         jobs = db.jobs_with(state=AVAILABLE, **extra)
-    jobs = jobs[0:nb]
-    nb = len(jobs)
+    #jobs = jobs[0:nb]
     print("Number of jobs to run : {}".format(nb))
     for j in jobs:
+        if nb == 0:
+            break
         if ref_where is not None and 'model_summary' in j['content']:
             jref = db.get_job_by_summary(j['content']['model_summary'])
             print(jref['where'], ref_where)
             if jref['where'] != ref_where:
-                print('Skipping {} because its ref is not in {}'.format(j['summary'], ref_where))
+                #print('Skipping {} because its ref is not in {}'.format(j['summary'], ref_where))
                 continue
             else:
                 print('ok not skipping')
@@ -57,3 +58,4 @@ if __name__ == "__main__":
             cmd = cmd[cmd.find('invoke'):]
         subprocess.call(cmd, shell=True)
         time.sleep(0.5)
+        nb -= 1
