@@ -247,6 +247,7 @@ def compute_tsne(job_folder , hash_matrix):
     from lasagne.layers.helper import get_output
     import pandas as pd
     import theano.tensor as T
+    import theano
     filenames = []
     # input space
     X = construct_data(job_folder, hash_matrix)
@@ -263,7 +264,7 @@ def compute_tsne(job_folder , hash_matrix):
     x = T.tensor4()
     fn = theano.function([x], get_output(layers['conv3'], x))
     feats = fn(X.reshape((X.shape[0], 1, 28, 28)))
-    feats.reshape((feats.shape[0], -1))
+    feats = feats.reshape((feats.shape[0], -1))
     tsne = TSNE(perplexity=30, early_exaggeration=4., verbose=1, n_components=2)
     X_2d = tsne.fit_transform(feats)
     filename = '{}/tsne_latent.csv'.format(job_folder)

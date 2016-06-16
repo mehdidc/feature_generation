@@ -43,7 +43,7 @@ if __name__ == '__main__':
     jobs = list(db.jobs_with(state=SUCCESS, type='generation'))
     random.shuffle(jobs)
     print(len(jobs))
-    dataset = f.create_dataset('unlimited', (10000, 784), maxshape=(None, 784), compression="gzip")
+    dataset = f.create_dataset('X', (10000 * len(jobs), 784), maxshape=(None, 784), compression="gzip")
     i = 0
     for j in jobs:
         folder = "jobs/results/{}".format(j['summary'])
@@ -52,5 +52,6 @@ if __name__ == '__main__':
         X = construct_data(folder, hash_matrix)
         dataset[i:i + len(X)] = X
         i += len(X)
+        dataset.attrs['nb'] = i
         print('nb examples so far : {}'.format(i))
     f.close()
