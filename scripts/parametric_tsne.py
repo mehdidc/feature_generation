@@ -15,7 +15,7 @@ def x2p(X, u=15, tol=1e-4, print_iter=500, max_tries=50, verbose=0):
     P = np.zeros((n, n))               # empty probability matrix
     beta = np.ones(n)                  # empty precision vector
     logU = np.log(u)                   # log of perplexity (= entropy)
-    
+
     # Compute pairwise distances
     if verbose > 0: print('Computing pairwise distances...')
     sum_X = np.sum(np.square(X), axis=1)
@@ -25,24 +25,24 @@ def x2p(X, u=15, tol=1e-4, print_iter=500, max_tries=50, verbose=0):
     # Run over all datapoints
     if verbose > 0: print('Computing P-values...')
     for i in range(n):
-        
+
         if verbose > 1 and print_iter and i % print_iter == 0:
             print('Computed P-values {} of {} datapoints...'.format(i, n))
-        
+
         # Set minimum and maximum values for precision
         betamin = float('-inf')
         betamax = float('+inf')
-        
+
         # Compute the Gaussian kernel and entropy for the current precision
         indices = np.concatenate((np.arange(0, i), np.arange(i + 1, n)))
         Di = D[i, indices]
         H, thisP = Hbeta(Di, beta[i])
-        
+
         # Evaluate whether the perplexity is within tolerance
         Hdiff = H - logU
         tries = 0
         while abs(Hdiff) > tol and tries < max_tries:
-            
+
             # If not, increase or decrease precision
             if Hdiff > 0:
                 betamin = beta[i]
@@ -56,36 +56,37 @@ def x2p(X, u=15, tol=1e-4, print_iter=500, max_tries=50, verbose=0):
                     beta[i] /= 2
                 else:
                     beta[i] = (beta[i] + betamin) / 2
-            
+
             # Recompute the values
             H, thisP = Hbeta(Di, beta[i])
             Hdiff = H - logU
             tries += 1
-        
+
         # Set the final row of P
         P[i, indices] = thisP
-        
-    if verbose > 0: 
+
+    if verbose > 0:
         print('Mean value of sigma: {}'.format(np.mean(np.sqrt(1 / beta))))
         print('Minimum value of sigma: {}'.format(np.min(np.sqrt(1 / beta))))
         print('Maximum value of sigma: {}'.format(np.max(np.sqrt(1 / beta))))
-    
+
     return P, beta
 
-def compute_joint_probabilities(samples, batch_size=5000, d=2, perplexity=30, tol=1e-5, verbose=0):    
+def compute_joint_probabilities(samples, batch_size=5000, d=2, perplexity=30, tol=1e-5, verbose=0, P=None):
     # Initialize some variables
     n = samples.shape[0]
     batch_size = min(batch_size, n)
-    
+
     # Precompute joint probabilities for all batches
     if verbose > 0: print('Precomputing P-values...')
     batch_count = int(n / batch_size)
-    P = np.zeros((batch_count, batch_size, batch_size))
-    for i, start in enumerate(range(0, n - batch_size + 1, batch_size)):   
+    if P is None:
+        P = np.zeros((batch_count, batch_size, batch_size))
+    for i, start in enumerate(range(0, n - batch_size + 1, batch_size)):
         curX = samples[start:start+batch_size]                   # select batch
         P[i], beta = x2p(curX, perplexity, tol, verbose=verbose) # compute affinities using fixed perplexity
         P[i][np.isnan(P[i])] = 0                                 # make sure we don't have NaN's
-        P[i] = (P[i] + P[i].T) # / 2                             # make symmetric
+        P[i] = (P[i] + P[i].T)                                   # make symmetric
         P[i] = P[i] / P[i].sum()                                 # obtain estimation of joint probabilities
         P[i] = np.maximum(P[i], np.finfo(P[i].dtype).eps)
 
@@ -110,68 +111,95 @@ def tsne_loss(P, activations):
     return C
 
 
+def save_model(net, filename):
+    import cPickle as pickle
+    fd = open(filename, 'w')
+    pickle.dump(net, fd)
+    fd.close()
+
+
+def load_model(filename):
+    import cPickle as pickle
+    fd = open(filename)
+    net = pickle.load(fd)
+    fd.close()
+    return net
+
+def iterate_minibatches(nb, batch_size=128, shuffle=False):
+    if shuffle:
+        indices = np.arange(nb)
+        np.random.shuffle(nb)
+    for start_idx in range(0, nb - batch_size + 1, batch_size):
+        if shuffle:
+            excerpt = indices[start_idx:start_idx + batch_size]
+        else:
+            excerpt = slice(start_idx, start_idx + batch_size)
+        yield excerpt
+
 if __name__ == '__main__':
-    from sklearn.datasets import load_digits
     from lasagne.layers import DenseLayer as Dense
     from lasagne.layers import InputLayer as Input
     from lasagne.layers.helper import get_output, get_all_params
-    from lasagne.nonlinearities import rectify, linear
+    from lasagne.nonlinearities import rectify, linear, tanh
     from lasagne import updates
     import theano
-    import matplotlib.pyplot as plt
-
+    import h5py
+    from time import time
+    data = h5py.File('dataset/generated_images.hdf5')
+    X = data['X']
+    nb = X.attrs['nb']
+    batch_size = 4096
     floatX = theano.config.floatX
 
-    def iterate_minibatches(inputs, targets=None, batch_size=128, shuffle=False):
-        if targets:
-            assert len(inputs) == len(targets)
-        if shuffle:
-            indices = np.arange(len(inputs))
-            np.random.shuffle(indices)
-        for start_idx in range(0, len(inputs) - batch_size + 1, batch_size):
-            if shuffle:
-                excerpt = indices[start_idx:start_idx + batch_size]
-            else:
-                excerpt = slice(start_idx, start_idx + batch_size)
-            if targets:
-                yield inputs[excerpt], targets[excerpt]
-            else:
-                yield inputs[excerpt]
-    data = load_digits()
-    batch_size = 256
-    X = data['data']
-    y = data['target']
-    P = compute_joint_probabilities(X, batch_size=batch_size, d=2, perplexity=30, tol=1e-5, verbose=0)
-
     x = Input((None, X.shape[1]))
-    z = Dense(x, num_units=256, nonlinearity=rectify)
+    z = Dense(x, num_units=500, nonlinearity=tanh)
+    #z = Dense(z, num_units=500, nonlinearity=rectify)
+    #z = Dense(z, num_units=2000, nonlinearity=rectify)
     z = Dense(z, num_units=2, nonlinearity=linear)
+    net = z
+
     z_pred = get_output(z)
     P_real = T.matrix()
     loss = tsne_loss(P_real, z_pred)
 
     params = get_all_params(z, trainable=True)
-    lr = theano.shared(np.array(0.01, dtype=floatX))
+    lr = theano.shared(np.array(0.00001, dtype=floatX))
     updates = updates.adam(
         loss, params, learning_rate=lr
     )
     train_fn = theano.function([x.input_var, P_real], loss, updates=updates)
     encode = theano.function([x.input_var], z_pred)
+    avg_loss = 0.
+    nb_updates = 0
 
-    X_train = X
-    Y_train = P
+    P = np.empty((1, batch_size, batch_size))
     for epoch in range(1000):
         total_loss = 0
         nb = 0
-        for xt in iterate_minibatches(X_train, batch_size=batch_size, shuffle=False):
-            yt = Y_train[nb]
-            total_loss += train_fn(xt, yt)
+        for mb in iterate_minibatches(len(X),
+                                      batch_size=batch_size,
+                                      shuffle=False):
+            t = time()
+            xt = X[mb]
+            yt = compute_joint_probabilities(xt, batch_size=batch_size, d=2, perplexity=50, tol=1e-5, verbose=0, P=P)
+            yt = yt[0]
+            if np.any(np.isnan(yt)):
+                print('nan')
+                continue
+            xt = xt.astype(floatX)
+            yt = yt.astype(floatX)
+            loss = train_fn(xt, yt)
+            avg_loss = 0.999 * avg_loss + (1 - 0.999) * loss
+            total_loss += loss
+            dt = time() - t
+            print('Avg loss : {}, nb updates : {}, time : {}'.format(avg_loss, nb_updates, dt))
             nb += 1
+            nb_updates += 1
         total_loss /= nb
         print('Loss : {}'.format(total_loss))
         if epoch % 100 == 0:
             lr.set_value(np.array(lr.get_value() * 0.5, dtype=floatX))
-
-    z_train = encode(X_train)
-    plt.scatter(z_train[:, 0], z_train[:, 1], c=y)
-    plt.show()
+        save_model(net, 'tsne.pkl')
+    #z_train = encode(X_train)
+    #plt.scatter(z_train[:, 0], z_train[:, 1], c=y)
+    #plt.savefig('tsne.png')

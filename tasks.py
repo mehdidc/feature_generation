@@ -125,29 +125,6 @@ def train(dataset=None,
         nb_filters=nb_filters,
         w=w, h=h, c=c
     )
-    if model_name in ("model18", "model20"):
-        u = dict(
-            nb_layers=2,
-            size_filters=6
-        )
-        kw_builder.update(u)
-    elif model_name in ("model19", "model21",):
-        u = dict(
-            nb_layers=2,
-            size_filters=5
-        )
-        kw_builder.update(u)
-    elif model_name in ("model24", "model25", "model26", "model27", "model28", "model29", "model30", "model33"):
-        u = dict(
-            nb_layers=3,
-            size_filters=2**3+2
-        )
-        kw_builder.update(u)
-    elif model_name in ("model34", "model35", "model36", "model37", "model38"):
-        u = dict(nb_layers=3, size_filters=2**3+2)
-        kw_builder.update(u)
-        kw_builder["nb_filters"] = 128
-    kw_builder.update(model_params)
     builder = getattr(model, model_name)
 
     # build the model and return layers dictionary
@@ -168,12 +145,12 @@ def train(dataset=None,
     # info["optimization"] = capsule.batch_optimizer.optim_params
     if mode == 'random':
         dummy = np.zeros((1, c, w, h)).astype(np.float32)
-        V = {"X": dummy}
+        V = {"X": dummy, "X_true": dummy}
         if "y" in layers:
             dummy_y = np.zeros((1,)).astype(np.int32)
             V.update({"y": dummy_y})
     elif mode == 'minibatch':
-        V = {"X": capsule.preprocess(data.X)}
+        V = {"X": capsule.preprocess(data.X), "X_true": capsule.preprocess(data.X)}
         # y not handled for now
     else:
         raise Exception('not supported mode {}'.format(mode))
@@ -229,7 +206,7 @@ def build_capsule_(layers, data, nbl, nbc,
     # we only have inputs (X) : no labels
     input_variables = OrderedDict()
     input_variables["X"] = dict(tensor_type=T.tensor4)
-
+    input_variables["X_true"] = dict(tensor_type=T.tensor4)
     if is_predictive:
         input_variables["y"] = dict(tensor_type=T.ivector)
 
@@ -506,6 +483,7 @@ def build_capsule_(layers, data, nbl, nbc,
 
     def loss_function(model, tensors):
         X = tensors["X"]
+        X_true = tensors["X_true"]
         if denoise is not None:
             # for backward compatibility, but walkback_jump should not be used
             # anymore, use walkback_mode only
@@ -519,7 +497,7 @@ def build_capsule_(layers, data, nbl, nbc,
                 Xtilde = noisify(X)
                 X_pred = stoch_reconstruct(model, Xtilde)
                 for i in range(walkback):
-                    recons += recons_loss(X, X_pred)
+                    recons += recons_loss(X_true, X_pred)
                     X_pred = stoch_reconstruct(model, X_pred)
                 loss = recons
             elif walkback_mode == "bengio_without_sampling":
@@ -528,14 +506,14 @@ def build_capsule_(layers, data, nbl, nbc,
                 for i in range(walkback):
                     Xcur = noisify(Xcur)
                     Xcur = stoch_reconstruct(model, Xcur)
-                    recons += recons_loss(X, Xcur)
+                    recons += recons_loss(X_true, Xcur)
                 loss = recons
             elif walkback_mode == "bengio":
                 recons = 0
                 Xcur = X
                 for i in range(walkback):
                     Xcur = noisify(Xcur)
-                    recons += recons_loss(X, stoch_reconstruct(model, Xcur))
+                    recons += recons_loss(X_true, stoch_reconstruct(model, Xcur))
                     Xcur = stoch_reconstruct_and_sample(model, Xcur)
                 loss = recons
             elif walkback_mode == "mine":
@@ -553,7 +531,7 @@ def build_capsule_(layers, data, nbl, nbc,
             updates.extend([(v, u) for v, u in theano_rng_cpu.updates()])
         else:
             X_pred = stoch_reconstruct(model, X)
-            recons = recons_loss(X, X_pred)
+            recons = recons_loss(X_true, X_pred)
             loss = recons
             updates = []
 
@@ -569,7 +547,6 @@ def build_capsule_(layers, data, nbl, nbc,
                 if layer_name.startswith("factor") and type(layer) == L.DenseLayer:
                     mu = train_params.get("mu", 10.)
                     loss += mu * cross_correlation(L.get_output(layer, X), y_pred)
-        print(train_params)
         if train_params.get('sparse_mean', None) is not None:
             sparse_mean = train_params.get('sparse_mean', {})
             sparse_coef = train_params.get('sparse_coef', 1)
@@ -619,11 +596,28 @@ def build_capsule_(layers, data, nbl, nbc,
         return loss, updates
 
     def transform(batch_index, batch_slice, tensors):
-        data.load()
         t = OrderedDict()
-        t["X"] = preprocess(data.X)
-        if is_predictive:
-            t["y"] = data.y
+        sampling = train_params.get("sampling", "normal")
+        print(sampling)
+        if sampling == "normal":
+            data.load()
+            t["X"] = preprocess(data.X)
+            t["X_true"] = preprocess(data.X)
+            if is_predictive:
+                t["y"] = data.y
+        if sampling == "perclass":
+            data.load()
+            y = data.y
+            X = data.X
+            X_true = np.empty_like(X)
+            data.load()
+            for i, example_y in enumerate(y):
+                s = data.X[data.y==example_y]
+                X_true[i] = s[np.random.choice(np.arange(len(s)))]
+            t["X"] = preprocess(X)
+            t["X_true"] = preprocess(X_true)
+            if is_predictive:
+                t["y"] = y
         return t
 
     def preprocess(X):
@@ -659,12 +653,12 @@ def build_capsule_(layers, data, nbl, nbc,
         mode = train_params.get("mode", "random")
         if mode == "random":
             dummy = np.zeros((1, c, w, h)).astype(np.float32)
-            dummyvars = {"X": dummy}
+            dummyvars = {"X": dummy, "X_true": dummy}
             if is_predictive:
                 dummyvars.update({"y": dummy})
             capsule._build(dummyvars)
         elif mode == "minibatch":
-            V = {"X": capsule.preprocess(data.X)}
+            V = {"X": capsule.preprocess(data.X), "X_true": capsule.preprocess(data.X)}
             print(data.X.shape)
             capsule._build(V)
     elif compile_ == "functions_only":

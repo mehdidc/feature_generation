@@ -251,27 +251,35 @@ def compute_tsne(job_folder , hash_matrix):
     filenames = []
     # input space
     X = construct_data(job_folder, hash_matrix)
-    tsne = TSNE(perplexity=30, early_exaggeration=4., verbose=1, n_components=2)
-    X_2d = tsne.fit_transform(X)
-    filename = '{}/tsne_input.csv'.format(job_folder)
-    filenames.append(filename)
-    pd.DataFrame(X_2d).to_csv(filename)
-    # latent space
-    v = check(what="notebook",
-              filename="models/model_E.pkl",
-              dataset='digits') # any would work, we dont care
-    capsule, data, layers, _, _, _ = v
-    x = T.tensor4()
-    fn = theano.function([x], get_output(layers['conv3'], x))
-    feats = fn(X.reshape((X.shape[0], 1, 28, 28)))
-    feats = feats.reshape((feats.shape[0], -1))
-    tsne = TSNE(perplexity=30, early_exaggeration=4., verbose=1, n_components=2)
-    X_2d = tsne.fit_transform(feats)
-    filename = '{}/tsne_latent.csv'.format(job_folder)
-    filenames.append(filename)
-    pd.DataFrame(X_2d).to_csv(filename)
-    return filenames
-
+    indices = np.arange(0, len(X))
+    np.random.shuffle(indices)
+    indices = indices[0:1000]
+    X = X[indices]
+    try:
+        tsne = TSNE(perplexity=30, early_exaggeration=4., verbose=1, n_components=2)
+        X_2d = tsne.fit_transform(X)
+        filename = '{}/tsne_input.csv'.format(job_folder)
+        input_filename = filename
+        filenames.append(filename)
+        pd.DataFrame({'x':X_2d[:, 0], 'y': X_2d[:, 1], 'ind': indices}).to_csv(filename)
+        # latent space
+        v = check(what="notebook",
+                filename="models/model_E.pkl",
+                dataset='digits') # any would work, we dont care
+        capsule, data, layers, _, _, _ = v
+        x = T.tensor4()
+        fn = theano.function([x], get_output(layers['conv3'], x))
+        feats = fn(X.reshape((X.shape[0], 1, 28, 28)))
+        feats = feats.reshape((feats.shape[0], -1))
+        tsne = TSNE(perplexity=30, early_exaggeration=4., verbose=1, n_components=2)
+        X_2d = tsne.fit_transform(feats)
+        filename = '{}/tsne_latent.csv'.format(job_folder)
+        latent_filename = filename
+        filenames.append(filename)
+        pd.DataFrame({'x':X_2d[:, 0], 'y': X_2d[:, 1], 'ind': indices}).to_csv(filename)
+        return {'input': input_filename, 'latent': latent_filename}
+    except Exception:
+        return {}
 def compute_rec_error(job, dataset, ref_job):
     from tasks import check
     from data import load_data
