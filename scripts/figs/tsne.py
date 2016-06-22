@@ -1,12 +1,9 @@
 import matplotlib as mpl
 mpl.use('Agg')
-import sys
-import numpy as  np
 import os
 import matplotlib.pyplot as plt
 import pandas as pd
 from skimage.io import imread
-import json
 from lightjob.cli import load_db
 
 db = load_db()
@@ -31,5 +28,5 @@ for j in J:
     plt.subplot(1, 2, 2)
     plt.imshow(img_content, cmap='gray')
     plt.title(id_+'/'+jref_s)
-    plt.savefig('tsne/{}.png'.format(id_))
+    plt.savefig('figs/tsne/{}.png'.format(id_))
     plt.close(fig)
