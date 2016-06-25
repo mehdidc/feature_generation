@@ -8,12 +8,29 @@ import pandas as pd
 from lightjob.cli import load_db
 from astroML.correlation import two_point
 from sklearn.metrics import euclidean_distances
+from sklearn.manifold import TSNE
+from tqdm import tqdm
+from joblib import Memory
+
+from tempfile import mkdtemp
+cachedir = mkdtemp()
+memory = Memory(cachedir=cachedir, verbose=0)
+
+np.random.seed(2)
 
 db = load_db()
 
 J = db.jobs_with(state='success', type='generation')
 
-for j in J:
+@memory.cache
+def build_baseline(nb=1000):
+    R = np.random.uniform(size=(X.shape[0], 784))#TODO change, only tied to mnist
+    tsne = TSNE(perplexity=30, early_exaggeration=4., verbose=0, n_components=2)
+    R = tsne.fit_transform(R)
+    return R
+
+
+for j in tqdm(J):
     id_ = j['summary']
     jref_s = j['content']['model_summary']
     jref = db.get_job_by_summary(jref_s)
@@ -28,8 +45,8 @@ for j in J:
     width = (dist_max - dist_min) / nb
     c = 0
     bins = np.linspace(dist_min - c, dist_max + c, nb)
-
-    t = two_point(X, bins, method='landy-szalay')
+    R = build_baseline(nb=X.shape[0])
+    t = two_point(X, bins, method='landy-szalay', data_R=R)
 
     bins = (bins - bins.min()) / (bins.max() - bins.min())
     pt = (bins[0:-1] + bins[1:])/2.

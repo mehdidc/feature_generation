@@ -5,12 +5,13 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from skimage.io import imread
 from lightjob.cli import load_db
+from tqdm import tqdm
 
 db = load_db()
 
 J = db.jobs_with(state='success', type='generation')
 
-for j in J:
+for j in tqdm(J):
     id_ = j['summary']
     jref_s = j['content']['model_summary']
     jref = db.get_job_by_summary(jref_s)
@@ -22,6 +23,8 @@ for j in J:
         continue
     img_content = imread(img_filename)
     data = pd.read_csv(filename)
+    if not ('x' in data.columns and 'y' in data.columns):
+        continue
 
     for c in ('x', 'y'):
         data[c] = (data[c] - data[c].mean()) / data[c].std()
