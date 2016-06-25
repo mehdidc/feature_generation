@@ -4,6 +4,7 @@ import glob
 from lightjob.cli import load_db
 from lightjob.db import SUCCESS
 import h5py
+import json
 
 def construct_data(job_folder, hash_matrix, transform=lambda x:x):
     filenames = glob.glob(os.path.join(job_folder, 'final', '*.png'))
@@ -12,7 +13,6 @@ def construct_data(job_folder, hash_matrix, transform=lambda x:x):
     filenames = [filenames[ind] for ind in indices]
     if len(filenames) == 0:
         return None
-
     X = []
     for im in get_images(filenames):
         X.append([transform(im)])
@@ -38,20 +38,22 @@ def unique_indices(hm):
 if __name__ == '__main__':
     import random
     random.seed(42)
-    f = h5py.File('out.hdf5', 'w')
+    f = h5py.File('figs/dataset.hdf5', 'w')
     db = load_db()
     jobs = list(db.jobs_with(state=SUCCESS, type='generation'))
     random.shuffle(jobs)
     print(len(jobs))
     dataset = f.create_dataset('X', (10000 * len(jobs), 784), maxshape=(None, 784), compression="gzip")
     i = 0
+    ind = 0
     for j in jobs:
         folder = "jobs/results/{}".format(j['summary'])
         hash_matrix_filename = os.path.join(folder, "csv", "hashmatrix.npy")
         hash_matrix = np.load(hash_matrix_filename)
         X = construct_data(folder, hash_matrix)
         dataset[i:i + len(X)] = X
+        dataset.attrs[j['summary']] = json.dumps({'start': i, 'end': i + len(X)})
         i += len(X)
-        dataset.attrs['nb'] = i
+        f.attrs['nb'] = i
         print('nb examples so far : {}'.format(i))
     f.close()

@@ -269,27 +269,32 @@ def clusterfinder(capsule, data, layers, w, h, c, folder, **params):
         patterns = [patterns]
     F = (f for p in patterns for f in glob(p))
     for filename in F:
-        #if "out" in filename:
-        #    continue
-        #if "_cv_" in filename and not filename.endswith("0.png"):
-        #    continue
+        if "out" in filename:
+            continue
+        if "_cv_" in filename and not filename.endswith("0.png"):
+            continue
         filenames.append(filename)
+    print('Total number of {} images found'.format(len(filenames)))
+    filenames = sorted(filenames)
     if params.get("force_nb") is not None:
         nb = params.get("force_nb")
         ind = np.random.choice(np.arange(len(filenames)), size=nb, replace=False)
         filenames = np.array(filenames)[ind].tolist()
-    X = []
-    for filename in filenames:
-        img = imread(filename)
-        if len(img.shape) == 3:
-            img = img[:, :, 0]
-        img = img.astype(np.float32)
-        if img.max() > 0:
-            img /= img.max()
-        assert len(img.shape) == 2, str(img.shape)
-        X.append(img[None, None, :, :])
-    X = np.concatenate(X, axis=0)
-    logger.info("Total number of {} images".format(X.shape[0]))
+    if params.get('X') is not None:
+        X = params.get('X')
+    else:
+        X = []
+        for filename in filenames:
+            img = imread(filename)
+            if len(img.shape) == 3:
+                img = img[:, :, 0]
+            img = img.astype(np.float32)
+            if img.max() > 0:
+                img /= img.max()
+            assert len(img.shape) == 2, str(img.shape)
+            X.append(img[None, None, :, :])
+        X = np.concatenate(X, axis=0)
+    logger.info("Total number of {} images taken".format(X.shape[0]))
     X = X.astype(np.float32)
     logger.info("Computing the code...")
 
@@ -343,10 +348,9 @@ def clusterfinder(capsule, data, layers, w, h, c, folder, **params):
 
         logger.info("Embedding into 2d...")
         sne = TSNE(verbose=1, n_components=2, **params.get("tsneparams", {}))
-        pca = PCA(n_components=2)
-
+        if params.get('code_extended') is not None:
+            code_extended = params['code_extended']
         code_2d = sne.fit_transform(code_extended)
-        #code_2d = bh_tsne(code_extended)
         ret["code_2d"] = code_2d
         logger.info("Scattering..")
         plt.scatter(code_2d[categories < 0, 0],

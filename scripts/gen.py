@@ -19,7 +19,7 @@ def main():
 @click.command()
 @click.option('--model', help='model', required=False, default=None)
 @click.option('--where', help='where', required=True)
-@click.option('--folder', help='folder', required=False, default='gallery')
+@click.option('--folder', help='folder', required=False, default='figs/gallery')
 @click.option('--nbpages', help='nbpages', required=False, default=-1)
 @click.option('--limit', help='limit', required=False, default=None)
 @click.option('--show-freqs/--no-show-freqs', help='show_freqs', required=False, default=False)

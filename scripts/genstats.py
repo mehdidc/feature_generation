@@ -249,13 +249,13 @@ def compute_tsne(job_folder , hash_matrix):
     import theano.tensor as T
     import theano
     filenames = []
-    # input space
-    X = construct_data(job_folder, hash_matrix)
-    indices = np.arange(0, len(X))
-    np.random.shuffle(indices)
-    indices = indices[0:1000]
-    X = X[indices]
     try:
+        # input space
+        X = construct_data(job_folder, hash_matrix)
+        indices = np.arange(0, len(X))
+        np.random.shuffle(indices)
+        indices = indices[0:1000]
+        X = X[indices]
         tsne = TSNE(perplexity=30, early_exaggeration=4., verbose=1, n_components=2)
         X_2d = tsne.fit_transform(X)
         filename = '{}/tsne_input.csv'.format(job_folder)
