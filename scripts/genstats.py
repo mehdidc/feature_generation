@@ -259,9 +259,11 @@ def compute_tsne(job_folder , hash_matrix):
 
         np.random.seed(2)
         data_X = data.train.X
+        data_y = data.train.y
         data_indices = np.arange(0, len(data_X))
         data_indices = data_indices[0:nb]
         data_X = data_X[data_indices]
+        data_y = data_y[data_indices]
         data_X -= data_X.min()
         data_X /= data_X.max()
 
@@ -274,8 +276,7 @@ def compute_tsne(job_folder , hash_matrix):
         X -= X.min()
         X /= X.max()
         X_full = np.concatenate((X, data_X), axis=0)
-        is_gen = np.array([True] * len(X) + [False] * len(data_X))
-        print(X_full.shape, X.shape, data_X.shape, indices.shape, data_indices.shape)
+        cats = np.array([-1] * len(X) + data_y.tolist())
         # input space
         np.random.seed(2)
         tsne = TSNE(perplexity=15, early_exaggeration=20, verbose=1, n_components=2)
@@ -287,7 +288,8 @@ def compute_tsne(job_folder , hash_matrix):
               'y': X_2d[:, 1],
               'gen_ind': indices,
               'dataset_ind': data_indices,
-              'is_generated': is_gen}
+              'images': X_full,
+              'categories': cats}
         fd = open(filename, 'w')
         pickle.dump(dt, fd)
         fd.close()
