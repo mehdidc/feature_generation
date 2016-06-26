@@ -66,7 +66,12 @@ if __name__ == '__main__':
     ind = 0
     for j in tqdm(jobs):
         folder = "jobs/results/{}".format(j['summary'])
-        X = construct_data(folder)
+        try:
+            X = construct_data(folder)
+            print(X.shape)
+        except Exception as ex:
+            print(str(ex))
+            continue
         dataset[i:i + len(X)] = X
         dataset.attrs[j['summary']] = json.dumps({'start': i, 'end': i + len(X)})
         i += len(X)

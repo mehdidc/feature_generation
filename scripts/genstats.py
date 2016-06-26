@@ -248,37 +248,74 @@ def compute_tsne(job_folder , hash_matrix):
     import pandas as pd
     import theano.tensor as T
     import theano
+    import cPickle as pickle
     filenames = []
     try:
-        # input space
+        nb = 1000
+        v = check(what="notebook",
+                  filename="training/initial_models/model_E.pkl",
+                  dataset='digits')
+        capsule, data, layers, _, _, _ = v
+
+        np.random.seed(2)
+        data_X = data.train.X
+        data_indices = np.arange(0, len(data_X))
+        data_indices = data_indices[0:nb]
+        data_X = data_X[data_indices]
+        data_X -= data_X.min()
+        data_X /= data_X.max()
+
+        np.random.seed(2)
         X = construct_data(job_folder, hash_matrix)
         indices = np.arange(0, len(X))
         np.random.shuffle(indices)
-        indices = indices[0:1000]
+        indices = indices[0:nb]
         X = X[indices]
-        tsne = TSNE(perplexity=30, early_exaggeration=4., verbose=1, n_components=2)
+        X -= X.min()
+        X /= X.max()
+        X_full = np.concatenate((X, data_X), axis=0)
+        is_gen = np.array([True] * len(X) + [False] * len(data_X))
+        print(X_full.shape, X.shape, data_X.shape, indices.shape, data_indices.shape)
+        # input space
+        np.random.seed(2)
+        tsne = TSNE(perplexity=15, early_exaggeration=20, verbose=1, n_components=2)
         X_2d = tsne.fit_transform(X)
-        filename = '{}/tsne_input.csv'.format(job_folder)
+        filename = '{}/tsne_input.pkl'.format(job_folder)
         input_filename = filename
         filenames.append(filename)
-        pd.DataFrame({'x':X_2d[:, 0], 'y': X_2d[:, 1], 'ind': indices}).to_csv(filename)
+        dt = {'x':X_2d[:, 0],
+              'y': X_2d[:, 1],
+              'gen_ind': indices,
+              'dataset_ind': data_indices,
+              'is_generated': is_gen}
+        fd = open(filename, 'w')
+        pickle.dump(dt, fd)
+        fd.close()
+
+        """
         # latent space
-        v = check(what="notebook",
-                filename="models/model_E.pkl",
-                dataset='digits') # any would work, we dont care
-        capsule, data, layers, _, _, _ = v
         x = T.tensor4()
         fn = theano.function([x], get_output(layers['conv3'], x))
+        X = X.astype(np.float32)
         feats = fn(X.reshape((X.shape[0], 1, 28, 28)))
         feats = feats.reshape((feats.shape[0], -1))
-        tsne = TSNE(perplexity=30, early_exaggeration=4., verbose=1, n_components=2)
+        np.random.seed(2)
+        tsne = TSNE(perplexity=15, early_exaggeration=20, verbose=1, n_components=2)
         X_2d = tsne.fit_transform(feats)
-        filename = '{}/tsne_latent.csv'.format(job_folder)
+        filename = '{}/tsne_latent.pkl'.format(job_folder)
         latent_filename = filename
         filenames.append(filename)
-        pd.DataFrame({'x':X_2d[:, 0], 'y': X_2d[:, 1], 'ind': indices}).to_csv(filename)
-        return {'input': input_filename, 'latent': latent_filename}
-    except Exception:
+
+        dt = {'x':X_2d[:, 0], 'y': X_2d[:, 1], 'ind': indices, 'data_ind': data_indices}
+        fd = open(filename, 'w')
+        pickle.dump(dt, fd)
+        fd.close()
+        """
+
+        print('OK DONE')
+        return {'input': input_filename}
+    except Exception as ex:
+        print(str(ex))
         return {}
 def compute_rec_error(job, dataset, ref_job):
     from tasks import check
