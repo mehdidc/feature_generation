@@ -75,17 +75,13 @@ if __name__ == '__main__':
         fig = plt.figure(figsize=(15, 22))
 
         plt.subplot(2, 1, 1)
-        #print(data['x'].shape, data['y'].shape, data['is_generated'].shape, data['dataset_ind'].shape, data['gen_ind'].shape)
         code_2d = pd.DataFrame({'x': data['x'], 'y': data['y']}).values
-        cats = data['is_generated'].astype(int)
-        cats[cats == 1] = -1
-        cats[cats == 0] = dataset.y[data['dataset_ind']]
+        cats = data['categories']
         try:
             plot_dataset(code_2d, cats)
             plot_generated(code_2d, cats)
         except Exception:
             continue
-
         plt.title(id_+'/'+jref_s)
         plt.subplot(2, 1, 2)
         plt.imshow(img_content, cmap='gray', interpolation='none')
