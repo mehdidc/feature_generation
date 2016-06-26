@@ -23,6 +23,7 @@ def get_data(filename):
     fd.close()
     return data
 
+
 def plot_dataset(code_2d, categories):
     colors = [
         'r',
@@ -34,13 +35,14 @@ def plot_dataset(code_2d, categories):
         'maroon',
         'm',
         'c',
-        'o'
+        'orange'
     ]
     for cat in range(0, 10):
         g = categories == cat
         plt.scatter(code_2d[g, 0], code_2d[g, 1],
-                   marker='+', c=colors[cat], s=40, alpha=0.7,
-                   label="digit {}".format(cat))
+                    marker='+', c=colors[cat], s=40, alpha=0.7,
+                    label="digit {}".format(cat))
+
 
 def plot_generated(code_2d, categories):
     g = categories < 0
@@ -70,19 +72,22 @@ if __name__ == '__main__':
         for c in ('x', 'y'):
             data[c] = (data[c] - data[c].mean()) / data[c].std()
 
-        fig = plt.figure(figsize=(20, 20))
+        fig = plt.figure(figsize=(15, 22))
 
-        plt.subplot(1, 2, 1)
-
+        plt.subplot(2, 1, 1)
+        #print(data['x'].shape, data['y'].shape, data['is_generated'].shape, data['dataset_ind'].shape, data['gen_ind'].shape)
         code_2d = pd.DataFrame({'x': data['x'], 'y': data['y']}).values
-        cats = data['is_gen'].astype(int)
-        cats[cats==1] = -1
-        cats[cats==0] = dataset.y[data['dataset_ind']]
-        plot_dataset(code_2d, cats)
-        plot_generated(code_2d, cats)
+        cats = data['is_generated'].astype(int)
+        cats[cats == 1] = -1
+        cats[cats == 0] = dataset.y[data['dataset_ind']]
+        try:
+            plot_dataset(code_2d, cats)
+            plot_generated(code_2d, cats)
+        except Exception:
+            continue
 
         plt.title(id_+'/'+jref_s)
-        plt.subplot(1, 2, 2)
+        plt.subplot(2, 1, 2)
         plt.imshow(img_content, cmap='gray', interpolation='none')
         plt.title(id_+'/'+jref_s)
         plt.savefig('figs/tsne/{}.png'.format(id_))

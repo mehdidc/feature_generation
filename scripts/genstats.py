@@ -279,7 +279,7 @@ def compute_tsne(job_folder , hash_matrix):
         # input space
         np.random.seed(2)
         tsne = TSNE(perplexity=15, early_exaggeration=20, verbose=1, n_components=2)
-        X_2d = tsne.fit_transform(X)
+        X_2d = tsne.fit_transform(X_full)
         filename = '{}/tsne_input.pkl'.format(job_folder)
         input_filename = filename
         filenames.append(filename)
