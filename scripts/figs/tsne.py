@@ -76,8 +76,8 @@ if __name__ == '__main__':
 
         plt.subplot(2, 1, 1)
         code_2d = pd.DataFrame({'x': data['x'], 'y': data['y']}).values
-        cats = data['categories']
         try:
+            cats = data['categories']
             plot_dataset(code_2d, cats)
             plot_generated(code_2d, cats)
         except Exception:
