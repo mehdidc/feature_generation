@@ -11,6 +11,7 @@ from sklearn.metrics import euclidean_distances
 from sklearn.manifold import TSNE
 from tqdm import tqdm
 from joblib import Memory
+import cPickle as pickle
 
 from tempfile import mkdtemp
 cachedir = mkdtemp()
@@ -24,28 +25,43 @@ J = db.jobs_with(state='success', type='generation')
 
 @memory.cache
 def build_baseline(nb=1000):
-    R = np.random.uniform(size=(X.shape[0], 784))#TODO change, only tied to mnist
-    tsne = TSNE(perplexity=30, early_exaggeration=4., verbose=0, n_components=2)
+    np.random.seed(2)
+    R = np.random.uniform(size=(nb, 784)) #TODO change, only tied to mnist
+    tsne = TSNE(perplexity=15, early_exaggeration=20, verbose=0, n_components=2)
     R = tsne.fit_transform(R)
     return R
+
+
+def get_data(filename):
+    fd = open(filename, "r")
+    data = pickle.load(fd)
+    fd.close()
+    return data
 
 
 for j in tqdm(J):
     id_ = j['summary']
     jref_s = j['content']['model_summary']
     jref = db.get_job_by_summary(jref_s)
-    filename = 'jobs/results/{}/tsne_input.csv'.format(id_)
+    filename = 'jobs/results/{}/tsne_input.pkl'.format(id_)
     if not os.path.exists(filename):
         continue
-    df = pd.read_csv(filename)
-    X = df[['x', 'y']].values
+    df = get_data(filename)
+    try:
+        c = df['categories'] < 0
+    except Exception:
+        continue
+    X = pd.DataFrame({'x': df['x'][c], 'y': df['y'][c]}).values
     dist = euclidean_distances(X)
     dist_min, dist_max = dist.min(), dist.max()
     nb = 30
     width = (dist_max - dist_min) / nb
     c = 0
     bins = np.linspace(dist_min - c, dist_max + c, nb)
-    R = build_baseline(nb=X.shape[0])
+    try:
+        R = build_baseline(nb=X.shape[0])
+    except Exception:
+        continue
     t = two_point(X, bins, method='landy-szalay', data_R=R)
 
     bins = (bins - bins.min()) / (bins.max() - bins.min())

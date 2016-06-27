@@ -294,12 +294,12 @@ def compute_tsne(job_folder , hash_matrix):
         pickle.dump(dt, fd)
         fd.close()
 
-        """
         # latent space
         x = T.tensor4()
         fn = theano.function([x], get_output(layers['conv3'], x))
         X = X.astype(np.float32)
-        feats = fn(X.reshape((X.shape[0], 1, 28, 28)))
+        X_full = X_full.astype(np.float32)
+        feats = fn(X_full.reshape((X_full.shape[0], 1, 28, 28)))
         feats = feats.reshape((feats.shape[0], -1))
         np.random.seed(2)
         tsne = TSNE(perplexity=15, early_exaggeration=20, verbose=1, n_components=2)
@@ -307,15 +307,19 @@ def compute_tsne(job_folder , hash_matrix):
         filename = '{}/tsne_latent.pkl'.format(job_folder)
         latent_filename = filename
         filenames.append(filename)
+        dt = {'x':X_2d[:, 0],
+              'y': X_2d[:, 1],
+              'gen_ind': indices,
+              'dataset_ind': data_indices,
+              'images': X_full,
+              'categories': cats}
 
-        dt = {'x':X_2d[:, 0], 'y': X_2d[:, 1], 'ind': indices, 'data_ind': data_indices}
         fd = open(filename, 'w')
         pickle.dump(dt, fd)
         fd.close()
-        """
 
         print('OK DONE')
-        return {'input': input_filename}
+        return {'input': input_filename, 'latent': latent_filename}
     except Exception as ex:
         print(str(ex))
         return {}

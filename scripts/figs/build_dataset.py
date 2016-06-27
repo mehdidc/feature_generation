@@ -59,7 +59,6 @@ if __name__ == '__main__':
     db = load_db()
     jobs = list(db.jobs_with(state=SUCCESS, type='generation'))
     random.shuffle(jobs)
-    jobs = [{'summary': 'iccc'}] + jobs
     print(len(jobs))
     dataset = f.create_dataset('X', (10000 * len(jobs), 784), maxshape=(None, 784), compression="gzip")
     i = 0
