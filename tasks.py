@@ -555,7 +555,6 @@ def build_capsule_(layers, data, nbl, nbc,
                 layer = layers[layername]
                 hid = L.get_output(layer, X)
                 hid_mean = hid.mean(axis=0)
-                print(sparse_mean[layername], sparse_coef)
                 kl_term = (
                     sparse_mean[layername] * T.log(sparse_mean[layername]) -
                     sparse_mean[layername] * T.log(hid_mean) +
@@ -598,7 +597,6 @@ def build_capsule_(layers, data, nbl, nbc,
     def transform(batch_index, batch_slice, tensors):
         t = OrderedDict()
         sampling = train_params.get("sampling", "normal")
-        print(sampling)
         if sampling == "normal":
             data.load()
             t["X"] = preprocess(data.X)
@@ -659,7 +657,6 @@ def build_capsule_(layers, data, nbl, nbc,
             capsule._build(dummyvars)
         elif mode == "minibatch":
             V = {"X": capsule.preprocess(data.X), "X_true": capsule.preprocess(data.X)}
-            print(data.X.shape)
             capsule._build(V)
     elif compile_ == "functions_only":
         capsule._build_functions()
@@ -694,14 +691,11 @@ def check(filename="out.pkl",
     else:
         layers, model_params = load_(filename)#if w not specified take the one in the model
         w = layers['input'].output_shape[2]
-        print(w)
     if force_h is not None:
         h = force_h
     else:
         layers, model_params = load_(filename)#if h not specified take the one in the model
         h = layers['input'].output_shape[3]
-        print(h)
-
 
     if kw_load_data is None:
         kw_load_data = {}
@@ -762,11 +756,9 @@ def check(filename="out.pkl",
             state = p.get("seed", 2)
             np.random.seed(state)
             p["seed"] = state
-            #print(p)
             ret = func(capsule, data, layers, w, h, c, folder, **p)
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            #traceback.print_tb(exc_traceback, limit=4, file=sys.stdout)
             traceback.print_exception(exc_type, exc_value, exc_traceback,
                                       limit=5, file=sys.stdout)
             if update_db:
