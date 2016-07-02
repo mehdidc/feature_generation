@@ -61,7 +61,7 @@ if __name__ == '__main__':
         id_ = j['summary']
         jref_s = j['content']['model_summary']
         jref = db.get_job_by_summary(jref_s)
-        filename = 'jobs/results/{}/tsne_input.pkl'.format(id_)
+        filename = 'jobs/results/{}/tsne_latent.pkl'.format(id_)
         if not os.path.exists(filename):
             continue
         img_filename = 'jobs/results/{}/final1000.png'.format(id_)

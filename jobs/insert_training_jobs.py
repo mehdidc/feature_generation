@@ -1767,6 +1767,66 @@ if __name__ == "__main__":
 
         return nb
 
+    def jobset33():
+        """
+        jobset21 but with more training time
+        """
+        nb_filters_per_layer = {
+            3: [[2**x, 2**(x+1), 2**(x+2)] for x in range(3, 9)],
+            4: [[2**x, 2**(x+1), 2**(x+1), 2**(x+2)] for x in range(3, 9)],
+            5: [[2**x, 2**x, 2**(x+1), 2**(x+1), 2**(x+2)] for x in range(3, 9)]
+        }
+        all_params = (
+            OrderedDict(
+                model_params=OrderedDict(nb_filters=nb_filters,
+                                         filter_size=filter_size,
+                                         use_wta_channel=use_wta_channel,
+                                         use_wta_spatial=use_wta_spatial,
+                                         nb_filters_mul=nb_filters_mul,
+                                         wta_channel_stride=wta_channel_stride,
+                                         nb_layers=nb_layers),
+                denoise=denoise,
+                noise=noise,
+                walkback=walkback,
+                walkback_mode=walkback_mode,
+                autoencoding_loss=autoencoding_loss,
+                contractive=contractive,
+                contractive_coef=contractive_coef,
+                marginalized=marginalized,
+                binarize_thresh=binarize_thresh)
+            for nb_filters_mul in (1,)
+            for filter_size in (5,)
+            for nb_layers in (3, 4, 5)
+            for nb_filters in nb_filters_per_layer[nb_layers]
+            for use_wta_channel in (True,)
+            for use_wta_spatial in (False,)
+            for wta_channel_stride in (2, 4)
+            for denoise in (None,)
+            for noise in ("zero_masking",)
+            for walkback in (1,)
+            for walkback_mode in ('bengio_without_sampling',)
+            for autoencoding_loss in ("squared_error",)
+            for contractive in (False,)
+            for contractive_coef in (None,)
+            for marginalized in (False,)
+            for binarize_thresh in (None,)
+        )
+        all_params = list(all_params)
+        print(len(all_params))
+        nb = 0
+        budget_hours = 12
+        model_name = 'model55'
+        dataset = 'digits'
+        jobset_name = "jobset33"
+        for p in all_params:
+            p['model_name'] = model_name
+            p['dataset'] = dataset
+            p['budget_hours'] = budget_hours
+            cmd = build_cmd(model_name=model_name, dataset=dataset, params=p, budget_hours=budget_hours)
+            nb += job_write(p, cmd, where=jobset_name)
+            print(json.dumps(p, indent=4))
+        return nb
+
     nb = 0
     #nb += test()
     #nb += jobset1()
@@ -1799,5 +1859,6 @@ if __name__ == "__main__":
     #nb += jobset29()
     #nb += jobset30()
     #nb += jobset31()
-    nb += jobset32()
+    #nb += jobset32()
+    nb += jobset33()
     print("Total number of jobs added : {}".format(nb))
