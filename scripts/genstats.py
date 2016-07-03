@@ -300,6 +300,7 @@ def compute_tsne(job_folder , hash_matrix):
         X = X.astype(np.float32)
         X_full = X_full.astype(np.float32)
         feats = fn(X_full.reshape((X_full.shape[0], 1, 28, 28)))
+        feats = feats.max(axis=(2, 3))
         feats = feats.reshape((feats.shape[0], -1))
         np.random.seed(2)
         tsne = TSNE(perplexity=15, early_exaggeration=20, verbose=1, n_components=2)
