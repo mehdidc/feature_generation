@@ -3427,6 +3427,8 @@ def model66(nb_filters=64, w=32, h=32, c=1, sparsity=True):
             - share the weights of (conv3_back2->out3), (conv2_back1->out2) and (sparseconv1->out1)
             - share the weights of (conv3_back1->conv3_back2) and (sparseconv2->conv2_back1)
     """
+    if type(nb_filters) != list:
+        nb_filters = [nb_filters] * 3
     sparse_layers = []
 
     def sparse(l):
@@ -3444,7 +3446,7 @@ def model66(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     l_in = layers.InputLayer((None, c, w, h), name="input")
     l_conv1 = layers.Conv2DLayer(
             l_in,
-            num_filters=nb_filters,
+            num_filters=nb_filters[0],
             filter_size=(5, 5),
             nonlinearity=rectify,
             W=init.GlorotUniform(),
@@ -3452,7 +3454,7 @@ def model66(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     l_conv1_sparse = sparse(l_conv1)
     l_conv2 = layers.Conv2DLayer(
             l_conv1,
-            num_filters=nb_filters,
+            num_filters=nb_filters[1],
             filter_size=(5, 5),
             nonlinearity=rectify,
             W=init.GlorotUniform(),
@@ -3460,7 +3462,7 @@ def model66(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     l_conv2_sparse = sparse(l_conv2)
     l_conv3 = layers.Conv2DLayer(
              l_conv2,
-             num_filters=nb_filters,
+             num_filters=nb_filters[2],
              filter_size=(5, 5),
              nonlinearity=rectify,
              W=init.GlorotUniform(),
@@ -3471,7 +3473,7 @@ def model66(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     for i in range(2):
         l_conv3_back = layers.Conv2DLayer(
             l_conv3_back,
-            num_filters=nb_filters,
+            num_filters=nb_filters[2 - i - 1],
             filter_size=(5, 5),
             nonlinearity=rectify,
             W=init.GlorotUniform(),
@@ -3482,7 +3484,7 @@ def model66(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     for i in range(1):
         l_conv2_back = layers.Conv2DLayer(
             l_conv2_back,
-            num_filters=nb_filters,
+            num_filters=nb_filters[0],
             filter_size=(5, 5),
             nonlinearity=rectify,
             W=init.GlorotUniform(),
@@ -3515,6 +3517,202 @@ def model66(nb_filters=64, w=32, h=32, c=1, sparsity=True):
             name='out3')
     out_layers = [l_out1, l_out2, l_out3]
     l_out = layers.ElemwiseMergeLayer(out_layers, T.mul, name="output")
+    all_layers = [l_in, l_conv1, l_conv2, l_conv3] + sparse_layers + [l_out1, l_out2, l_out3, l_out]
+    return layers_from_list_to_dict(all_layers)
+
+def model67(nb_filters=64, w=32, h=32, c=1, sparsity=True):
+    """
+    like model66 but with sum instead of multiplication
+    """
+    if type(nb_filters) != list:
+        nb_filters = [nb_filters] * 3
+    sparse_layers = []
+
+    def sparse(l):
+        name = l.name
+        l = layers.NonlinearityLayer(
+                l, wta_spatial,
+                name="wta_spatial_{}".format(name))
+        sparse_layers.append(l)
+        l = layers.NonlinearityLayer(
+                l, wta_channel_strided(stride=4),
+                name="wta_channel_{}".format(name))
+        sparse_layers.append(l)
+        return l
+
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_conv1 = layers.Conv2DLayer(
+            l_in,
+            num_filters=nb_filters[0],
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            name="conv1")
+    l_conv1_sparse = sparse(l_conv1)
+    l_conv2 = layers.Conv2DLayer(
+            l_conv1,
+            num_filters=nb_filters[1],
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            name="conv2")
+    l_conv2_sparse = sparse(l_conv2)
+    l_conv3 = layers.Conv2DLayer(
+             l_conv2,
+             num_filters=nb_filters[2],
+             filter_size=(5, 5),
+             nonlinearity=rectify,
+             W=init.GlorotUniform(),
+             name="conv3")
+    l_conv3_sparse = sparse(l_conv3)
+
+    l_conv3_back = l_conv3_sparse
+    for i in range(2):
+        l_conv3_back = layers.Conv2DLayer(
+            l_conv3_back,
+            num_filters=nb_filters[2 - i - 1],
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            pad='full'
+        )
+
+    l_conv2_back = l_conv2_sparse
+    for i in range(1):
+        l_conv2_back = layers.Conv2DLayer(
+            l_conv2_back,
+            num_filters=nb_filters[0],
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            pad='full'
+        )
+    l_conv1_back = l_conv1_sparse
+    l_out1 = layers.Conv2DLayer(
+            l_conv1_back,
+            num_filters=c,
+            filter_size=(5, 5),
+            nonlinearity=linear,
+            W=init.GlorotUniform(),
+            pad='full',
+            name='out1')
+    l_out2 = layers.Conv2DLayer(
+            l_conv2_back,
+            num_filters=c,
+            filter_size=(5, 5),
+            nonlinearity=linear,
+            W=init.GlorotUniform(),
+            pad='full',
+            name='out2')
+    l_out3 = layers.Conv2DLayer(
+            l_conv3_back,
+            num_filters=c,
+            filter_size=(5, 5),
+            nonlinearity=linear,
+            W=init.GlorotUniform(),
+            pad='full',
+            name='out3')
+    out_layers = [l_out1, l_out2, l_out3]
+    l_out = layers.ElemwiseMergeLayer(out_layers, T.add)
+    l_out = layers.NonlinearityLayer(l_out, sigmoid, name='output')
+    all_layers = [l_in, l_conv1, l_conv2, l_conv3] + sparse_layers + [l_out1, l_out2, l_out3, l_out]
+    return layers_from_list_to_dict(all_layers)
+
+def model68(nb_filters=64, w=32, h=32, c=1, sparsity=True):
+    """
+    like model67 but with weight sharing in the last layers
+    """
+    if type(nb_filters) != list:
+        nb_filters = [nb_filters] * 3
+    sparse_layers = []
+
+    def sparse(l):
+        name = l.name
+        l = layers.NonlinearityLayer(
+                l, wta_spatial,
+                name="wta_spatial_{}".format(name))
+        sparse_layers.append(l)
+        l = layers.NonlinearityLayer(
+                l, wta_channel_strided(stride=4),
+                name="wta_channel_{}".format(name))
+        sparse_layers.append(l)
+        return l
+
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_conv1 = layers.Conv2DLayer(
+            l_in,
+            num_filters=nb_filters[0],
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            name="conv1")
+    l_conv1_sparse = sparse(l_conv1)
+    l_conv2 = layers.Conv2DLayer(
+            l_conv1,
+            num_filters=nb_filters[1],
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            name="conv2")
+    l_conv2_sparse = sparse(l_conv2)
+    l_conv3 = layers.Conv2DLayer(
+             l_conv2,
+             num_filters=nb_filters[2],
+             filter_size=(5, 5),
+             nonlinearity=rectify,
+             W=init.GlorotUniform(),
+             name="conv3")
+    l_conv3_sparse = sparse(l_conv3)
+
+    l_conv3_back = l_conv3_sparse
+    for i in range(2):
+        l_conv3_back = layers.Conv2DLayer(
+            l_conv3_back,
+            num_filters=nb_filters[2 - i - 1],
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            pad='full'
+        )
+
+    l_conv2_back = l_conv2_sparse
+    for i in range(1):
+        l_conv2_back = layers.Conv2DLayer(
+            l_conv2_back,
+            num_filters=nb_filters[0],
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            pad='full'
+        )
+    l_conv1_back = l_conv1_sparse
+    l_out1 = layers.Conv2DLayer(
+            l_conv1_back,
+            num_filters=c,
+            filter_size=(5, 5),
+            nonlinearity=linear,
+            W=init.GlorotUniform(),
+            pad='full',
+            name='out1')
+    l_out2 = layers.Conv2DLayer(
+            l_conv2_back,
+            num_filters=c,
+            filter_size=(5, 5),
+            nonlinearity=linear,
+            W=l_out1.W,
+            pad='full',
+            name='out2')
+    l_out3 = layers.Conv2DLayer(
+            l_conv3_back,
+            num_filters=c,
+            filter_size=(5, 5),
+            nonlinearity=linear,
+            W=l_out1.W,
+            pad='full',
+            name='out3')
+    out_layers = [l_out1, l_out2, l_out3]
+    l_out = layers.ElemwiseMergeLayer(out_layers, T.add)
+    l_out = layers.NonlinearityLayer(l_out, sigmoid, name='output')
     all_layers = [l_in, l_conv1, l_conv2, l_conv3] + sparse_layers + [l_out1, l_out2, l_out3, l_out]
     return layers_from_list_to_dict(all_layers)
 

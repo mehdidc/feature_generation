@@ -301,6 +301,23 @@ def load_data(dataset="digits",
             return X
         data = Transformed(data, preprocess, per_example=False)
 
+    elif dataset == 'aloi':
+
+        from lasagnekit.datasets.imagecollection import ImageCollection
+        from lasagnekit.datasets.transformed import Transformed
+        if w is None and h is None:
+            w, h = 33, 32
+        c = 3
+        folder = "{}/aloi".format(os.getenv("DATA_PATH"))
+        data = ImageCollection(size=(w, h), nb=batch_size, folder=folder, recur=True)
+        data.load()
+        print(data.X.shape)
+        def preprocess(X):
+            X = X.transpose((0, 3, 1, 2))
+            X = X.reshape((X.shape[0], -1))
+            return X
+        data = Transformed(data, preprocess, per_example=False)
+
     elif dataset == 'lfw':
         from lasagnekit.datasets.skimagecollection import ImageCollection
         from skimage.io import imread_collection
