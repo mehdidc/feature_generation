@@ -1,29 +1,9 @@
+import json
 from collections import OrderedDict
 from lightjob.utils import summarize
 from lightjob.db import SUCCESS
-
-def feed(feval, inputs, outputs):
-    """
-    decorate the hyperopt feval (fmin) function
-    by a collection of pairs of inputs and outputs at the beginning.
-    the motivation is to have a way to save hyperopt 'state' and load
-    it later to continue later.
-    """
-    def feval_(x):
-        if feval_.i < len(inputs):
-            print(feval_.i)
-            assert inputs[feval_.i] == x, 'Check the'
-            output = outputs[feval_.i]
-            feval_.i += 1
-            return output
-        else:
-            return feval(x)
-    feval_.i = 0
-    return feval_
-
-
-def get_from_trials(trials, name):
-    return [t[name] for t in trials.trials]
+from hp import get_next_hyperopt
+from hyperopt import hp
 
 def test():
         """
@@ -1849,16 +1829,14 @@ if __name__ == "__main__":
         jobs = db.jobs_with(where=where, state=SUCCESS)
         inputs = [j['content'] for j in jobs]
         outputs = [j['stats'][crit] for j in jobs]
-
-        params = OrderedDict(
-                model_params=OrderedDict(
-                                         use_wta_lifetime=('categorical', [True, False], False),
-                                         wta_lifetime_perc=('real', [0, 1], 0),
-                                         nb_layers=('integer', 1, 5),
-                                         nb_hidden_units=('integer', 1100, 10000)),
-                denoise=('real', [0, 1], 0),
-                noise=('categorical', ['zero_masking']),
-                walkback=('integer', 1, 5),
+        space = OrderedDict(
+                model_params=OrderedDict(use_wta_lifetime=hp.choice('use_wta_lifetime', (True, False)),
+                                         wta_lifetime_perc=hp.uniform('wta_lifetime_perc', 0, 1),
+                                         nb_layers=hp.randint('nb_layers', 1, 5),
+                                         nb_hidden_units=hp.randint('nb_hidden_units', 100, 2000)),
+                denoise=hp.uniform('denoise', 0, 1),
+                noise=hp.choice('noise', ('zero_masking',)),
+                walkback=hp.randint('walkback', 1, 5),
                 walkback_mode='bengio_without_sampling',
                 autoencoding_loss='squared_error',
                 contractive=False,
@@ -1866,16 +1844,17 @@ if __name__ == "__main__":
                 marginalized=False,
                 binarize_thresh=('categorical', (None, 0.5))
         )
-        return
+        params = get_next_hyperopt(inputs, outputs, space)
 
-    def linearize_dict(d):
-        def linearize_(k, v, path):
-            if not isinstance(v, dict):
-                return {'.'.join(path + [k]): v}
-            res = {}
-            for klocal, vlocal in v.items():
-                res.update(linearize_(klocal, vlocal, path + [klocal]))
-            return res
+        print(params)
+
+        budget_hours = 12
+        model_name = 'model55'
+        dataset = 'digits'
+        jobset_name = "jobset34"
+        cmd = build_cmd(model_name=model_name, dataset=dataset, params=params, budget_hours=budget_hours)
+        #nb = job_write(params, cmd, where=jobset_name)
+        return nb
     nb = 0
     #nb += test()
     #nb += jobset1()
