@@ -1,14 +1,29 @@
-
-
-import uuid
-from tempfile import NamedTemporaryFile
-import json
-import subprocess
-import hashlib
 from collections import OrderedDict
-import os
-
 from lightjob.utils import summarize
+from lightjob.db import SUCCESS
+
+def feed(feval, inputs, outputs):
+    """
+    decorate the hyperopt feval (fmin) function
+    by a collection of pairs of inputs and outputs at the beginning.
+    the motivation is to have a way to save hyperopt 'state' and load
+    it later to continue later.
+    """
+    def feval_(x):
+        if feval_.i < len(inputs):
+            print(feval_.i)
+            assert inputs[feval_.i] == x, 'Check the'
+            output = outputs[feval_.i]
+            feval_.i += 1
+            return output
+        else:
+            return feval(x)
+    feval_.i = 0
+    return feval_
+
+
+def get_from_trials(trials, name):
+    return [t[name] for t in trials.trials]
 
 def test():
         """
@@ -1827,6 +1842,40 @@ if __name__ == "__main__":
             print(json.dumps(p, indent=4))
         return nb
 
+    # hyperopt loop
+    def jobset34():
+        where = 'jobset34'
+        crit = 'knn_classification'
+        jobs = db.jobs_with(where=where, state=SUCCESS)
+        inputs = [j['content'] for j in jobs]
+        outputs = [j['stats'][crit] for j in jobs]
+
+        params = OrderedDict(
+                model_params=OrderedDict(
+                                         use_wta_lifetime=('categorical', [True, False], False),
+                                         wta_lifetime_perc=('real', [0, 1], 0),
+                                         nb_layers=('integer', 1, 5),
+                                         nb_hidden_units=('integer', 1100, 10000)),
+                denoise=('real', [0, 1], 0),
+                noise=('categorical', ['zero_masking']),
+                walkback=('integer', 1, 5),
+                walkback_mode='bengio_without_sampling',
+                autoencoding_loss='squared_error',
+                contractive=False,
+                contractive_coef=None,
+                marginalized=False,
+                binarize_thresh=('categorical', (None, 0.5))
+        )
+        return
+
+    def linearize_dict(d):
+        def linearize_(k, v, path):
+            if not isinstance(v, dict):
+                return {'.'.join(path + [k]): v}
+            res = {}
+            for klocal, vlocal in v.items():
+                res.update(linearize_(klocal, vlocal, path + [klocal]))
+            return res
     nb = 0
     #nb += test()
     #nb += jobset1()
@@ -1860,5 +1909,6 @@ if __name__ == "__main__":
     #nb += jobset30()
     #nb += jobset31()
     #nb += jobset32()
-    nb += jobset33()
+    #nb += jobset33()
+    nb += jobset34()
     print("Total number of jobs added : {}".format(nb))
