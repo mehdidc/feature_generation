@@ -5,6 +5,7 @@ import os
 from lasagnekit.easy import iterate_minibatches
 import lasagne
 
+
 def wta_spatial(X):
     # From http://arxiv.org/pdf/1409.2752v2.pdf
     # Introduce sparsity for each channel/feature map, for each
@@ -195,3 +196,98 @@ class Deconv2DLayer(lasagne.layers.Layer):
         if self.b is not None:
             conved += self.b.dimshuffle('x', 0, 'x', 'x')
         return self.nonlinearity(conved)
+
+
+class BrushLayer(lasagne.layers.Layer):
+
+    def __init__(self, incoming, output_shape, patch_size=(5, 5), n_steps=10, **kwargs):
+        super(BrushLayer, self).__init__(incoming, **kwargs)
+        self.incoming = incoming
+        self.output_shape = output_shape
+        self.n_steps = n_steps
+        self.patch_size = patch_size
+
+    def get_output_shape_for(self, input_shape):
+        return (input_shape[0],) + self.output_shape
+
+    def get_output_for(self, input, **kwargs):
+        def apply_func(X):
+            x, y, width, height = (
+                    input[:, 0], input[:, 1],
+                    input[:, 2], input[:, 3]) 
+            fpos = T.shared(np.linspace(0, 1, self.output_shape[0]).astype(np.float32)) # pw
+
+            #x : [5, 1, 1, 5]
+            #f : [1, 2, 3, 4, 5]
+
+            # results (examples, w, pw): Fi, j, k = 1 if xi=w=pw else 0
+
+            fx = T.zeros(self.get_output_shape_for(input.shape))  # examples, w, pw
+            fy = T.zeros(self.get_output_shape_for(input.shape))  # examples, h, ph
+            pw, ph = self.patch_size
+            patch = T.ones((pw, ph))  # pw, ph
+            output = ((fx.dimshuffle(0, 1, 'x', 2, 'x') * fy.dimshuffle(0, 'x', 1, 'x', 2) *
+                       patch.dimshuffle('x', 'x', 'x', 0, 1)).sum(axis=(3, 4)))
+            return output
+
+        def reduce_func(prev, new):
+            return prev + new
+        output_shape = self.get_output_shape_for(input.shape)
+        init_val = T.zeros(output_shape)
+        output = recurrent_accumulation(
+                input.dimshuffle(1, 0, 2, 3),  # 'time' should be the first dimension
+                apply_func,
+                reduce_func,
+                init_val,
+                self.n_steps)
+        output = output.dimshuffle(1, 0, 2, 3)
+
+
+class ConvBrushLayer(lasagne.layers.Layer):
+
+    def __init__(self, incoming, output_shape, patch_size=(5, 5), n_steps=10, **kwargs):
+        super(BrushLayer, self).__init__(incoming, **kwargs)
+        self.incoming = incoming
+        self.output_shape = output_shape
+        self.n_steps = n_steps
+        self.patch_size = patch_size
+
+    def get_output_shape_for(self, input_shape):
+        return (input_shape[0],) + self.output_shape
+
+    def get_output_for(self, input, **kwargs):
+        def apply_func(X):
+            return output
+
+        def reduce_func(prev, new):
+            return prev + new
+        output_shape = self.get_output_shape_for(input.shape)
+        init_val = T.zeros(output_shape)
+        output = recurrent_accumulation(
+                input.dimshuffle(1, 0, 2, 3),  # 'time' should be the first dimension
+                apply_func,
+                reduce_func,
+                init_val,
+                self.n_steps)
+        output = output.dimshuffle(1, 0, 2, 3)
+
+
+
+def recurrent_accumulation(X, apply_func, reduce_func,
+                           init_val, n_steps, **scan_kwargs):
+
+    def step_function(input_cur, output_prev):
+        return reduce_func(apply_func(input_cur), output_prev)
+
+    sequences = []
+    outputs_info = [init_val]
+    non_sequences = [X]
+
+    result, updates = theano.scan(fn=step_function,
+                                  sequences=sequences,
+                                  outputs_info=outputs_info,
+                                  non_sequences=non_sequences,
+                                  strict=True,
+                                  n_steps=n_steps,
+                                  **scan_kwargs)
+    return result, updates

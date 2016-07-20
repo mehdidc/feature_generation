@@ -27,6 +27,9 @@ from model import *  # for dill
 from skimage.io import imsave
 import logging
 
+from lightjob.cli import load_db
+from lightjob.db import DB, SUCCESS, RUNNING, AVAILABLE, ERROR, PENDING
+
 
 sys.setrecursionlimit(10000)
 
@@ -35,9 +38,6 @@ logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(stream=sys.stdout)
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
-
-from lightjob.cli import load_db
-from lightjob.db import DB, SUCCESS, RUNNING, AVAILABLE, ERROR, PENDING
 
 
 def mkdir_path(path):
@@ -105,7 +105,6 @@ def train(dataset=None,
         model_name = params.get('model_name', 'model8')
     logger.info("Loading data...")
 
-
     mode = params.get("mode", "random")
 
     batch_size = params.get("batch_size", 128)
@@ -150,7 +149,8 @@ def train(dataset=None,
             dummy_y = np.zeros((1,)).astype(np.int32)
             V.update({"y": dummy_y})
     elif mode == 'minibatch':
-        V = {"X": capsule.preprocess(data.X), "X_true": capsule.preprocess(data.X)}
+        V = {"X": capsule.preprocess(data.X),
+             "X_true": capsule.preprocess(data.X)}
         # y not handled for now
     else:
         raise Exception('not supported mode {}'.format(mode))
@@ -234,26 +234,20 @@ def build_capsule_(layers, data, nbl, nbc,
         elif autoencoding_loss == "cross_entropy":
             pred = theano.tensor.clip(pred, 0.001, 0.999)
             return (T.nnet.binary_crossentropy(pred, true)).sum(axis=(1, 2, 3)).mean()
+
     def get_recons_loss(model, X):
         Xrec = reconstruct(model, X)
         return recons_loss(X, Xrec)
 
     functions = {
         "reconstruct": make_function(func=reconstruct, params=["X"]),
-        #"get_conv_layers": make_function(func=get_conv, params=["X"]),
         "get_recons_loss": make_function(func=get_recons_loss, params=["X"]),
-        #"get_hid":  make_function(func=lambda model, X: L.get_output(layers['hid'], X), params=["X"])
     }
     if is_predictive:
         functions.update({
             "predict": make_function(func=predict, params=["X"])})
 
-
     def report(status):
-        #h = capsule.get_hid(capsule.preprocess(data.X))
-        #print(h.mean(axis=0))
-        #print(sorted(h[0])[::-1])
-        #print(h.mean())
         c, w, h = layers["input"].output_shape[1:]
         ep = status["epoch"]
 
@@ -351,7 +345,7 @@ def build_capsule_(layers, data, nbl, nbc,
     # called each epoch for monitoring
 
     def update_status(self, status):
-        status['duration'] =  (datetime.now() - self.last_checkpoint).total_seconds()
+        status['duration'] = (datetime.now() - self.last_checkpoint).total_seconds()
         self.last_checkpoint = datetime.now()
         t = status["epoch"]
         cur_lr = lr.get_value()
@@ -415,7 +409,6 @@ def build_capsule_(layers, data, nbl, nbc,
 
     # Initialize the optimization algorithm
     mode = train_params.get("mode", "random")
-    #print(mode, train_params)
     optim_params_default = dict(
         lr_decay_method="none",
         initial_lr=0.1,
@@ -438,7 +431,9 @@ def build_capsule_(layers, data, nbl, nbc,
     initial_lr = optim_params["initial_lr"]
     lr_decay = optim_params["lr_decay"]
     lr = theano.shared(np.array(initial_lr, dtype=np.float32))
-    algos = {"adam": updates.adam, "adadelta": updates.adadelta, "momentum": updates.momentum}
+    algos = {"adam": updates.adam,
+             "adadelta": updates.adadelta,
+             "momentum": updates.momentum}
     algo = algos[optim_params["algo"]]
     params = {"learning_rate": lr}
 
@@ -469,7 +464,8 @@ def build_capsule_(layers, data, nbl, nbc,
             return X
         noise = train_params.get("noise", "zero_masking")
         if noise == "salt_and_pepper":
-            Xtilde = salt_and_pepper(X, corruption_level=pr, rng=theano_rng, backend='theano')
+            Xtilde = salt_and_pepper(X, corruption_level=pr,
+                                     rng=theano_rng, backend='theano')
         elif noise == "zero_masking":
             Xtilde = zero_masking(X, corruption_level=pr, rng=theano_rng)
         elif noise == "superpose":

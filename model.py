@@ -4005,6 +4005,57 @@ def model71(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     all_layers = [l_in, l_conv1, l_conv2, l_conv3] + sparse_layers + [l_out1, l_out2, l_out3, l_out]
     return layers_from_list_to_dict(all_layers)
 
+
+def model72(nb_filters=64, w=32, h=32, c=1, sparsity=True):
+    """
+    square brush
+    """
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_convs = []
+    l_conv = layers.Conv2DLayer(
+            l_in,
+            num_filters=nb_filters,
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            pad=2,
+            name="conv1")
+    l_convs.append(l_conv)
+    l_conv = layers.Conv2DLayer(
+            l_conv,
+            num_filters=nb_filters,
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            pad=2,
+            name="conv2")
+    l_convs.append(l_conv)
+    l_conv = layers.Conv2DLayer(
+            l_conv,
+            num_filters=nb_filters,
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            pad=2,
+            name="conv3")
+    l_convs.append(l_conv)
+    l_wta = layers.NonlinearityLayer(l_conv, wta_spatial, name="wta_spatial")
+    l_unconv = layers.Conv2DLayer(
+            l_wta,
+            num_filters=c,
+            filter_size=(5, 5),
+            nonlinearity=linear,
+            W=init.Constant(1.),  # square brush
+            b=init.Constant(0.),
+            trainable=False,
+            pad=2,
+            name='unconv')
+    l_out = layers.NonlinearityLayer(
+            l_unconv,
+            sigmoid, name="output")
+    return layers_from_list_to_dict([l_in] + l_convs + [l_wta, l_unconv, l_out])
+
+
 build_convnet_simple = model1
 build_convnet_simple_2 = model2
 build_convnet_simple_3 = model3
