@@ -1830,11 +1830,10 @@ if __name__ == "__main__":
         inputs = [j['content'] for j in jobs]
         outputs = [j['stats'][crit] for j in jobs]
         space = OrderedDict(
-                model_params=OrderedDict(
-                    use_wta_lifetime=hp.choice('use_wta_lifetime', (True, False)),
-                    wta_lifetime_perc=hp.uniform('wta_lifetime_perc', 0, 1),
-                    nb_layers=1 + hp.randint('nb_layers', 5),
-                    nb_hidden_units=100 + hp.randint('nb_hidden_units', 2000)),
+                model_params=OrderedDict(use_wta_lifetime=hp.choice('use_wta_lifetime', (True, False)),
+                                         wta_lifetime_perc=hp.uniform('wta_lifetime_perc', 0, 1),
+                                         nb_layers=1 + hp.randint('nb_layers', 5),
+                                         nb_hidden_units=100 + hp.randint('nb_hidden_units', 2000)),
                 denoise=hp.uniform('denoise', 0, 1),
                 noise=hp.choice('noise', ('zero_masking', 'salt_and_pepper')),
                 walkback=1 + hp.randint('walkback', 5),
