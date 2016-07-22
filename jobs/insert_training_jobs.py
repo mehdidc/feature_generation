@@ -1822,7 +1822,7 @@ if __name__ == "__main__":
             print(json.dumps(p, indent=4))
         return nb
 
-    # hyperopt loop
+    # hyperopt loop for hidden
     def jobset34():
         where = 'jobset34'
         crit = 'knn_classification'
@@ -1832,28 +1832,26 @@ if __name__ == "__main__":
         space = OrderedDict(
                 model_params=OrderedDict(use_wta_lifetime=hp.choice('use_wta_lifetime', (True, False)),
                                          wta_lifetime_perc=hp.uniform('wta_lifetime_perc', 0, 1),
-                                         nb_layers=hp.randint('nb_layers', 1, 5),
-                                         nb_hidden_units=hp.randint('nb_hidden_units', 100, 2000)),
+                                         nb_layers=1 + hp.randint('nb_layers', 5),
+                                         nb_hidden_units=100 + hp.randint('nb_hidden_units', 2000)),
                 denoise=hp.uniform('denoise', 0, 1),
-                noise=hp.choice('noise', ('zero_masking',)),
-                walkback=hp.randint('walkback', 1, 5),
+                noise=hp.choice('noise', ('zero_masking', 'salt_and_pepper')),
+                walkback=1 + hp.randint('walkback', 5),
                 walkback_mode='bengio_without_sampling',
                 autoencoding_loss='squared_error',
                 contractive=False,
                 contractive_coef=None,
                 marginalized=False,
-                binarize_thresh=('categorical', (None, 0.5))
+                binarize_thresh=hp.choice('binarize_thresh', (None, 0.5))
         )
         params = get_next_hyperopt(inputs, outputs, space)
-
         print(params)
-
         budget_hours = 12
         model_name = 'model55'
         dataset = 'digits'
         jobset_name = "jobset34"
         cmd = build_cmd(model_name=model_name, dataset=dataset, params=params, budget_hours=budget_hours)
-        #nb = job_write(params, cmd, where=jobset_name)
+        nb = job_write(params, cmd, where=jobset_name)
         return nb
     nb = 0
     #nb += test()
