@@ -4045,14 +4045,15 @@ def model72(nb_filters=64, w=32, h=32, c=1, sparsity=True):
             num_filters=c,
             filter_size=(5, 5),
             nonlinearity=linear,
-            W=init.Constant(1.),  # square brush
-            b=init.Constant(0.),
-            trainable=False,
+            W=init.Constant(1),  # square brush
+            b=init.Constant(0),
             pad=2,
             name='unconv')
+    l_unconv.params[l_unconv.W].remove('trainable')
+    l_unconv.params[l_unconv.b].remove('trainable')
     l_out = layers.NonlinearityLayer(
             l_unconv,
-            sigmoid, name="output")
+            linear, name="output")
     return layers_from_list_to_dict([l_in] + l_convs + [l_wta, l_unconv, l_out])
 
 
