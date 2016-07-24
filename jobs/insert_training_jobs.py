@@ -1942,11 +1942,13 @@ def jobset35():
 
 @click.command()
 @click.option('--where', default='', help='jobset name', required=False)
-def insert(where):
+@click.option('--nb', default=1, help='nb of repetitions', required=False)
+def insert(where, nb):
     where = globals()[where]
-    nb = 0
-    nb += where()
-    print("Total number of jobs added : {}".format(nb))
+    total = 0
+    for _ in range(nb):
+        total += where()
+    print("Total number of jobs added : {}".format(total))
 
 if __name__ == '__main__':
     insert()

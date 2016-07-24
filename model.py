@@ -4115,6 +4115,9 @@ def model73(nb_filters=64, w=32, h=32, c=1,
         weight_sharing = [weight_sharing] * nb_layers
     sparse_layers = []
 
+    print('nb_filters : {}'.format(nb_filters))
+    print('nb_layers : {}'.format(nb_layers))
+
     def sparse(l):
         name = l.name
         idx = int(name.replace('conv', '')) - 1
@@ -4183,6 +4186,7 @@ def model73(nb_filters=64, w=32, h=32, c=1,
     all_layers = [l_in] + convs + sparse_layers + conv_backs + outs + [l_out]
     return layers_from_list_to_dict(all_layers)
 
+
 def model74(nb_filters=64, w=32, h=32, c=1,
             nb_layers=3,
             filter_size=5,
@@ -4207,6 +4211,7 @@ def model74(nb_filters=64, w=32, h=32, c=1,
     if weight_sharing != list:
         weight_sharing = [weight_sharing] * nb_layers
     sparse_layers = []
+    print('nb_filters : {}'.format(nb_filters))
 
     def sparse(l):
         name = l.name
