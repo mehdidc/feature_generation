@@ -63,7 +63,7 @@ def get_next_hyperopt(inputs, outputs, space, algo='tpe'):
     if algo == 'tpe':
         algo = tpe.suggest
     elif algo == 'rand':
-        algo = tpe.rand
+        algo = rand.suggest
     else:
         raise Exception('Expected tpe or rand, got : {}'.format(algo))
     trials = Trials()
