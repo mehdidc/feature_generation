@@ -55,15 +55,22 @@ def feed(feval, inputs, outputs):
     feval_.i = 0
     return feval_
 
+
 def get_next_hyperopt(inputs, outputs, space, algo='tpe'):
     def fn(x):
         fn.next_val = x
         return 1
-    trials = Trials()  
-    fmin(feed(fn, inputs, outputs), 
-         space, 
-         algo=tpe.suggest if algo=='tpe' else rand.suggest, 
-         max_evals=len(inputs) + 1, 
+    if algo == 'tpe':
+        algo = tpe.suggest
+    elif algo == 'rand':
+        algo = tpe.rand
+    else:
+        raise Exception('Expected tpe or rand, got : {}'.format(algo))
+    trials = Trials()
+    fmin(feed(fn, inputs, outputs),
+         space,
+         algo=algo,
+         max_evals=len(inputs) + 1,
          trials=trials,
          rseed=1)
     return fn.next_val
