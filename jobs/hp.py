@@ -56,7 +56,7 @@ def feed(feval, inputs, outputs):
     return feval_
 
 
-def get_next_hyperopt(inputs, outputs, space, algo='tpe'):
+def get_next_hyperopt(inputs, outputs, space, algo='tpe', rseed=1):
     def fn(x):
         fn.next_val = x
         return 1
@@ -72,8 +72,9 @@ def get_next_hyperopt(inputs, outputs, space, algo='tpe'):
          algo=algo,
          max_evals=len(inputs) + 1,
          trials=trials,
-         rseed=1)
+         rseed=rseed)
     return fn.next_val
+
 
 def get_from_trials(trials, name):
     return [t[name] for t in trials.trials]
