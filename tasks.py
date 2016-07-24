@@ -141,7 +141,6 @@ def train(dataset=None,
                              report_event, prefix=prefix,
                              **params)
     info["stats"] = capsule.batch_optimizer.stats
-    # info["optimization"] = capsule.batch_optimizer.optim_params
     if mode == 'random':
         dummy = np.zeros((1, c, w, h)).astype(np.float32)
         V = {"X": dummy, "X_true": dummy}
@@ -182,7 +181,7 @@ def train(dataset=None,
         db = load_db()
         job = db.get_job_by_summary(job_summary)
         db.close()
-        genstats([job], db, filter_stats=stats)
+        genstats([job], db, filter_stats=stats, n_jobs=1)
 
 
 def build_capsule_(layers, data, nbl, nbc,
@@ -393,13 +392,19 @@ def build_capsule_(layers, data, nbl, nbc,
         if mode == "minibatch":
             N = 5
         elif mode == 'random':
-            N = 1000
+            N = 100
         else:
             raise Exception('wtf how come mode is not valid and it happens here')
+
         # each N epochs save reconstructions
         # and how features look like
+
+        if t % N == 0:
+            report(status)
+
         if t % N == 0:
             for name in ("train", "test"):
+                logger.info('Computing reconstruction error on {}'.format(name))
                 if hasattr(data, name):
                     dt = getattr(data, name)
                     rec_errors = []
@@ -408,8 +413,6 @@ def build_capsule_(layers, data, nbl, nbc,
                         rec_errors.append(rec_error)
                     rec_error_mean = np.mean(rec_errors)
                     status["{}_recons_error".format(name)] = rec_error_mean
-        if t % N == 0:
-            report(status)
         if (datetime.now() - begin).total_seconds() >= budget_sec:
             logger.info("Budget finished.quit.")
             raise KeyboardInterrupt("Budget finished.quit.")

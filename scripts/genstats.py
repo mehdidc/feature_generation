@@ -49,7 +49,7 @@ def compute_stats(job, force=False, filter_stats=None):
     ref_job = j['ref_job']['summary']
 
     if filter_stats is not None:
-        filter_stats = set(filter_stats.split(','))
+        filter_stats = set(filter_stats)
     def should_compute(s, stats):
         if filter_stats is None:
             if force:
@@ -126,28 +126,12 @@ def compute_stats(job, force=False, filter_stats=None):
             '10per': float(np.percentile(scores, 10)),
             '90per': float(np.percentile(scores, 90))
         }
-
-
     if should_compute('tsne', stats):
         logger.info('compute tsne...')
         stats['tsne'] = compute_tsne(folder, hash_matrix)
-
     if should_compute('knn_classification_accuracy', stats):
         logger.info('compute knn classification accuracy')
-        stats['knn_classification_acc'] = compute_knn_classification_accuracy(folder, hash_matrix, ref_job)
-    #if "nb_almost_uniques" not in stats or force:
-    #    logger.info('computing nb  of almost uniques of {} (with meanshift)'.format(s))
-    #    stats['nb_almost_uniques'] = compute_almost_uniq(folder, hash_matrix)
-
-    #if "manifold_dist" not in stats or force:
-    #    logger.info('computing manifold distance of {}'.format(s))
-    #    stats['manifold_dist'] = compute_manifold_dist(folder, hash_matrix, ref_job)
-    #if "nearestneighborsdiversity" not in stats or force:
-    #    logger.info('computing nearest neighbors diversity score using clustering of {}'.format(s))
-    #    stats["nearestneighborsdiversity"] = compute_nearestneighbours_diversity(folder, hash_matrix)
-    #if "dpgmmnbclus" not in stats or force:
-    #    logger.info('computing nb of clusters with DPGMM of {}'.format(s))
-    #    stats["dpgmmnbclus"] = compute_dpgmmclusdiversity(folder, hash_matrix)
+        stats['knn_classification_accuracy'] = compute_knn_classification_accuracy(folder, hash_matrix, ref_job)
     logger.info('Finished on {}, stats : {}'.format(s, stats))
     return stats
 
@@ -370,7 +354,7 @@ def compute_knn_classification_accuracy(job_folder, hash_matrix, ref_job):
     import time
     t = time.time()
 
-    max_iter = 10
+    max_iter = 100
     n_neighbors =(5,)
     v = check(what="notebook",
               filename="jobs/results/{}/model.pkl".format(ref_job),
@@ -393,9 +377,16 @@ def compute_knn_classification_accuracy(job_folder, hash_matrix, ref_job):
             x = X_test[batch]
             x = capsule.preprocess(x)
             logger.info('iterative refinement...')
-            for _ in range(max_iter):
+            for i in range(max_iter):
+                x_prev = x
                 x = capsule.reconstruct(x)
                 x = x > 0.5
+                x = x.astype(np.float32)
+                score = np.abs(x - x_prev).sum()
+                print(score)
+                if score == 0:
+                    break
+            logger.info('performed {} iterations'.format(i + 1))
             x = x.reshape((x.shape[0], -1))
             logger.info('knn prediction...')
             y_pred = knn.predict(x)

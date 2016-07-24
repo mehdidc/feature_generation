@@ -4014,49 +4014,61 @@ def model72(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     l_in = layers.InputLayer((None, c, w, h), name="input")
     l_convs = []
     l_conv = layers.Conv2DLayer(
-            l_in,
-            num_filters=nb_filters,
-            filter_size=(5, 5),
-            nonlinearity=rectify,
-            W=init.GlorotUniform(),
-            pad=2,
-            name="conv1")
-    l_convs.append(l_conv)
-    l_conv = layers.Conv2DLayer(
-            l_conv,
-            num_filters=nb_filters,
-            filter_size=(5, 5),
-            nonlinearity=rectify,
-            W=init.GlorotUniform(),
-            pad=2,
-            name="conv2")
-    l_convs.append(l_conv)
-    l_conv = layers.Conv2DLayer(
-            l_conv,
-            num_filters=nb_filters,
-            filter_size=(5, 5),
-            nonlinearity=rectify,
-            W=init.GlorotUniform(),
-            pad=2,
-            name="conv3")
-    l_convs.append(l_conv)
-    l_wta_spatial = layers.NonlinearityLayer(l_conv, wta_spatial, name="wta_spatial")
-
-    l_unconv = layers.BiasLayer(l_wta_spatial)
-    l_unconv = layers.NonlinearityLayer(l_unconv, sigmoid)
-
-    l_unconv = layers.Conv2DLayer(
-        l_wta_spatial,
-        num_filters=nb_filters * c,
+        l_in,
+        num_filters=nb_filters,
         filter_size=(5, 5),
-        nonlinearity=linear,
-        W=init.Constant(0.04),  # square brush
-        b=init.Constant(0),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
         pad=2,
+        name="conv1")
+    l_convs.append(l_conv)
+    l_conv = layers.Conv2DLayer(
+        l_conv,
+        num_filters=nb_filters,
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        pad=2,
+        name="conv2")
+    l_convs.append(l_conv)
+    l_conv = layers.Conv2DLayer(
+        l_conv,
+        num_filters=nb_filters,
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        pad=2,
+        name="conv3")
+    l_convs.append(l_conv)
+    l_wta_spatial = layers.NonlinearityLayer(
+        l_conv,
+        wta_spatial,
+        name="wta_spatial")
+    size = 3
+    W = np.zeros((nb_filters, nb_filters, c, size, size))
+    i = np.arange(nb_filters)
+    W[i, i, :, :, :] = 1./(size*size)
+    W = W.reshape((nb_filters, nb_filters * c, size, size))
+    W = W.astype(np.float32)
+    print(W[0, 0])
+    print(W[0, 1])
+    l_unconv = l_wta_spatial
+    l_unconv = layers.Conv2DLayer(
+        l_unconv,
+        num_filters=nb_filters * c,
+        filter_size=(size, size),
+        nonlinearity=linear,
+        W = W,  # square brush
+        b=init.Constant(0),
+        pad=(size - 1) / 2,
         name='unconv')
     l_unconv.params[l_unconv.W].remove('trainable')
     l_unconv.params[l_unconv.b].remove('trainable')
-    l_wta_channel = layers.NonlinearityLayer(l_unconv, wta_channel, name='wta_channel')
+    l_wta_channel = layers.NonlinearityLayer(
+        l_unconv,
+        wta_channel,
+        name='wta_channel')
+
     def fn(x):
         x = x.reshape((x.shape[0], c, nb_filters, x.shape[2], x.shape[3]))
         return x.sum(axis=2)
@@ -4065,9 +4077,13 @@ def model72(nb_filters=64, w=32, h=32, c=1, sparsity=True):
         fn
     )
     l_out = layers.NonlinearityLayer(
-            l_out,
-            sigmoid, name="output")
-    return layers_from_list_to_dict([l_in] + l_convs + [l_unconv, l_wta_spatial, l_wta_channel, l_out])
+        l_out,
+        linear, name="output")
+    all_layers = (
+        [l_in] +
+        l_convs +
+        [l_unconv, l_wta_spatial, l_wta_channel, l_out])
+    return layers_from_list_to_dict(all_layers)
 
 
 build_convnet_simple = model1

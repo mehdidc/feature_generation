@@ -46,6 +46,8 @@ def stats(model, where, n_jobs, stats, force):
         where = None
     jobs = load_jobs(model, where)
     db = load_db()
+    if stats is not None:
+        stats = stats.split(',')
     genstats(jobs, db, n_jobs=n_jobs, force=force, filter_stats=stats)
 
 
