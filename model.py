@@ -4011,11 +4011,14 @@ def model72(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     """
     square brush
     """
+    if type(nb_filters) != list:
+        nb_filters = [nb_filters] * 3
+
     l_in = layers.InputLayer((None, c, w, h), name="input")
     l_convs = []
     l_conv = layers.Conv2DLayer(
         l_in,
-        num_filters=nb_filters,
+        num_filters=nb_filters[0],
         filter_size=(5, 5),
         nonlinearity=rectify,
         W=init.GlorotUniform(),
@@ -4024,7 +4027,7 @@ def model72(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     l_convs.append(l_conv)
     l_conv = layers.Conv2DLayer(
         l_conv,
-        num_filters=nb_filters,
+        num_filters=nb_filters[1],
         filter_size=(5, 5),
         nonlinearity=rectify,
         W=init.GlorotUniform(),
@@ -4033,7 +4036,7 @@ def model72(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     l_convs.append(l_conv)
     l_conv = layers.Conv2DLayer(
         l_conv,
-        num_filters=nb_filters,
+        num_filters=nb_filters[2],
         filter_size=(5, 5),
         nonlinearity=rectify,
         W=init.GlorotUniform(),
@@ -4045,17 +4048,17 @@ def model72(nb_filters=64, w=32, h=32, c=1, sparsity=True):
         wta_spatial,
         name="wta_spatial")
     size = 3
-    W = np.zeros((nb_filters, nb_filters, c, size, size))
-    i = np.arange(nb_filters)
+    W = np.zeros((nb_filters[2], nb_filters[2], c, size, size))
+    i = np.arange(nb_filters[2])
     W[i, i, :, :, :] = 1./(size*size)
-    W = W.reshape((nb_filters, nb_filters * c, size, size))
+    W = W.reshape((nb_filters[2], nb_filters[2] * c, size, size))
     W = W.astype(np.float32)
     print(W[0, 0])
     print(W[0, 1])
     l_unconv = l_wta_spatial
     l_unconv = layers.Conv2DLayer(
         l_unconv,
-        num_filters=nb_filters * c,
+        num_filters=nb_filters[2] * c,
         filter_size=(size, size),
         nonlinearity=linear,
         W = W,  # square brush
@@ -4070,7 +4073,7 @@ def model72(nb_filters=64, w=32, h=32, c=1, sparsity=True):
         name='wta_channel')
 
     def fn(x):
-        x = x.reshape((x.shape[0], c, nb_filters, x.shape[2], x.shape[3]))
+        x = x.reshape((x.shape[0], c, nb_filters[2], x.shape[2], x.shape[3]))
         return x.sum(axis=2)
     l_out = layers.ExpressionLayer(
         l_wta_channel,

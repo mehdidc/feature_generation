@@ -47,8 +47,6 @@ def feed(feval, inputs, outputs):
                     ": {} vs {}".format(feval_.i + 1, inputs[feval_.i], x))
             output = outputs[feval_.i]
             feval_.i += 1
-            if feval_.i == len(inputs) and feval.next_seed:
-                feval.rng.randint(0, feval.next_seed)
             return output
         else:
             return feval(x)
@@ -57,12 +55,11 @@ def feed(feval, inputs, outputs):
 
 
 def get_next_hyperopt(inputs, outputs, space,
-                      algo='tpe', rstate=None, next_seed=None):
+                      algo='tpe', rstate=None):
     # dummy func
     def fn(x):
         fn.next_val = x
         return 1
-    fn.next_seed = next_seed
     fn.rng = rstate if rstate is not None else np.random
 
     if algo == 'tpe':
@@ -89,6 +86,17 @@ if __name__ == '__main__':
     import numpy as np
     inputs = []
     space = {'x': hp.uniform('x', 0, 1)}
+
+    trials = Trials()
+    def fn(s):
+        return s['x']
+    rng = np.random.RandomState(5)
+    fmin(fn, space, algo=tpe.suggest, max_evals=2, rstate=rng, trials=trials)
+    print(get_from_trials(trials, 'result'))
+    rng = np.random.RandomState(5)
+    fmin(fn, space, algo=tpe.suggest, max_evals=3, rstate=rng, trials=trials)
+    print(get_from_trials(trials, 'result'))
+    sys.exit(0)
     outputs = []
     for i in range(10):
         rng = np.random.RandomState(123)

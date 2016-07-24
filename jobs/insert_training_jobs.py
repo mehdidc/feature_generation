@@ -5,7 +5,7 @@ from lightjob.db import SUCCESS
 from hp import get_next_hyperopt
 from hyperopt import hp
 
-import mumpy as np
+import numpy as np
 
 
 def test():
@@ -1829,18 +1829,30 @@ if __name__ == "__main__":
     def jobset34():
         where = 'jobset34'
         crit = 'knn_classification_accuracy'
-        jobs = db.jobs_with(where=where, state=SUCCESS)
+        model = 'model64'
+        def filter_func(job):
+            if job['stats'] != SUCCESS:
+                return False
+            if 'stats' not in job:
+                return False
+            if crit not in job['stats']:
+                return False
+            if job['content']['model_name'] != model:
+                return False
+            return True
+        jobs = db.jobs_filter(filter_func)
         inputs = [j['content'] for j in jobs]
         outputs = [j['stats'][crit] for j in jobs]
+        print('len of prior params : {}'.format(len(inputs)))
 
         model_params_space = OrderedDict(
-            use_wta_lifetime=hp.choice('use_wta_lifetime', (True, False)),
-            wta_lifetime_perc=hp.uniform('wta_lifetime_perc', 0, 1),
+            use_wta_sparse=hp.choice('use_wta_sparse', (True, False)),
+            wta_sparse_perc=hp.uniform('wta_sparse_perc', 0, 1),
             nb_layers=1 + hp.randint('nb_layers', 5),
             nb_hidden_units=100 + hp.randint('nb_hidden_units', 2000))
         space = OrderedDict(
             model_params=model_params_space,
-            denoise=hp.uniform('denoise', 0, 1),
+            denoise=hp.choice('denoise', (hp.uniform('denoise_pr', 0, 1), None)),
             noise=hp.choice('noise', ('zero_masking', 'salt_and_pepper')),
             walkback=1 + hp.randint('walkback', 5),
             walkback_mode='bengio_without_sampling',
@@ -1852,15 +1864,16 @@ if __name__ == "__main__":
             binarize_thresh=hp.choice('binarize_thresh', (None, 0.5)),
             eval_stats=[crit]
         )
-        rng = np.random.RandomState(123)
+        seed = np.random.randint(0, 99999999)
+        rng = np.random.RandomState(seed)
         params = get_next_hyperopt(
             inputs,
             outputs,
             space,
-            algo='tpe',
+            algo='rand',
             rstate=rng)
         budget_hours = 4
-        model_name = 'model55'
+        model_name = 'model64'
         dataset = 'digits'
         jobset_name = "jobset34"
         cmd = build_cmd(model_name=model_name,
