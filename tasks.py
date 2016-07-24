@@ -176,6 +176,14 @@ def train(dataset=None,
         db.modify_state_of(job_summary, SUCCESS)
         db.close()
 
+    if params.get('eval_stats') is not None:
+        assert update_db
+        stats = params.get('eval_stats')
+        db = load_db()
+        job = db.get_job_by_summary(job_summary)
+        db.close()
+        genstats([job], db, filter_stats=stats)
+
 
 def build_capsule_(layers, data, nbl, nbc,
                    report_event=None,

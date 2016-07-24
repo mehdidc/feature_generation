@@ -131,6 +131,10 @@ def compute_stats(job, force=False, filter_stats=None):
     if should_compute('tsne', stats):
         logger.info('compute tsne...')
         stats['tsne'] = compute_tsne(folder, hash_matrix)
+
+    if should_compute('knn_classification_accuracy', stats):
+        logger.info('compute knn classification accuracy')
+        stats['knn_classification_acc'] = compute_knn_classification_accuracy(folder, hash_matrix, ref_job)
     #if "nb_almost_uniques" not in stats or force:
     #    logger.info('computing nb  of almost uniques of {} (with meanshift)'.format(s))
     #    stats['nb_almost_uniques'] = compute_almost_uniq(folder, hash_matrix)
@@ -359,6 +363,50 @@ def compute_almost_uniq(folder, hash_matrix):
     except Exception:
         return np.nan
 
+def compute_knn_classification_accuracy(job_folder, hash_matrix, ref_job):
+    from sklearn.neighbors import KNeighborsClassifier as KNN
+    from lasagnekit.easy import iterate_minibatches
+    from tasks import check
+    import time
+    t = time.time()
+
+    max_iter = 10
+    n_neighbors =(5,)
+    v = check(what="notebook",
+              filename="jobs/results/{}/model.pkl".format(ref_job),
+              kw_load_data={'include_test': True},
+              dataset="digits")
+    capsule, data, layers, w, h, c = v
+    X_train, y_train = data.train.X, data.train.y
+    knns = {}
+    for nn in n_neighbors:
+        knn = KNN(n_neighbors=nn, n_jobs=-1).fit(X_train, y_train)
+        knns[nn] = knn
+    X_test = data.test.X
+    y_test = data.test.y
+    accs = defaultdict(list)
+
+    for nn in n_neighbors:
+        logger.info('nn:{}'.format(nn))
+        for batch in iterate_minibatches(X_test.shape[0], batchsize=512):
+            logger.info('X_test : {}'.format(batch))
+            x = X_test[batch]
+            x = capsule.preprocess(x)
+            logger.info('iterative refinement...')
+            for _ in range(max_iter):
+                x = capsule.reconstruct(x)
+                x = x > 0.5
+            x = x.reshape((x.shape[0], -1))
+            logger.info('knn prediction...')
+            y_pred = knn.predict(x)
+            accs[nn].extend((y_test[batch] == y_pred).tolist())
+        logger.info('Acccuracy on {} : {}'.format(nn, np.mean(accs[nn])))
+    for k, v in accs.items():
+        accs[k] = float(np.mean(v))
+    accs = dict(accs)
+    print(accs)
+    logger.info(time.time() - t)
+    return accs
 
 def compute_manifold_dist(job_folder, hash_matrix, ref_job):
 
@@ -375,7 +423,6 @@ def compute_manifold_dist(job_folder, hash_matrix, ref_job):
 
     np.random.seed(1234)
     nb = 10000
-    print(data.train.X.shape)
     Y = data.train.X[np.random.choice(np.arange(len(data.train.X)), size=nb, replace=False)]
     x = T.tensor4()
     g = theano.function(

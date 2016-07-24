@@ -20,6 +20,7 @@ get_nonlinearity = dict(
     tanh=tanh
 )
 
+
 def model1(nb_filters=64, w=32, h=32, c=1):
     l_in = layers.InputLayer((None, c, w, h), name="input")
     l_conv = layers.Conv2DLayer(
@@ -4039,22 +4040,34 @@ def model72(nb_filters=64, w=32, h=32, c=1, sparsity=True):
             pad=2,
             name="conv3")
     l_convs.append(l_conv)
-    l_wta = layers.NonlinearityLayer(l_conv, wta_spatial, name="wta_spatial")
+    l_wta_spatial = layers.NonlinearityLayer(l_conv, wta_spatial, name="wta_spatial")
+
+    l_unconv = layers.BiasLayer(l_wta_spatial)
+    l_unconv = layers.NonlinearityLayer(l_unconv, sigmoid)
+
     l_unconv = layers.Conv2DLayer(
-            l_wta,
-            num_filters=c,
-            filter_size=(5, 5),
-            nonlinearity=linear,
-            W=init.Constant(1),  # square brush
-            b=init.Constant(0),
-            pad=2,
-            name='unconv')
+        l_wta_spatial,
+        num_filters=nb_filters * c,
+        filter_size=(5, 5),
+        nonlinearity=linear,
+        W=init.Constant(0.04),  # square brush
+        b=init.Constant(0),
+        pad=2,
+        name='unconv')
     l_unconv.params[l_unconv.W].remove('trainable')
     l_unconv.params[l_unconv.b].remove('trainable')
+    l_wta_channel = layers.NonlinearityLayer(l_unconv, wta_channel, name='wta_channel')
+    def fn(x):
+        x = x.reshape((x.shape[0], c, nb_filters, x.shape[2], x.shape[3]))
+        return x.sum(axis=2)
+    l_out = layers.ExpressionLayer(
+        l_wta_channel,
+        fn
+    )
     l_out = layers.NonlinearityLayer(
-            l_unconv,
-            linear, name="output")
-    return layers_from_list_to_dict([l_in] + l_convs + [l_wta, l_unconv, l_out])
+            l_out,
+            sigmoid, name="output")
+    return layers_from_list_to_dict([l_in] + l_convs + [l_unconv, l_wta_spatial, l_wta_channel, l_out])
 
 
 build_convnet_simple = model1
