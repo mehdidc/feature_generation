@@ -352,7 +352,7 @@ def build_capsule_(layers, data, nbl, nbc,
     begin = datetime.now()
     budget_sec = budget_hours * 3600
     # called each epoch for monitoring
-
+    report_rec_error = train_params.get('report_rec_error', True)
     def update_status(self, status):
         status['duration'] = (datetime.now() - self.last_checkpoint).total_seconds()
         self.last_checkpoint = datetime.now()
@@ -394,7 +394,7 @@ def build_capsule_(layers, data, nbl, nbc,
         if mode == "minibatch":
             N = 5
         elif mode == 'random':
-            N = 100
+            N = 1000
         else:
             raise Exception('wtf how come mode is not valid and it happens here')
 
@@ -403,8 +403,7 @@ def build_capsule_(layers, data, nbl, nbc,
 
         if t % N == 0:
             report(status)
-
-        if t % N == 0:
+        if t % N == 0 and report_rec_error:
             for name in ("train", "test"):
                 logger.info('Computing reconstruction error on {}'.format(name))
                 if hasattr(data, name):

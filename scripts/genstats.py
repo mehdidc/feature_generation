@@ -40,13 +40,23 @@ def compute_stats(job, force=False, filter_stats=None):
     j = job
     folder = "jobs/results/{}".format(j['summary'])
     hash_matrix_filename = os.path.join(folder, "csv", "hashmatrix.npy")
-    hash_matrix = np.load(hash_matrix_filename)
-    x = hash_matrix_to_int(hash_matrix)
+    if os.path.exists(hash_matrix_filename):
+        hash_matrix = np.load(hash_matrix_filename)
+        x = hash_matrix_to_int(hash_matrix)
+    else:
+        hash_matrix = None
+        x = None
+        logger.warning('No hash matrix out there, you are probably using a trainong job type')
+
     stats = j.get("stats", {})
     if stats is None:
         stats = {}
     s = job['summary']
-    ref_job = j['ref_job']['summary']
+    if 'ref_job' in j:
+        ref_job = j['ref_job']['summary']
+    else:
+        logger.warning('No ref_job here, you are probably using a training job type')
+        ref_job = s
 
     if filter_stats is not None:
         filter_stats = set(filter_stats)

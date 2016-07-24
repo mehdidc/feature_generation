@@ -4103,6 +4103,8 @@ def model73(nb_filters=64, w=32, h=32, c=1,
     parametrized version of model67
     """
     merge_op = {'sum': T.add, 'mul': T.mul}[merge_op]
+    if type(filter_size) != list:
+        filter_size = [filter_size] * nb_layers
     if type(nb_filters) != list:
         nb_filters = [nb_filters] * nb_layers
     if type(channel_stride) != list:
@@ -4152,7 +4154,7 @@ def model73(nb_filters=64, w=32, h=32, c=1,
             if weight_sharing[i] and i > 0 and j > 0:
                 W = back[(i - 1, j - 1)]
             else:
-                W = init.GlorotUniform(),
+                W = init.GlorotUniform()
             l_conv_back = layers.Conv2DLayer(
                 l_conv_back,
                 num_filters=nb_filters[i - j - 1],
@@ -4162,6 +4164,7 @@ def model73(nb_filters=64, w=32, h=32, c=1,
                 pad='full'
             )
             back[(i, j)] = l_conv_back
+        l_conv_back.name = 'conv_back{}'.format(i + 1)
         conv_backs.append(l_conv_back)
 
     outs = []
@@ -4173,7 +4176,7 @@ def model73(nb_filters=64, w=32, h=32, c=1,
             nonlinearity=linear,
             W=init.GlorotUniform(),
             pad='full',
-            name='out{}'.format(i))
+            name='out{}'.format(i + 1))
         outs.append(l_out)
     l_out = layers.ElemwiseMergeLayer(outs, merge_op)
     l_out = layers.NonlinearityLayer(l_out, sigmoid, name='output')
