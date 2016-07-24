@@ -5,6 +5,9 @@ from lightjob.db import SUCCESS
 from hp import get_next_hyperopt
 from hyperopt import hp
 
+import mumpy as np
+
+
 def test():
         """
         small test jobs
@@ -1822,7 +1825,7 @@ if __name__ == "__main__":
             print(json.dumps(p, indent=4))
         return nb
 
-    # hyperopt loop for hidden
+    # hyperopt loop for model55
     def jobset34():
         where = 'jobset34'
         crit = 'knn_classification_accuracy'
@@ -1849,7 +1852,13 @@ if __name__ == "__main__":
             binarize_thresh=hp.choice('binarize_thresh', (None, 0.5)),
             eval_stats=[crit]
         )
-        params = get_next_hyperopt(inputs, outputs, space)
+        rng = np.random.RandomState(123)
+        params = get_next_hyperopt(
+            inputs,
+            outputs,
+            space,
+            algo='tpe',
+            rstate=rng)
         budget_hours = 4
         model_name = 'model55'
         dataset = 'digits'
@@ -1861,38 +1870,5 @@ if __name__ == "__main__":
         nb = job_write(params, cmd, where=jobset_name)
         return nb
     nb = 0
-    #nb += test()
-    #nb += jobset1()
-    #nb += jobset2()
-    #nb += jobset4()
-    #nb += jobset4()
-    #nb += jobset5()
-    #nb += jobset6()
-    #nb += jobset7()
-    #nb += jobset8()
-    #nb += jobset9()
-    #nb += jobset10()
-    #nb += jobset11()
-    #nb += jobset12()
-    #nb += jobset13()
-    #nb += jobset14()
-    #nb += jobset15()
-    #nb += jobset16()
-    #nb += jobset17()
-    #nb += jobset19()
-    #nb += jobset20()
-    #nb += jobset21()
-    #nb += jobset22()
-    #nb += jobset23()
-    #nb += jobset24()
-    #nb += jobset25()
-    #nb += jobset26()
-    #nb += jobset27()
-    #nb += jobset28()
-    #nb += jobset29()
-    #nb += jobset30()
-    #nb += jobset31()
-    #nb += jobset32()
-    #nb += jobset33()
     nb += jobset34()
     print("Total number of jobs added : {}".format(nb))

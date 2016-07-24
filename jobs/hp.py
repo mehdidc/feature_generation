@@ -1,14 +1,9 @@
 from hyperopt import hp, Trials
 from hyperopt import fmin, tpe, rand
 
+
 def linearize_dict(d):
-    def linearize_(k, v, path):
-        if not isinstance(v, dict):
-            return {'.'.join(path + [k]): v}
-        res = {}
-        for klocal, vlocal in v.items():
-            res.update(linearize_(klocal, vlocal, path + [klocal]))
-        return res
+    return linearize_('', d, [])
 
 
 def linearize_(k, v, path):
@@ -18,6 +13,7 @@ def linearize_(k, v, path):
     for klocal, vlocal in v.items():
         res.update(linearize_(klocal, vlocal, path + [klocal]))
     return res
+
 
 def delinearize_dict(d):
     d_out = {}
@@ -44,9 +40,15 @@ def feed(feval, inputs, outputs):
     """
     def feval_(x):
         if feval_.i < len(inputs):
-            assert inputs[feval_.i] == x, 'Check the'
+            if inputs[feval_.i] != x:
+                raise ValueError(
+                    "The {}-th element of the provided inputs do not"
+                    "correspond to the inputs asked by hyperopt"
+                    ": {} vs {}".format(i + 1, inputs[feval_.i], x))
             output = outputs[feval_.i]
             feval_.i += 1
+            if feval_.i == len(inputs) and feval.alter_rng:
+                feval.rng.uniform()
             return output
         else:
             return feval(x)
@@ -54,10 +56,15 @@ def feed(feval, inputs, outputs):
     return feval_
 
 
-def get_next_hyperopt(inputs, outputs, space, algo='tpe', rstate=None):
+def get_next_hyperopt(inputs, outputs, space,
+                      algo='tpe', rstate=None, alter_rng=False):
+    # dummy func
     def fn(x):
         fn.next_val = x
         return 1
+    fn.alter_rng = alter_rng
+    fn.rng = rstate if rstate is not None else np.random
+
     if algo == 'tpe':
         algo = tpe.suggest
     elif algo == 'rand':
@@ -80,13 +87,13 @@ def get_from_trials(trials, name):
 
 if __name__ == '__main__':
     import numpy as np
-    space = {'x': hp.uniform('x', 1, 10)}
     inputs = []
+    space = {'x': hp.uniform('x', 0, 1)}
     outputs = []
-
     for i in range(10):
         rng = np.random.RandomState(123)
-        next_hp = get_next_hyperopt(inputs, outputs, space, algo='rand', rstate=rng)
+        next_hp = get_next_hyperopt(
+            inputs, outputs, space, algo='rand', rstate=rng, alter_rng=True)
         inputs.append(next_hp)
         outputs.append((next_hp['x'] - 2) ** 2)
         print(next_hp)
