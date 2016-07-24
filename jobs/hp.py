@@ -19,9 +19,6 @@ def linearize_(k, v, path):
         res.update(linearize_(klocal, vlocal, path + [klocal]))
     return res
 
-def linearize_dict(d):
-    return linearize_('', d, [])
-
 def delinearize_dict(d):
     d_out = {}
     for k, v in d.items():
@@ -36,6 +33,7 @@ def delinearize_dict(d):
             d_out_ = d_out_[s]
         d_out_[path[-1]] = v
     return d_out
+
 
 def feed(feval, inputs, outputs):
     """
@@ -56,7 +54,7 @@ def feed(feval, inputs, outputs):
     return feval_
 
 
-def get_next_hyperopt(inputs, outputs, space, algo='tpe', rseed=1):
+def get_next_hyperopt(inputs, outputs, space, algo='tpe', rstate=None):
     def fn(x):
         fn.next_val = x
         return 1
@@ -72,7 +70,7 @@ def get_next_hyperopt(inputs, outputs, space, algo='tpe', rseed=1):
          algo=algo,
          max_evals=len(inputs) + 1,
          trials=trials,
-         rseed=rseed)
+         rstate=rstate)
     return fn.next_val
 
 
@@ -81,12 +79,14 @@ def get_from_trials(trials, name):
 
 
 if __name__ == '__main__':
+    import numpy as np
     space = {'x': hp.uniform('x', 1, 10)}
     inputs = []
     outputs = []
 
-    for i in range(1000):
-        next_hp = get_next_hyperopt(inputs, outputs, space, algo='rand')
+    for i in range(10):
+        rng = np.random.RandomState(123)
+        next_hp = get_next_hyperopt(inputs, outputs, space, algo='rand', rstate=rng)
         inputs.append(next_hp)
         outputs.append((next_hp['x'] - 2) ** 2)
         print(next_hp)
