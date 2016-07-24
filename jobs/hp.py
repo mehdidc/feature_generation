@@ -44,7 +44,7 @@ def feed(feval, inputs, outputs):
                 raise ValueError(
                     "The {}-th element of the provided inputs do not"
                     "correspond to the inputs asked by hyperopt"
-                    ": {} vs {}".format(i + 1, inputs[feval_.i], x))
+                    ": {} vs {}".format(feval_.i + 1, inputs[feval_.i], x))
             output = outputs[feval_.i]
             feval_.i += 1
             if feval_.i == len(inputs) and feval.alter_rng:
