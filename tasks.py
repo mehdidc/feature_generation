@@ -26,9 +26,10 @@ from data import load_data
 from model import *  # for dill
 from skimage.io import imsave
 import logging
+from scripts.genstats import genstats
 
 from lightjob.cli import load_db
-from lightjob.db import DB, SUCCESS, RUNNING, AVAILABLE, ERROR, PENDING
+from lightjob.db import SUCCESS, RUNNING, AVAILABLE, ERROR, PENDING
 
 
 sys.setrecursionlimit(10000)
@@ -170,10 +171,6 @@ def train(dataset=None,
     # save model and report at the end
     capsule.report(capsule.batch_optimizer.stats[-1])
     print("Ok finished training")
-    if update_db:
-        db = load_db()
-        db.modify_state_of(job_summary, SUCCESS)
-        db.close()
 
     if params.get('eval_stats') is not None:
         assert update_db
@@ -182,6 +179,11 @@ def train(dataset=None,
         job = db.get_job_by_summary(job_summary)
         db.close()
         genstats([job], db, filter_stats=stats, n_jobs=1)
+
+    if update_db:
+        db = load_db()
+        db.modify_state_of(job_summary, SUCCESS)
+        db.close()
 
 
 def build_capsule_(layers, data, nbl, nbc,

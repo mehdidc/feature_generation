@@ -3619,6 +3619,7 @@ def model67(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     all_layers = [l_in, l_conv1, l_conv2, l_conv3] + sparse_layers + [l_out1, l_out2, l_out3, l_out]
     return layers_from_list_to_dict(all_layers)
 
+
 def model68(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     """
     like model67 but with weight sharing in the last layers
@@ -3790,7 +3791,7 @@ def model69(nb_filters=64, w=32, h=32, c=1, sparsity=True):
 
 def model70(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     """
-    model68 with stride
+    model68 with stride (used for large images)
     """
     if type(nb_filters) != list:
         nb_filters = [nb_filters] * 3
@@ -4086,6 +4087,97 @@ def model72(nb_filters=64, w=32, h=32, c=1, sparsity=True):
         [l_in] +
         l_convs +
         [l_unconv, l_wta_spatial, l_wta_channel, l_out])
+    return layers_from_list_to_dict(all_layers)
+
+
+def model73(nb_filters=64, w=32, h=32, c=1,
+            nb_layers=3,
+            filter_size=5,
+            use_channel=True,
+            use_spatial=True,
+            spatial_k=1,
+            channel_stride=2,
+            weight_sharing=False,
+            merge_op='sum'):
+    """
+    parametrized version of model67
+    """
+    merge_op = {'sum': T.add, 'mul': T.mul}[merge_op]
+    if type(nb_filters) != list:
+        nb_filters = [nb_filters] * nb_layers
+    if type(channel_stride) != list:
+        channel_stride = [channel_stride] * nb_layers
+    if type(spatial_k) != list:
+        spatial_k = [spatial_k] * nb_layers
+    if weight_sharing != list:
+        weight_sharing = [weight_sharing] * nb_layers
+    sparse_layers = []
+
+    def sparse(l):
+        name = l.name
+        idx = int(name.replace('conv', '')) - 1
+        if use_spatial:
+            l = layers.NonlinearityLayer(
+                l, (wta_spatial
+                    if spatial_k[idx] == 1
+                    else wta_k_spatial(k=spatial_k[idx])),
+                name="wta_spatial_{}".format(name))
+            sparse_layers.append(l)
+        if use_channel:
+            l = layers.NonlinearityLayer(
+                l, wta_channel_strided(stride=channel_stride[idx]),
+                name="wta_channel_{}".format(name))
+            sparse_layers.append(l)
+        return l
+
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_conv = l_in
+    convs = []
+    for i in range(nb_layers):
+        l_conv = layers.Conv2DLayer(
+            l_conv,
+            num_filters=nb_filters[i],
+            filter_size=(filter_size[i], filter_size[i]),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            name="conv{}".format(i + 1))
+        l_conv = sparse(l_conv)
+        convs.append(l_conv)
+
+    conv_backs = []
+    back = {}
+    for i in range(nb_layers): #[0, 1, 2]
+        l_conv_back = convs[i]
+        for j in range(i): # for 0 : [], for 1 : [0], for 2 : [0, 1]
+            if weight_sharing[i] and i > 0 and j > 0:
+                W = back[(i - 1, j - 1)]
+            else:
+                W = init.GlorotUniform(),
+            l_conv_back = layers.Conv2DLayer(
+                l_conv_back,
+                num_filters=nb_filters[i - j - 1],
+                filter_size=(filter_size[i - j - 1], filter_size[i - j - 1]),
+                nonlinearity=rectify,
+                W=W,
+                pad='full'
+            )
+            back[(i, j)] = l_conv_back
+        conv_backs.append(l_conv_back)
+
+    outs = []
+    for i, conv_back in enumerate(conv_backs):
+        l_out = layers.Conv2DLayer(
+            conv_back,
+            num_filters=c,
+            filter_size=(filter_size[0], filter_size[0]),
+            nonlinearity=linear,
+            W=init.GlorotUniform(),
+            pad='full',
+            name='out{}'.format(i))
+        outs.append(l_out)
+    l_out = layers.ElemwiseMergeLayer(outs, merge_op)
+    l_out = layers.NonlinearityLayer(l_out, sigmoid, name='output')
+    all_layers = [l_in] + convs + sparse_layers + conv_backs + outs + [l_out]
     return layers_from_list_to_dict(all_layers)
 
 

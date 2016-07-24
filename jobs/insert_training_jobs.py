@@ -1825,11 +1825,11 @@ if __name__ == "__main__":
             print(json.dumps(p, indent=4))
         return nb
 
-    # hyperopt loop for model55
+    # hyperopt loop for model64
     def jobset34():
-        where = 'jobset34'
         crit = 'knn_classification_accuracy'
         model = 'model64'
+
         def filter_func(job):
             if job['stats'] != SUCCESS:
                 return False
@@ -1882,6 +1882,9 @@ if __name__ == "__main__":
                         budget_hours=budget_hours)
         nb = job_write(params, cmd, where=jobset_name)
         return nb
+
+    def jobset35():
+        pass
     nb = 0
     nb += jobset34()
     print("Total number of jobs added : {}".format(nb))
