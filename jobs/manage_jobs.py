@@ -69,6 +69,8 @@ def do(action, where, type, ref_where, state, dontcare, details):
             s = j['summary']
             if has_exception(s):
                 print(s)
+    else:
+        raise Exception('Wrong action : {}'.format(action))
     if details:
         print('Total nb of jobs processed : {}'.format(len(jobs)))
 
