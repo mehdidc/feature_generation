@@ -83,7 +83,11 @@ def has_exception(s):
         data = gzip.GzipFile(filename + '.gz').read()
     else:
         return False
-    return "Traceback (most recent call last):" in data
+    if "Traceback (most recent call last):" in data:
+        return True
+    if "DUE TO TIME LIMIT ***" in data:
+        return True
+    return False
 
 if __name__ == '__main__':
     main.add_command(do)
