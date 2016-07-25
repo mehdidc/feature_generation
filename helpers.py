@@ -218,8 +218,8 @@ class BrushLayer(lasagne.layers.Layer):
                 X[:, 0], X[:, 1],
                 X[:, 2], X[:, 3],
                 X[:, 4])
-            sx = sx**2
-            sy = sy**2
+            sx = T.exp(sx)
+            sy = T.exp(sy)
             sigma = T.exp(log_sigma)
             w = self.w
             h = self.h
@@ -247,7 +247,7 @@ class BrushLayer(lasagne.layers.Layer):
             ux_ = ux.dimshuffle(0, 1, 'x')
             sigma_ = sigma.dimshuffle(0, 'x', 'x')
             Fx = T.exp(-(a_ - ux_) ** 2 / (2 * sigma_ ** 2))
-            eps = 1e-10
+            eps = 1e-12
             # that is,  ...(1, pw, w) - (nb_examples, pw, 1) / ... (nb_examples, 1, 1)
             # shape of Fx : (nb_examples, pw, w)
             Fx = Fx / (Fx.sum(axis=2, keepdims=True) + eps)

@@ -1940,6 +1940,42 @@ def jobset35():
     return nb
 
 
+def jobset36():
+    rng = random
+    nb_layers = rng.randint(1, 7)
+    nb_units = [rng.randint(1, 20) * 100 for l in range(nb_layers)]
+    model_params = OrderedDict(
+        nb_layers=nb_layers,
+        nb_units=nb_units,
+        n_steps=rng.randint(1, 30),
+        patch_size=rng.randint(1, 9),
+        nonlin=rng.choice(('rectify', 'very_leaky_rectify'))
+    )
+    params = OrderedDict(
+        model_params=model_params,
+        denoise=None,
+        noise=None,
+        walkback=1,
+        walkback_mode='bengio_without_sampling',
+        autoencoding_loss='squared_error',
+        mode='random',
+        contractive=False,
+        contractive_coef=None,
+        marginalized=False,
+        binarize_thresh=None
+    )
+    budget_hours = 4
+    model_name = 'model75'
+    dataset = 'digits'
+    jobset_name = "jobset36"
+    cmd = build_cmd(model_name=model_name,
+                    dataset=dataset,
+                    params=params,
+                    budget_hours=budget_hours)
+    nb = job_write(params, cmd, where=jobset_name)
+    return nb
+
+
 @click.command()
 @click.option('--where', default='', help='jobset name', required=False)
 @click.option('--nb', default=1, help='nb of repetitions', required=False)

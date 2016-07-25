@@ -445,6 +445,7 @@ def build_capsule_(layers, data, nbl, nbc,
     lr = theano.shared(np.array(initial_lr, dtype=np.float32))
     algos = {"adam": updates.adam,
              "adadelta": updates.adadelta,
+             "rmsprop": updates.rmsprop,
              "momentum": updates.momentum}
     algo = algos[optim_params["algo"]]
     params = {"learning_rate": lr}
