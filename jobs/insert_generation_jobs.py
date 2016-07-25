@@ -1,15 +1,22 @@
 import os
 import json
 
-if __name__ == "__main__":
+import click
+
+@click.command()
+@click.option('--where', default='', help='jobset name', required=False)
+@click.option('--nb', default=1, help='nb of repetitions', required=False)
+def insert(where, nb):
     from lightjob.db import DB, SUCCESS
     from lightjob.cli import load_db
     from lightjob.utils import summarize
     db = load_db()
-    jobs = db.jobs_with(state=SUCCESS, type="training")
+    kw = {}
+    if where:
+        kw['where'] = where
+    jobs = db.jobs_with(state=SUCCESS, type="training", **kw)
     print("Number of jobs : {}".format(len(jobs)))
     nb = 0
-
     for up_binarize in (0.5,):
         params = dict(
             op_params=[],
@@ -30,6 +37,7 @@ if __name__ == "__main__":
             d['model_summary'] = sref
             check = {}
             check['params'] = params
+            print(job['content'].keys())
             check['dataset'] = job['content']['dataset']
             check['filename'] = 'jobs/results/{}/model.pkl'.format(sref)
             check['what'] = 'simple_genetic'
@@ -50,3 +58,6 @@ if __name__ == "__main__":
             nb += db.safe_add_job(d, cmd=cmd, type="generation")
 
     print("Total number of jobs added : {}".format(nb))
+
+if __name__ == "__main__":
+    insert()

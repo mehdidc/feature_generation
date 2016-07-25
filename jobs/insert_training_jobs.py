@@ -1878,7 +1878,10 @@ def jobset34():
         contractive_coef=None,
         marginalized=False,
         binarize_thresh=hp.choice('binarize_thresh', (None, 0.5)),
-        eval_stats=[crit]
+        eval_stats=[crit],
+        model_name='model64',
+        dataset='digits',
+        budget_hours=4
     )
     seed = np.random.randint(0, 99999999)
     rng = np.random.RandomState(seed)
@@ -1932,6 +1935,11 @@ def jobset35():
     model_name = 'model73'
     dataset = 'digits'
     jobset_name = "jobset35"
+
+    params['model_name'] = model_name
+    params['dataset'] = 'digits'
+    params['budget_hours'] = budget_hours
+
     cmd = build_cmd(model_name=model_name,
                     dataset=dataset,
                     params=params,
@@ -1968,6 +1976,11 @@ def jobset36():
     model_name = 'model75'
     dataset = 'digits'
     jobset_name = "jobset36"
+
+    params['model_name'] = model_name
+    params['dataset'] = 'digits'
+    params['budget_hours'] = budget_hours
+
     cmd = build_cmd(model_name=model_name,
                     dataset=dataset,
                     params=params,
