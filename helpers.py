@@ -200,77 +200,91 @@ class Deconv2DLayer(lasagne.layers.Layer):
 
 class BrushLayer(lasagne.layers.Layer):
 
-    def __init__(self, incoming, output_shape, patch_size=(5, 5), n_steps=10, **kwargs):
+    def __init__(self, incoming, w, h,
+                 patch=np.ones((5, 5)), n_steps=10, **kwargs):
         super(BrushLayer, self).__init__(incoming, **kwargs)
         self.incoming = incoming
-        self.output_shape = output_shape
+        self.w = w
+        self.h = h
         self.n_steps = n_steps
-        self.patch_size = patch_size
+        self.patch = patch
 
     def get_output_shape_for(self, input_shape):
-        return (input_shape[0],) + self.output_shape
+        return (input_shape[0],) + (self.w, self.h)
 
     def get_output_for(self, input, **kwargs):
         def apply_func(X):
-            x, y, width, height = (
-                    input[:, 0], input[:, 1],
-                    input[:, 2], input[:, 3]) 
-            fpos = T.shared(np.linspace(0, 1, self.output_shape[0]).astype(np.float32)) # pw
+            gx, gy, sx, sy, log_sigma = (
+                X[:, 0], X[:, 1],
+                X[:, 2], X[:, 3],
+                X[:, 4])
 
-            #x : [5, 1, 1, 5]
-            #f : [1, 2, 3, 4, 5]
+            sigma = T.exp(log_sigma)
 
-            # results (examples, w, pw): Fi, j, k = 1 if xi=w=pw else 0
+            w = self.w
+            h = self.h
+            pw = self.patch.shape[0]
+            ph = self.patch.shape[1]
 
-            fx = T.zeros(self.get_output_shape_for(input.shape))  # examples, w, pw
-            fy = T.zeros(self.get_output_shape_for(input.shape))  # examples, h, ph
-            pw, ph = self.patch_size
-            patch = T.ones((pw, ph))  # pw, ph
-            output = ((fx.dimshuffle(0, 1, 'x', 2, 'x') * fy.dimshuffle(0, 'x', 1, 'x', 2) *
-                       patch.dimshuffle('x', 'x', 'x', 0, 1)).sum(axis=(3, 4)))
-            return output
+            gx = gx * w  # assumes gx is between 0 and 1
+            gy = gy * h  # assumes gy is between 0 and 1
+
+            a, _ = np.indices((w, pw))
+            a = a.T
+            a = theano.shared(a)
+            b, _ = np.indices((h, ph))
+            b = b.T
+            b = theano.shared(b)
+            # shape of a (pw, w)
+            # shape of b (ph, h)
+            # shape of sx : (nb_examples,)
+            # shape of sy : (nb_examples,)
+            ux = gx.dimshuffle(0, 'x') + (T.arange(1, pw + 1) - pw/2. - 0.5) * sx.dimshuffle(0, 'x')
+            # shape of ux : (nb_examples, pw)
+            a_ = a.dimshuffle('x', 0, 1)
+            ux_ = ux.dimshuffle(0, 1, 'x')
+            sigma_ = sigma.dimshuffle(0, 'x', 'x')
+            Fx = np.exp(-(a_ - ux_) ** 2 / (2 * sigma_ ** 2))
+            # that is,  ...(1, pw, w) - (nb_examples, pw, 1) / ... (nb_examples, 1, 1)
+            # shape of Fx : (nb_examples, pw, w)
+            Fx = Fx / Fx.sum(axis=2, keepdims=True)
+
+            uy = gy.dimshuffle(0, 'x') + (T.arange(1, ph + 1) - ph/2. - 0.5) * sy.dimshuffle(0, 'x')
+            # shape of uy : (nb_examples, ph)
+            b_ = b.dimshuffle('x', 0, 1)
+            uy_ = uy.dimshuffle(0, 1, 'x')
+            sigma_ = sigma.dimshuffle(0, 'x', 'x')
+            Fy = np.exp(-(b_ - uy_) ** 2 / (2 * sigma_ ** 2))
+            # that is,  ...(1, ph, h) - (nb_examples, ph, 1) / ... (nb_examples, 1, 1)
+            # shape of Fy : (nb_examples, ph, h)
+            Fy = Fy / Fy.sum(axis=2, keepdims=True)
+            patch = theano.shared(self.patch)
+            # patch : (pw, ph)
+            # Fx : (nb_examples, pw, w)
+            # Fy : (nb_examples, ph, h)
+            o = T.tensordot(patch, Fy, axes=[1, 1])
+            # -> shape (pw, nb_examples, h)
+            o = o.transpose((1, 2, 0))
+            # -> shape (nb_examples, h, pw)
+            o = T.batched_dot(o, Fx)
+            # -> shape (nb_examples, h, w)
+            o = o.transpose((0, 2, 1))
+            # -> shape (nb_examples, w, h)
+            return o
 
         def reduce_func(prev, new):
             return prev + new
         output_shape = self.get_output_shape_for(input.shape)
         init_val = T.zeros(output_shape)
-        output = recurrent_accumulation(
-                input.dimshuffle(1, 0, 2, 3),  # 'time' should be the first dimension
+        output, _ = recurrent_accumulation(
+                # 'time' should be the first dimension
+                input.dimshuffle(1, 0, 2),
                 apply_func,
                 reduce_func,
                 init_val,
                 self.n_steps)
         output = output.dimshuffle(1, 0, 2, 3)
-
-
-class ConvBrushLayer(lasagne.layers.Layer):
-
-    def __init__(self, incoming, output_shape, patch_size=(5, 5), n_steps=10, **kwargs):
-        super(BrushLayer, self).__init__(incoming, **kwargs)
-        self.incoming = incoming
-        self.output_shape = output_shape
-        self.n_steps = n_steps
-        self.patch_size = patch_size
-
-    def get_output_shape_for(self, input_shape):
-        return (input_shape[0],) + self.output_shape
-
-    def get_output_for(self, input, **kwargs):
-        def apply_func(X):
-            return output
-
-        def reduce_func(prev, new):
-            return prev + new
-        output_shape = self.get_output_shape_for(input.shape)
-        init_val = T.zeros(output_shape)
-        output = recurrent_accumulation(
-                input.dimshuffle(1, 0, 2, 3),  # 'time' should be the first dimension
-                apply_func,
-                reduce_func,
-                init_val,
-                self.n_steps)
-        output = output.dimshuffle(1, 0, 2, 3)
-
+        return output[:, -1]
 
 
 def recurrent_accumulation(X, apply_func, reduce_func,
@@ -279,15 +293,27 @@ def recurrent_accumulation(X, apply_func, reduce_func,
     def step_function(input_cur, output_prev):
         return reduce_func(apply_func(input_cur), output_prev)
 
-    sequences = []
+    sequences = [X]
     outputs_info = [init_val]
-    non_sequences = [X]
+    non_sequences = []
 
     result, updates = theano.scan(fn=step_function,
                                   sequences=sequences,
                                   outputs_info=outputs_info,
                                   non_sequences=non_sequences,
-                                  strict=True,
+                                  strict=False,
                                   n_steps=n_steps,
                                   **scan_kwargs)
     return result, updates
+
+if __name__ == '__main__':
+    from lasagne import layers
+    n_steps = 10
+    inp = layers.InputLayer((None, n_steps, 5))
+    brush = BrushLayer(inp, 28, 28, n_steps=n_steps)
+    X = T.tensor3()
+    fn = theano.function([X], layers.get_output(brush, X))
+
+    X_example = np.random.uniform(0, 1, size=(100, n_steps, 5))
+    X_example = X_example.astype(np.float32)
+    print(fn(X_example).shape)

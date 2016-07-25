@@ -6,6 +6,7 @@ from lasagnekit.layers import Deconv2DLayer, Depool2DLayer
 from helpers import Deconv2DLayer as deconv2d
 
 from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse
+from helpers import BrushLayer
 import theano.tensor as T
 import numpy as np
 from batch_norm import NormalizeLayer, ScaleAndShiftLayer, DecoderNormalizeLayer, DenoiseLayer, FakeLayer
@@ -4281,6 +4282,20 @@ def model74(nb_filters=64, w=32, h=32, c=1,
     l_out = layers.NonlinearityLayer(l_out, sigmoid, name='output')
     all_layers = [l_in] + convs + sparse_layers + conv_backs + outs + [l_out]
     return layers_from_list_to_dict(all_layers)
+
+
+def model75(w=32, h=32, c=1):
+    """
+    Simple brush neural net
+    """
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_hid = layers.DenseLayer(l_in, 500, nonlinearity=rectify, name="hid1")
+    l_hid = layers.DenseLayer(l_hid, 100, nonlinearity=rectify, name="hid2")
+    l_hid = layers.DenseLayer(l_hid, 5, nonlinearity=linear, name="hid3")
+    l_brush = BrushLayer(l_hid, w, h, n_steps=10)
+    l_brush = layers.ReshapeLayer(l_brush, ([0], c, w, h), name="output")
+    l_out = layers.NonlinearityLayer(l_brush, nonlinearity=sigmoid)
+    return layers_from_list_to_dict([l_in, l_hid, l_brush, l_out])
 
 
 build_convnet_simple = model1
