@@ -201,13 +201,13 @@ class Deconv2DLayer(lasagne.layers.Layer):
 class BrushLayer(lasagne.layers.Layer):
 
     def __init__(self, incoming, w, h,
-                 patch=np.ones((5, 5)), n_steps=10, **kwargs):
+                 patch=np.ones((3, 3)), n_steps=10, **kwargs):
         super(BrushLayer, self).__init__(incoming, **kwargs)
         self.incoming = incoming
         self.w = w
         self.h = h
         self.n_steps = n_steps
-        self.patch = patch
+        self.patch = patch.astype(np.float32)
 
     def get_output_shape_for(self, input_shape):
         return (input_shape[0],) + (self.w, self.h)
@@ -218,21 +218,23 @@ class BrushLayer(lasagne.layers.Layer):
                 X[:, 0], X[:, 1],
                 X[:, 2], X[:, 3],
                 X[:, 4])
-
+            sx = sx**2
+            sy = sy**2
             sigma = T.exp(log_sigma)
-
             w = self.w
             h = self.h
             pw = self.patch.shape[0]
             ph = self.patch.shape[1]
 
-            gx = gx * w  # assumes gx is between 0 and 1
-            gy = gy * h  # assumes gy is between 0 and 1
+            #gx = gx * w  # assumes gx is between 0 and 1
+            #gy = gy * h  # assumes gy is between 0 and 1
 
             a, _ = np.indices((w, pw))
+            a = a.astype(np.float32)
             a = a.T
             a = theano.shared(a)
             b, _ = np.indices((h, ph))
+            b = b.astype(np.float32)
             b = b.T
             b = theano.shared(b)
             # shape of a (pw, w)
@@ -244,20 +246,21 @@ class BrushLayer(lasagne.layers.Layer):
             a_ = a.dimshuffle('x', 0, 1)
             ux_ = ux.dimshuffle(0, 1, 'x')
             sigma_ = sigma.dimshuffle(0, 'x', 'x')
-            Fx = np.exp(-(a_ - ux_) ** 2 / (2 * sigma_ ** 2))
+            Fx = T.exp(-(a_ - ux_) ** 2 / (2 * sigma_ ** 2))
+            eps = 1e-10
             # that is,  ...(1, pw, w) - (nb_examples, pw, 1) / ... (nb_examples, 1, 1)
             # shape of Fx : (nb_examples, pw, w)
-            Fx = Fx / Fx.sum(axis=2, keepdims=True)
+            Fx = Fx / (Fx.sum(axis=2, keepdims=True) + eps)
 
             uy = gy.dimshuffle(0, 'x') + (T.arange(1, ph + 1) - ph/2. - 0.5) * sy.dimshuffle(0, 'x')
             # shape of uy : (nb_examples, ph)
             b_ = b.dimshuffle('x', 0, 1)
             uy_ = uy.dimshuffle(0, 1, 'x')
             sigma_ = sigma.dimshuffle(0, 'x', 'x')
-            Fy = np.exp(-(b_ - uy_) ** 2 / (2 * sigma_ ** 2))
+            Fy = T.exp(-(b_ - uy_) ** 2 / (2 * sigma_ ** 2))
             # that is,  ...(1, ph, h) - (nb_examples, ph, 1) / ... (nb_examples, 1, 1)
             # shape of Fy : (nb_examples, ph, h)
-            Fy = Fy / Fy.sum(axis=2, keepdims=True)
+            Fy = Fy / (Fy.sum(axis=2, keepdims=True) + eps)
             patch = theano.shared(self.patch)
             # patch : (pw, ph)
             # Fx : (nb_examples, pw, w)
@@ -274,6 +277,7 @@ class BrushLayer(lasagne.layers.Layer):
 
         def reduce_func(prev, new):
             return prev + new
+
         output_shape = self.get_output_shape_for(input.shape)
         init_val = T.zeros(output_shape)
         output, _ = recurrent_accumulation(

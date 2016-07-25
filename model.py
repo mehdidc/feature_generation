@@ -4284,17 +4284,17 @@ def model74(nb_filters=64, w=32, h=32, c=1,
     return layers_from_list_to_dict(all_layers)
 
 
-def model75(w=32, h=32, c=1):
+def model75(w=32, h=32, c=1, n_steps=10, patch_size=3):
     """
     Simple brush neural net
     """
     l_in = layers.InputLayer((None, c, w, h), name="input")
-    l_hid = layers.DenseLayer(l_in, 500, nonlinearity=rectify, name="hid1")
-    l_hid = layers.DenseLayer(l_hid, 100, nonlinearity=rectify, name="hid2")
-    l_hid = layers.DenseLayer(l_hid, 5, nonlinearity=linear, name="hid3")
-    l_brush = BrushLayer(l_hid, w, h, n_steps=10)
+    l_hid = layers.DenseLayer(l_in, 2000, nonlinearity=rectify, name="hid1")
+    l_hid = layers.DenseLayer(l_hid, n_steps * 5, nonlinearity=linear, name="hid3")
+    l_hid = layers.ReshapeLayer(l_hid, ([0], n_steps, 5), name="hid3")
+    l_brush = BrushLayer(l_hid, w, h, n_steps=n_steps, name="brush", patch=np.ones((patch_size, patch_size)))
     l_brush = layers.ReshapeLayer(l_brush, ([0], c, w, h), name="output")
-    l_out = layers.NonlinearityLayer(l_brush, nonlinearity=sigmoid)
+    l_out = layers.NonlinearityLayer(l_brush, nonlinearity=linear, name="output")
     return layers_from_list_to_dict([l_in, l_hid, l_brush, l_out])
 
 

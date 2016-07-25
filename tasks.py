@@ -120,9 +120,9 @@ def train(dataset=None,
     # nbl and nbc are just used to show couple of nblxnbc reconstructed
     # vs true samples
     model_params = params.get("model_params", {})
-    nb_filters = model_params.get("nb_filters", 128)
+    #nb_filters = model_params.get("nb_filters", 128)
     kw_builder = dict(
-        nb_filters=nb_filters,
+        #nb_filters=nb_filters,
         w=w, h=h, c=c
     )
     builder = getattr(model, model_name)

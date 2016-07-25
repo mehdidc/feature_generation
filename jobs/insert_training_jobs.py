@@ -42,7 +42,7 @@ def build_cmd(launcher="scripts/launch_gpu",
     extra = " ".join(extra)
     cmd = "sbatch --time={} --output={} --error={} {} invoke train --update-db=1 --dataset={} --model-name={} --prefix={} --params={} {}"
     cmd = cmd.format(
-        int(budget_hours * 60) + 15,
+        int(budget_hours * 60) + 60,
         output,
         output,
         launcher,
