@@ -41,23 +41,27 @@ def gallery(model, where, folder, nbpages, limit, show_freqs, force):
 @click.option('--n_jobs', help='n_jobs', required=False, default=1)
 @click.option('--stats', help='stats to compute (otherwise will compute everything) separeted by commas', required=False, default=None)
 @click.option('--force/--no-force', help='force', required=False, default=False)
-def stats(model, where, n_jobs, stats, force):
+@click.option('--type', default='generation', help='type', required=False)
+def stats(model, where, n_jobs, stats, force, type):
     if where == '':
         where = None
-    jobs = load_jobs(model, where)
+    jobs = load_jobs(model, where, type_=type)
     db = load_db()
     if stats is not None:
         stats = stats.split(',')
     genstats(jobs, db, n_jobs=n_jobs, force=force, filter_stats=stats)
 
 
-def load_jobs(model_name, where):
+def load_jobs(model_name, where, type_="generation"):
     db = load_db()
     jobs = []
-    for j in db.jobs_with(state=SUCCESS, type="generation"):
+    for j in db.jobs_with(state=SUCCESS, type=type_):
         j = dict(j)
-        s = j['content']['model_summary']
-        ref_job = db.get_job_by_summary(s)
+        if type_ == "generation":
+            s = j['content']['model_summary']
+            ref_job = db.get_job_by_summary(s)
+        else:
+            ref_job = j
         model_details = ref_job['content']
         j['ref_job'] = dict(ref_job)
         if where is not None and ref_job['where'] != where:

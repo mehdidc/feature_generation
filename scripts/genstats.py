@@ -142,6 +142,9 @@ def compute_stats(job, force=False, filter_stats=None):
     if should_compute('knn_classification_accuracy', stats):
         logger.info('compute knn classification accuracy')
         stats['knn_classification_accuracy'] = compute_knn_classification_accuracy(folder, hash_matrix, ref_job)
+    if should_compute('training', stats):
+        logger.info('compute training stats')
+        stats.update(compute_training_stats(folder, ref_job))
     logger.info('Finished on {}, stats : {}'.format(s, stats))
     return stats
 
@@ -161,7 +164,14 @@ def construct_data(job_folder, hash_matrix, transform=lambda x:x):
     X = X.reshape((X.shape[0], -1))
     return X
 
-
+def compute_training_stats(folder, ref_job):
+    filename = "jobs/results/{}/csv/stats.csv".format(ref_job)
+    if not os.path.exists(filename):
+        return {}
+    df = pd.read_csv(filename)
+    df = df.iloc[-1]
+    logger.info(df)
+    return df.to_dict()
 
 def compute_modelness(job_folder, hash_matrix, model_path):
     import pickle
