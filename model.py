@@ -4323,13 +4323,13 @@ def model75(w=32, h=32, c=1,
             nonlinearity=nonlin,
             name="hid{}".format(i + 1))
         hids.append(l_hid)
-    l_hid = layers.DenseLayer(
+    l_coord = layers.DenseLayer(
         l_hid,
         n_steps * 5,
         nonlinearity=linear,
         W=init_method(),
         name="coord")
-    l_hid = layers.ReshapeLayer(l_hid, ([0], n_steps, 5), name="hid3")
+    l_hid = layers.ReshapeLayer(l_coord, ([0], n_steps, 5), name="hid3")
     l_brush = BrushLayer(
         l_hid,
         w, h,
@@ -4341,7 +4341,7 @@ def model75(w=32, h=32, c=1,
         l_out,
         nonlinearity=linear,
         name="output")
-    return layers_from_list_to_dict([l_in]+ hids + [l_hid, l_brush, l_out])
+    return layers_from_list_to_dict([l_in]+ hids + [l_coord, l_brush, l_out])
 
 
 build_convnet_simple = model1
