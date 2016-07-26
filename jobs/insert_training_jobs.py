@@ -1931,7 +1931,7 @@ def jobset35():
         marginalized=False,
         binarize_thresh=None
     )
-    budget_hours = 10
+    budget_hours = 4
     model_name = 'model73'
     dataset = 'digits'
     jobset_name = "jobset35"
