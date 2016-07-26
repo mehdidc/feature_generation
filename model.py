@@ -4139,6 +4139,7 @@ def model73(nb_filters=64, w=32, h=32, c=1,
     l_in = layers.InputLayer((None, c, w, h), name="input")
     l_conv = l_in
     convs = []
+    convs_sparse = []
     for i in range(nb_layers):
         l_conv = layers.Conv2DLayer(
             l_conv,
@@ -4147,13 +4148,14 @@ def model73(nb_filters=64, w=32, h=32, c=1,
             nonlinearity=rectify,
             W=init.GlorotUniform(),
             name="conv{}".format(i + 1))
-        l_conv = sparse(l_conv)
         convs.append(l_conv)
+        l_conv_sparse = sparse(l_conv)
+        convs_sparse.append(l_conv_sparse)
 
     conv_backs = []
     back = {}
     for i in range(nb_layers): #[0, 1, 2]
-        l_conv_back = convs[i]
+        l_conv_back = convs_sparse[i]
         for j in range(i): # for 0 : [], for 1 : [0], for 2 : [0, 1]
             if weight_sharing[i - j - 1] and i > 0 and j > 0:
                 W = back[(i - 1, j - 1)]
@@ -4186,7 +4188,6 @@ def model73(nb_filters=64, w=32, h=32, c=1,
     l_out = layers.NonlinearityLayer(l_out, sigmoid, name='output')
     all_layers = [l_in] + convs + sparse_layers + conv_backs + outs + [l_out]
     return layers_from_list_to_dict(all_layers)
-
 
 def model74(nb_filters=64, w=32, h=32, c=1,
             nb_layers=3,
@@ -4234,6 +4235,7 @@ def model74(nb_filters=64, w=32, h=32, c=1,
     l_in = layers.InputLayer((None, c, w, h), name="input")
     l_conv = l_in
     convs = []
+    convs_sparse = []
     for i in range(nb_layers):
         l_conv = layers.Conv2DLayer(
             l_conv,
@@ -4243,13 +4245,14 @@ def model74(nb_filters=64, w=32, h=32, c=1,
             W=init.GlorotUniform(),
             pad='same',
             name="conv{}".format(i + 1))
-        l_conv = sparse(l_conv)
         convs.append(l_conv)
+        l_conv_sparse = sparse(l_conv)
+        convs_sparse.append(l_conv_sparse)
 
     conv_backs = []
     back = {}
     for i in range(nb_layers): #[0, 1, 2]
-        l_conv_back = convs[i]
+        l_conv_back = convs_sparse[i]
         for j in range(i): # for 0 : [], for 1 : [0], for 2 : [0, 1]
             if weight_sharing[i - j - 1] and i > 0 and j > 0:
                 W = back[(i - 1, j - 1)]
