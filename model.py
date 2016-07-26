@@ -4324,12 +4324,13 @@ def model75(w=32, h=32, c=1,
             nonlinearity=nonlin,
             name="hid{}".format(i + 1))
         hids.append(l_hid)
+    l_hid = batch_norm(l_hid)
     l_coord = layers.DenseLayer(
         l_hid,
         n_steps * 5,
         nonlinearity=linear,
-        #W=init_method(),
-        W=init.Normal(0.001),
+        W=init.GlorotUniform(),
+        #W=init.Normal(0.001),
         name="coord")
     l_hid = layers.ReshapeLayer(l_coord, ([0], n_steps, 5), name="hid3")
     l_brush = BrushLayer(

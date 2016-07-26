@@ -225,13 +225,9 @@ class BrushLayer(lasagne.layers.Layer):
             h = self.h
             pw = self.patch.shape[0]
             ph = self.patch.shape[1]
-
-            #gx = gx * w  # assumes gx is between 0 and 1
-            #gy = gy * h  # assumes gy is between 0 and 1
-            gx = (w + 1) * 0.5  * (gx + 1)
-            gy = (h + 1) * 0.5 * (gy + 1)
-            sigma = ((max(w, h) - 1) / (max(pw, ph) - 1)) * sigma
-
+            #gx = (gx/gx.max()) * w
+            #gy = (gy/gy.max()) * h
+            #sigma = ((max(w, h) - 1) / (max(pw, ph) - 1)) * sigma
             a, _ = np.indices((w, pw))
             a = a.astype(np.float32)
             a = a.T
@@ -279,7 +275,7 @@ class BrushLayer(lasagne.layers.Layer):
             return o
 
         def reduce_func(prev, new):
-            return prev * new
+            return prev + new
 
         output_shape = self.get_output_shape_for(input.shape)
         init_val = T.zeros(output_shape)
