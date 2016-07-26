@@ -125,6 +125,7 @@ def train(dataset=None,
         #nb_filters=nb_filters,
         w=w, h=h, c=c
     )
+    kw_builder.update(model_params)
     builder = getattr(model, model_name)
 
     # build the model and return layers dictionary

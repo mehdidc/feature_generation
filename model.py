@@ -4112,7 +4112,9 @@ def model73(nb_filters=64, w=32, h=32, c=1,
         channel_stride = [channel_stride] * nb_layers
     if type(spatial_k) != list:
         spatial_k = [spatial_k] * nb_layers
-    if weight_sharing != list:
+
+    print(weight_sharing)
+    if type(weight_sharing) != list:
         weight_sharing = [weight_sharing] * nb_layers
     sparse_layers = []
 
@@ -4175,12 +4177,16 @@ def model73(nb_filters=64, w=32, h=32, c=1,
     print(conv_backs)
     outs = []
     for i, conv_back in enumerate(conv_backs):
+        if i == 0 or not weight_sharing[0]:
+            W = init.GlorotUniform()
+        else:
+            W = outs[0].W
         l_out = layers.Conv2DLayer(
             conv_back,
             num_filters=c,
             filter_size=(filter_size[0], filter_size[0]),
             nonlinearity=linear,
-            W=init.GlorotUniform(),
+            W=W,
             pad='full',
             name='out{}'.format(i + 1))
         outs.append(l_out)
@@ -4210,7 +4216,7 @@ def model74(nb_filters=64, w=32, h=32, c=1,
         channel_stride = [channel_stride] * nb_layers
     if type(spatial_k) != list:
         spatial_k = [spatial_k] * nb_layers
-    if weight_sharing != list:
+    if type(weight_sharing) != list:
         weight_sharing = [weight_sharing] * nb_layers
     sparse_layers = []
     print('nb_filters : {}'.format(nb_filters))
@@ -4271,13 +4277,18 @@ def model74(nb_filters=64, w=32, h=32, c=1,
         conv_backs.append(l_conv_back)
 
     outs = []
+    print(weight_sharing)
     for i, conv_back in enumerate(conv_backs):
+        if i == 0 or not weight_sharing[0]:
+            W = init.GlorotUniform()
+        else:
+            W = outs[0].W
         l_out = layers.Conv2DLayer(
             conv_back,
             num_filters=c,
             filter_size=(filter_size[0], filter_size[0]),
             nonlinearity=linear,
-            W=init.GlorotUniform(),
+            W=W,
             pad='same',
             name='out{}'.format(i + 1))
         outs.append(l_out)
