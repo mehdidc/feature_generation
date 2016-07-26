@@ -4328,7 +4328,8 @@ def model75(w=32, h=32, c=1,
         l_hid,
         n_steps * 5,
         nonlinearity=linear,
-        W=init_method(),
+        #W=init_method(),
+        W=init.Normal(0.001),
         name="coord")
     l_hid = layers.ReshapeLayer(l_coord, ([0], n_steps, 5), name="hid3")
     l_brush = BrushLayer(
