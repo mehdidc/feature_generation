@@ -4273,7 +4273,7 @@ def model74(nb_filters=64, w=32, h=32, c=1,
                 W=W,
                 pad='same'
             )
-            back[(i, j)] = l_conv_back
+            back[(i, j)] = l_conv_back.W
         l_conv_back.name = 'conv_back{}'.format(i + 1)
         conv_backs.append(l_conv_back)
 
