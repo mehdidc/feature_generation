@@ -4155,7 +4155,7 @@ def model73(nb_filters=64, w=32, h=32, c=1,
     for i in range(nb_layers): #[0, 1, 2]
         l_conv_back = convs[i]
         for j in range(i): # for 0 : [], for 1 : [0], for 2 : [0, 1]
-            if weight_sharing[i] and i > 0 and j > 0:
+            if weight_sharing[i - j - 1] and i > 0 and j > 0:
                 W = back[(i - 1, j - 1)]
             else:
                 W = init.GlorotUniform()
@@ -4170,7 +4170,7 @@ def model73(nb_filters=64, w=32, h=32, c=1,
             back[(i, j)] = l_conv_back
         l_conv_back.name = 'conv_back{}'.format(i + 1)
         conv_backs.append(l_conv_back)
-
+    print(conv_backs)
     outs = []
     for i, conv_back in enumerate(conv_backs):
         l_out = layers.Conv2DLayer(
@@ -4251,7 +4251,7 @@ def model74(nb_filters=64, w=32, h=32, c=1,
     for i in range(nb_layers): #[0, 1, 2]
         l_conv_back = convs[i]
         for j in range(i): # for 0 : [], for 1 : [0], for 2 : [0, 1]
-            if weight_sharing[i] and i > 0 and j > 0:
+            if weight_sharing[i - j - 1] and i > 0 and j > 0:
                 W = back[(i - 1, j - 1)]
             else:
                 W = init.GlorotUniform()

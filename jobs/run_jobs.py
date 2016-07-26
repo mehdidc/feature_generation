@@ -40,6 +40,10 @@ if __name__ == "__main__":
         jobs = db.jobs_with(state=AVAILABLE, **extra)
     #jobs = jobs[0:nb]
     print("Number of jobs to run : {}".format(nb))
+    if is_seq:
+        for j in jobs:
+            db.modify_state_of(j['summary'], PENDING)
+
     for j in jobs:
         if nb == 0:
             break
