@@ -4171,7 +4171,7 @@ def model73(nb_filters=64, w=32, h=32, c=1,
                 W=W,
                 pad='full'
             )
-            back[(i, j)] = l_conv_back
+            back[(i, j)] = l_conv_back.W
         l_conv_back.name = 'conv_back{}'.format(i + 1)
         conv_backs.append(l_conv_back)
     print(conv_backs)
@@ -4181,6 +4181,7 @@ def model73(nb_filters=64, w=32, h=32, c=1,
             W = init.GlorotUniform()
         else:
             W = outs[0].W
+            print(W)
         l_out = layers.Conv2DLayer(
             conv_back,
             num_filters=c,
