@@ -4308,24 +4308,27 @@ def model75(w=32, h=32, c=1,
     """
     Simple brush neural net without recurrence
     """
-    init_method = init.GlorotUniform
+    def init_method():
+        return init.GlorotUniform(gain='relu')
     if type(nb_units) != list:
         nb_units = [nb_units] * nb_layers
     l_in = layers.InputLayer((None, c, w, h), name="input")
     nonlin = get_nonlinearity[nonlin]
     l_hid = l_in
+    hids = []
     for i in range(nb_layers):
         l_hid = layers.DenseLayer(
             l_hid, nb_units[i],
             W=init_method(),
             nonlinearity=nonlin,
-            name="hid1")
+            name="hid{}".format(i + 1))
+        hids.append(l_hid)
     l_hid = layers.DenseLayer(
         l_hid,
         n_steps * 5,
         nonlinearity=linear,
         W=init_method(),
-        name="hid3")
+        name="coord")
     l_hid = layers.ReshapeLayer(l_hid, ([0], n_steps, 5), name="hid3")
     l_brush = BrushLayer(
         l_hid,
@@ -4333,12 +4336,12 @@ def model75(w=32, h=32, c=1,
         n_steps=n_steps,
         patch=np.ones((patch_size, patch_size)),
         name="brush")
-    l_brush = layers.ReshapeLayer(l_brush, ([0], c, w, h), name="output")
+    l_out = layers.ReshapeLayer(l_brush, ([0], c, w, h), name="output")
     l_out = layers.NonlinearityLayer(
-        l_brush,
+        l_out,
         nonlinearity=linear,
         name="output")
-    return layers_from_list_to_dict([l_in, l_hid, l_brush, l_out])
+    return layers_from_list_to_dict([l_in]+ hids + [l_hid, l_brush, l_out])
 
 
 build_convnet_simple = model1
