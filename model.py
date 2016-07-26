@@ -4313,8 +4313,9 @@ def model75(w=32, h=32, c=1,
     if type(nb_units) != list:
         nb_units = [nb_units] * nb_layers
     l_in = layers.InputLayer((None, c, w, h), name="input")
-    nonlin = get_nonlinearity[nonlin]
+    #l_hid = layers.ExpressionLayer(l_in, lambda x:x*2-1)
     l_hid = l_in
+    nonlin = get_nonlinearity[nonlin]
     hids = []
     for i in range(nb_layers):
         l_hid = layers.DenseLayer(
