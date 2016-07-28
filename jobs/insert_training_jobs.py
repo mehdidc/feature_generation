@@ -2,8 +2,7 @@ import json
 from collections import OrderedDict
 from lightjob.utils import summarize
 from lightjob.db import SUCCESS
-from hp import get_next_hyperopt, encode_dict, decode_dict, get_next_skopt, Categorical
-from hyperopt import hp
+from hp import get_next_skopt
 
 import numpy as np
 import random
