@@ -6,6 +6,7 @@ from lasagnekit.layers import Deconv2DLayer, Depool2DLayer
 from helpers import Deconv2DLayer as deconv2d
 
 from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse
+from helpers import Repeat
 from helpers import BrushLayer
 import theano.tensor as T
 import numpy as np
@@ -4306,7 +4307,7 @@ def model75(w=32, h=32, c=1,
             patch_size=3,
             nonlin='rectify'):
     """
-    Simple brush neural net without recurrence
+    Simple continuous brush stroke without recurrence
     """
     def init_method():
         return init.GlorotUniform(gain='relu')
@@ -4412,6 +4413,53 @@ def model76(c=1, w=28, h=28, nb_layers=3, nb_filters=128, filter_size=5, patch_s
         l_convs +
         [l_unconv, l_wta_spatial, l_wta_channel, l_out])
     return layers_from_list_to_dict(all_layers)
+
+
+def model77(w=32, h=32, c=1,
+            nb_fc_layers=3,
+            nb_recurrent_layers=1,
+            nb_recurrent_units=100,
+            nb_fc_units=1000,
+            n_steps=10,
+            patch_size=3,
+            nonlin='rectify'):
+    """
+    Simple continuous brush stroke with recurrence
+    """
+    def init_method():
+        return init.GlorotUniform(gain='relu')
+    if type(nb_fc_units) != list:
+        nb_units = [nb_fc_units] * nb_fc_layers
+    if type(nb_recurrent_units) != list:
+        nb_recurrent_units = [nb_recurrent_units] * nb_recurrent_layers
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_hid = l_in
+    nonlin = get_nonlinearity[nonlin]
+    hids = []
+    for i in range(nb_fc_layers):
+        l_hid = layers.DenseLayer(
+            l_hid, nb_units[i],
+            W=init_method(),
+            nonlinearity=nonlin,
+            name="hid{}".format(i + 1))
+        hids.append(l_hid)
+    l_hid = Repeat(l_hid, n_steps)
+    for i in range(nb_recurrent_layers):
+        l_hid = layers.RecurrentLayer(l_hid, nb_recurrent_units[i])
+    l_coord = layers.RecurrentLayer(l_hid, 5, name="coord")
+    l_hid = layers.ReshapeLayer(l_coord, ([0], n_steps, 5), name="hid3")
+    l_brush = BrushLayer(
+        l_hid,
+        w, h,
+        n_steps=n_steps,
+        patch=np.ones((patch_size, patch_size)),
+        name="brush")
+    l_out = layers.ReshapeLayer(l_brush, ([0], c, w, h), name="output")
+    l_out = layers.NonlinearityLayer(
+        l_out,
+        nonlinearity=linear,
+        name="output")
+    return layers_from_list_to_dict([l_in]+ hids + [l_coord, l_brush, l_out])
 
 
 build_convnet_simple = model1

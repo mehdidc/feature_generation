@@ -228,14 +228,14 @@ class BrushLayer(lasagne.layers.Layer):
             def norm(x):
                 return (x - x.min()) / (x.max() - x.min() + 1e-12)
 
-            #gx = norm(gx) * w
-            #gy = norm(gy) * h
-            #sx = norm(sx) * w
-            #sy = norm(sy) * h
-            gx = T.exp(gx)
-            gy = T.exp(gy)
-            sx = T.exp(sx)
-            sy = T.exp(sy)
+            gx = norm(gx) * w
+            gy = norm(gy) * h
+            sx = norm(sx) * w
+            sy = norm(sy) * h
+            #gx = T.exp(gx)
+            #gy = T.exp(gy)
+            #sx = T.exp(sx)
+            #sy = T.exp(sy)
             sigma = T.exp(log_sigma)
 
             a, _ = np.indices((w, pw))
@@ -255,18 +255,21 @@ class BrushLayer(lasagne.layers.Layer):
             a_ = a.dimshuffle('x', 0, 1)
             ux_ = ux.dimshuffle(0, 1, 'x')
             sigma_ = sigma.dimshuffle(0, 'x', 'x')
-            Fx = T.exp(-(a_ - ux_) ** 2 / (2 * sigma_ ** 2))
+            Fx = T.exp(-(a_ - ux_) ** 2 / (2 * sigma_ ** 2))#+ 1e-12
             eps = 1e-8
             # that is,  ...(1, pw, w) - (nb_examples, pw, 1) / ... (nb_examples, 1, 1)
             # shape of Fx : (nb_examples, pw, w)
+
             Fx = Fx / (Fx.sum(axis=2, keepdims=True) + eps)
+
+            #Fx = theano.printing.Print('this is a very important value')(Fx)
 
             uy = gy.dimshuffle(0, 'x') + (T.arange(1, ph + 1) - ph/2. - 0.5) * sy.dimshuffle(0, 'x')
             # shape of uy : (nb_examples, ph)
             b_ = b.dimshuffle('x', 0, 1)
             uy_ = uy.dimshuffle(0, 1, 'x')
             sigma_ = sigma.dimshuffle(0, 'x', 'x')
-            Fy = T.exp(-(b_ - uy_) ** 2 / (2 * sigma_ ** 2))
+            Fy = T.exp(-(b_ - uy_) ** 2 / (2 * sigma_ ** 2)) + 1e-12
             # that is,  ...(1, ph, h) - (nb_examples, ph, 1) / ... (nb_examples, 1, 1)
             # shape of Fy : (nb_examples, ph, h)
             Fy = Fy / (Fy.sum(axis=2, keepdims=True) + eps)
@@ -318,6 +321,20 @@ def recurrent_accumulation(X, apply_func, reduce_func,
                                   n_steps=n_steps,
                                   **scan_kwargs)
     return result, updates
+
+class Repeat(lasagne.layers.Layer):
+    def __init__(self, incoming, n, **kwargs):
+        super(Repeat, self).__init__(incoming, **kwargs)
+        self.n = n
+
+    def get_output_shape_for(self, input_shape):
+        return tuple([input_shape[0], self.n] + list(input_shape[1:]))
+
+    def get_output_for(self, input, **kwargs):
+        tensors = [input]*self.n
+        stacked = theano.tensor.stack(*tensors)
+        dim = [1, 0] + range(2, input.ndim + 1)
+        return stacked.dimshuffle(dim)
 
 if __name__ == '__main__':
     from lasagne import layers

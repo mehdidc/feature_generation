@@ -2070,14 +2070,13 @@ def jobset37():
             budget_hours=8,
             model_name='model76',
             dataset='digits',
-            jobset_name="jobset37",
         )
         return params
 
     def to_skopt(params):
         m = params['model_params']
         nb_filters = [m['nb_filters']] + [5] * (6 - len(m['nb_filters']))
-        p = m['nb_layers'] + nb_filters + [m['filter_size'], m['nonlin']]
+        p = [m['nb_layers']] + nb_filters + [m['filter_size'], m['nonlin']]
         return p
 
     inputs_ = map(to_skopt, inputs)
@@ -2092,7 +2091,7 @@ def jobset37():
     budget_hours = params_next['budget_hours']
     model_name = params_next['model_name']
     dataset = params_next['dataset']
-    jobset_name = "jobset34"
+    jobset_name = "jobset37"
     cmd = build_cmd(model_name=model_name,
                     dataset=dataset,
                     params=params_next,
