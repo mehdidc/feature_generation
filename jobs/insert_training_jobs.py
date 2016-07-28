@@ -1947,7 +1947,7 @@ def jobset35():
         nb_filters=nb_filters,
         filter_size=rng.choice((3, 5)),
         use_channel=rng.choice((True, False)),
-        use_spatial=rng.choice((True, False)),
+        use_spatial=True,
         spatial_k=rng.randint(1, 10),
         channel_stride=rng.choice((1, 2, 4)),
         weight_sharing=rng.choice((True, False)),
