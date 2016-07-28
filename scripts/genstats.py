@@ -165,13 +165,21 @@ def construct_data(job_folder, hash_matrix, transform=lambda x:x):
     return X
 
 def compute_training_stats(folder, ref_job):
-    filename = "jobs/results/{}/csv/stats.csv".format(ref_job)
+    from tasks import load_
+    filename = "jobs/results/{}/model.pkl".format(ref_job)
+    logger.info('loading {}'.format(filename))
     if not os.path.exists(filename):
         return {}
-    df = pd.read_csv(filename)
-    df = df.iloc[-1]
-    logger.info(df)
-    return df.to_dict()
+    _, info = load_(filename)
+    logger.info('loaded {}'.format(filename))
+    stats = info['stats']
+    stats_dict = {}
+    keys = stats[0].keys()
+    for k in keys:
+        stats_dict[k] = [s[k] for s in stats if k in s]
+        stats_dict[k] = stats_dict[k][-1]
+    return {'training': stats_dict}
+
 
 def compute_modelness(job_folder, hash_matrix, model_path):
     import pickle

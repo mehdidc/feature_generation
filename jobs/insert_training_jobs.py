@@ -1840,7 +1840,6 @@ def jobset33():
 
 # hyperopt loop for model64
 
-
 def jobset34():
     model = 'model64'
     crit = 'knn_classification_accuracy'
@@ -2025,6 +2024,21 @@ def jobset36():
 
 
 def jobset37():
+
+    values = db.get_values('stats.training.test_recons_error', where='jobset37')
+    inputs = [v['job']['content'] for v in values]
+    outputs = [v['stats.training.test_recons_error'] for v in values]
+
+    space_skopt = [
+        (1, 7),#nb_layers
+        (5, 9),
+        (5, 9),
+        (5, 9),
+        (5, 9),
+        (5, 9),
+        (5, 9)
+    ]
+
     # discrete brush stroke hyper-search
     rng = random
     nb_layers = rng.randint(1, 7)
@@ -2061,7 +2075,7 @@ def jobset37():
                     dataset=dataset,
                     params=params,
                     budget_hours=budget_hours)
-    nb = job_write(params, cmd, where=jobset_name)
+    #nb = job_write(params, cmd, where=jobset_name)
     return nb
 
 
