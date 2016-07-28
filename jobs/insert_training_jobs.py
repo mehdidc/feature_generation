@@ -2,7 +2,7 @@ import json
 from collections import OrderedDict
 from lightjob.utils import summarize
 from lightjob.db import SUCCESS
-from hp import get_next_skopt
+from hp import get_next_skopt, Categorical
 
 import numpy as np
 import random
@@ -2024,58 +2024,80 @@ def jobset36():
 
 
 def jobset37():
+    # discrete brush stroke hyper-search
 
     values = db.get_values('stats.training.test_recons_error', where='jobset37')
     inputs = [v['job']['content'] for v in values]
     outputs = [v['stats.training.test_recons_error'] for v in values]
 
     space_skopt = [
-        (1, 7),#nb_layers
-        (5, 9),
-        (5, 9),
-        (5, 9),
-        (5, 9),
-        (5, 9),
-        (5, 9)
+        (1, 7),  # nb_layers
+        (5, 9),  # nb_filters1 expo
+        (5, 9),  # nb_filters2 expo
+        (5, 9),  # nb_filters2 expo
+        (5, 9),  # nb_filters3 expo
+        (5, 9),  # nb_filters4 expo
+        (5, 9),  # nb_filters5 expo
+        (5, 9),  # nb_filters6 expo
+        Categorical([3, 5]),  # filter_size
+        Categorical(['rectify', 'very_leaky_rectify']),
     ]
 
-    # discrete brush stroke hyper-search
-    rng = random
-    nb_layers = rng.randint(1, 7)
-    nb_filters = [2 ** rng.randint(5, 9) for _ in range(nb_layers)]
-    model_params = OrderedDict(
-        nb_layers=nb_layers,
-        nb_filters=nb_filters,
-        filter_size=rng.choice((3, 5)),
-        nonlin=rng.choice(('rectify', 'very_leaky_rectify'))
-    )
-    params = OrderedDict(
-        model_params=model_params,
-        denoise=None,
-        noise=None,
-        walkback=1,
-        walkback_mode='bengio_without_sampling',
-        autoencoding_loss='squared_error',
-        mode='random',
-        contractive=False,
-        contractive_coef=None,
-        marginalized=False,
-        binarize_thresh=None
-    )
-    budget_hours = 8
-    model_name = 'model76'
-    dataset = 'digits'
-    jobset_name = "jobset37"
+    def from_skopt(params):
+        nb_layers = params[0]
+        nb_filters = params[1:7]
+        nb_filters = map(lambda x: 2**x, nb_filters)
+        filter_size = params[7]
+        nonlin = params[8]
+        model_params = OrderedDict(
+            nb_layers=nb_layers,
+            nb_filters=nb_filters,
+            filter_size=filter_size,
+            nonlin=nonlin
+        )
+        params = OrderedDict(
+            model_params=model_params,
+            denoise=None,
+            noise=None,
+            walkback=1,
+            walkback_mode='bengio_without_sampling',
+            autoencoding_loss='squared_error',
+            mode='random',
+            contractive=False,
+            contractive_coef=None,
+            marginalized=False,
+            binarize_thresh=None,
+            budget_hours=8,
+            model_name='model76',
+            dataset='digits',
+            jobset_name="jobset37",
+        )
+        return params
 
-    params['model_name'] = model_name
-    params['dataset'] = 'digits'
-    params['budget_hours'] = budget_hours
+    def to_skopt(params):
+        m = params['model_params']
+        nb_filters = [m['nb_filters']] + [5] * (6 - len(m['nb_filters']))
+        p = m['nb_layers'] + nb_filters + [m['filter_size'], m['nonlin']]
+        return p
 
+    inputs_ = map(to_skopt, inputs)
+    seed = np.random.randint(0, 99999999)
+    rng = np.random.RandomState(seed)
+    hp_next = get_next_skopt(
+        inputs_,
+        outputs,
+        space_skopt,
+        rstate=rng)
+    params_next = from_skopt(hp_next)
+    budget_hours = params_next['budget_hours']
+    model_name = params_next['model_name']
+    dataset = params_next['dataset']
+    jobset_name = "jobset34"
     cmd = build_cmd(model_name=model_name,
                     dataset=dataset,
-                    params=params,
+                    params=params_next,
                     budget_hours=budget_hours)
-    #nb = job_write(params, cmd, where=jobset_name)
+    #nb = job_write(params_next, cmd, where=jobset_name)
     return nb
 
 
