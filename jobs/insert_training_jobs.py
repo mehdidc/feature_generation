@@ -2100,6 +2100,53 @@ def jobset37():
     return nb
 
 
+def jobset38():
+    # Continuous brush stroke with recurrent layers hyper-search
+    rng = random
+    nb_fc_layers = rng.randint(1, 4)
+    nb_fc_units = [rng.randint(1, 20) * 100 for l in range(nb_fc_layers)]
+    nb_recurrent_layers = rng.randint(1, 3)
+    nb_recurrent_units = [rng.randint(1, 5) * 100 for l in range(nb_recurrent_layers)]
+
+    model_params = OrderedDict(
+        nb_fc_layers=nb_fc_layers,
+        nb_fc_units=nb_fc_units,
+        nb_recurrent_layers=nb_recurrent_layers,
+        nb_recurrent_units=nb_recurrent_units,
+        n_steps=rng.randint(1, 64),
+        patch_size=rng.randint(1, 6),
+        nonlin=rng.choice(('rectify', 'very_leaky_rectify'))
+    )
+    params = OrderedDict(
+        model_params=model_params,
+        denoise=None,
+        noise=None,
+        walkback=1,
+        walkback_mode='bengio_without_sampling',
+        autoencoding_loss='squared_error',
+        mode='random',
+        contractive=False,
+        contractive_coef=None,
+        marginalized=False,
+        binarize_thresh=None
+    )
+    budget_hours = 10
+    model_name = 'model77'
+    dataset = 'digits'
+    jobset_name = "jobset38"
+
+    params['model_name'] = model_name
+    params['dataset'] = 'digits'
+    params['budget_hours'] = budget_hours
+
+    cmd = build_cmd(model_name=model_name,
+                    dataset=dataset,
+                    params=params,
+                    budget_hours=budget_hours)
+    nb = job_write(params, cmd, where=jobset_name)
+    return nb
+
+
 @click.command()
 @click.option('--where', default='', help='jobset name', required=False)
 @click.option('--nb', default=1, help='nb of repetitions', required=False)

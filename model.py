@@ -4429,7 +4429,7 @@ def model77(w=32, h=32, c=1,
     def init_method():
         return init.GlorotUniform(gain='relu')
     if type(nb_fc_units) != list:
-        nb_units = [nb_fc_units] * nb_fc_layers
+        nb_fc_units = [nb_fc_units] * nb_fc_layers
     if type(nb_recurrent_units) != list:
         nb_recurrent_units = [nb_recurrent_units] * nb_recurrent_layers
     l_in = layers.InputLayer((None, c, w, h), name="input")
@@ -4438,15 +4438,15 @@ def model77(w=32, h=32, c=1,
     hids = []
     for i in range(nb_fc_layers):
         l_hid = layers.DenseLayer(
-            l_hid, nb_units[i],
+            l_hid, nb_fc_units[i],
             W=init_method(),
             nonlinearity=nonlin,
             name="hid{}".format(i + 1))
         hids.append(l_hid)
     l_hid = Repeat(l_hid, n_steps)
     for i in range(nb_recurrent_layers):
-        l_hid = layers.RecurrentLayer(l_hid, nb_recurrent_units[i])
-    l_coord = layers.RecurrentLayer(l_hid, 5, name="coord")
+        l_hid = layers.GRULayer(l_hid, nb_recurrent_units[i])
+    l_coord = layers.GRULayer(l_hid, 5, name="coord")
     l_hid = layers.ReshapeLayer(l_coord, ([0], n_steps, 5), name="hid3")
     l_brush = BrushLayer(
         l_hid,
