@@ -4128,7 +4128,7 @@ def model73(nb_filters=64, w=32, h=32, c=1,
             l = layers.NonlinearityLayer(
                 l, (wta_spatial
                     if spatial_k[idx] == 1
-                    else wta_k_spatial(k=spatial_k[idx])),
+                    else wta_k_spatial(spatial_k[idx])),
                 name="wta_spatial_{}".format(name))
             sparse_layers.append(l)
         if use_channel:
@@ -4229,7 +4229,7 @@ def model74(nb_filters=64, w=32, h=32, c=1,
             l = layers.NonlinearityLayer(
                 l, (wta_spatial
                     if spatial_k[idx] == 1
-                    else wta_k_spatial(k=spatial_k[idx])),
+                    else wta_k_spatial(spatial_k[idx])),
                 name="wta_spatial_{}".format(name))
             sparse_layers.append(l)
         if use_channel:
@@ -4313,7 +4313,6 @@ def model75(w=32, h=32, c=1,
     if type(nb_units) != list:
         nb_units = [nb_units] * nb_layers
     l_in = layers.InputLayer((None, c, w, h), name="input")
-    #l_hid = layers.ExpressionLayer(l_in, lambda x:x*2-1)
     l_hid = l_in
     nonlin = get_nonlinearity[nonlin]
     hids = []
@@ -4323,15 +4322,15 @@ def model75(w=32, h=32, c=1,
             W=init_method(),
             nonlinearity=nonlin,
             name="hid{}".format(i + 1))
+        #l_hid = batch_norm(l_hid)
         hids.append(l_hid)
-    l_hid = batch_norm(l_hid)
     l_coord = layers.DenseLayer(
         l_hid,
         n_steps * 5,
         nonlinearity=linear,
         W=init.GlorotUniform(),
-        #W=init.Normal(0.001),
         name="coord")
+    #l_coord = batch_norm(l_coord)
     l_hid = layers.ReshapeLayer(l_coord, ([0], n_steps, 5), name="hid3")
     l_brush = BrushLayer(
         l_hid,
@@ -4345,6 +4344,74 @@ def model75(w=32, h=32, c=1,
         nonlinearity=linear,
         name="output")
     return layers_from_list_to_dict([l_in]+ hids + [l_coord, l_brush, l_out])
+
+
+def model76(c=1, w=28, h=28, nb_layers=3, nb_filters=128, filter_size=5, patch_size=5, nonlin='rectify'):
+    """
+    discritized brush stroke parametrized version
+    """
+    if type(nb_filters) != list:
+        nb_filters = [nb_filters] * nb_layers
+    if type(filter_size) != list:
+        filter_size = [filter_size] * nb_layers
+    nonlin = get_nonlinearity[nonlin]
+
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_convs = []
+    l_conv = l_in
+    for i in range(nb_layers):
+        l_conv = layers.Conv2DLayer(
+            l_conv,
+            num_filters=nb_filters[i],
+            filter_size=(filter_size[i], filter_size[i]),
+            nonlinearity=nonlin,
+            W=init.GlorotUniform(),
+            pad=(filter_size[i] - 1) / 2,
+            name="conv{}".format(i + 1))
+        l_convs.append(l_conv)
+    l_wta_spatial = layers.NonlinearityLayer(
+        l_conv,
+        wta_spatial,
+        name="wta_spatial")
+    size = patch_size
+    W = np.zeros((nb_filters[-1], nb_filters[-1], c, size, size))
+    i = np.arange(nb_filters[-1])
+    W[i, i, :, :, :] = 1./(size*size)
+    W = W.reshape((nb_filters[-1], nb_filters[-1] * c, size, size))
+    W = W.astype(np.float32)
+    l_unconv = l_wta_spatial
+    l_unconv = layers.Conv2DLayer(
+        l_unconv,
+        num_filters=nb_filters[-1] * c,
+        filter_size=(size, size),
+        nonlinearity=linear,
+        W = W,  # square brush
+        b=init.Constant(0),
+        pad=(size - 1) / 2,
+        name='unconv')
+    print(l_unconv.output_shape)
+    l_unconv.params[l_unconv.W].remove('trainable')
+    l_unconv.params[l_unconv.b].remove('trainable')
+    l_wta_channel = layers.NonlinearityLayer(
+        l_unconv,
+        wta_channel,
+        name='wta_channel')
+
+    def fn(x):
+        x = x.reshape((x.shape[0], c, nb_filters[-1], x.shape[2], x.shape[3]))
+        return x.sum(axis=2)
+    l_out = layers.ExpressionLayer(
+        l_wta_channel,
+        fn
+    )
+    l_out = layers.NonlinearityLayer(
+        l_out,
+        linear, name="output")
+    all_layers = (
+        [l_in] +
+        l_convs +
+        [l_unconv, l_wta_spatial, l_wta_channel, l_out])
+    return layers_from_list_to_dict(all_layers)
 
 
 build_convnet_simple = model1

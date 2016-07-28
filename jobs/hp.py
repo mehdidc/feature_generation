@@ -1,6 +1,11 @@
+from collections import Iterable, Mapping
 from hyperopt import hp, Trials
 from hyperopt import fmin, tpe, rand
-
+from hyperopt.pyll.stochastic import sample
+from skopt.space import Categorical, Dimension
+import numpy as np
+from collections import OrderedDict
+from skopt import gp_minimize, forest_minimize
 
 def linearize_dict(d):
     return linearize_('', d, [])
@@ -8,23 +13,22 @@ def linearize_dict(d):
 
 def linearize_(k, v, path):
     if not isinstance(v, dict):
-        return {'_'.join(path): v}
+        return {'.'.join(path): v}
     res = {}
     for klocal, vlocal in v.items():
         res.update(linearize_(klocal, vlocal, path + [klocal]))
     return res
 
-
-def delinearize_dict(d):
-    d_out = {}
+def delinearize_dict(d, t=OrderedDict):
+    d_out = t()
     for k, v in d.items():
         d_out_ = d_out
-        for s in k.split('_'):
-            d_out_[s] = {}
+        for s in k.split('.'):
+            d_out_[s] = t()
             d_out_ = d_out_[s]
     for k, v in d.items():
         d_out_ = d_out
-        path = k.split('_')
+        path = k.split('.')
         for s in path[0:-1]:
             d_out_ = d_out_[s]
         d_out_[path[-1]] = v
@@ -81,12 +85,10 @@ def get_next_hyperopt(inputs, outputs, space,
 def get_from_trials(trials, name):
     return [t[name] for t in trials.trials]
 
-
-if __name__ == '__main__':
+def main():
     import numpy as np
     inputs = []
     space = {'x': hp.uniform('x', 0, 1)}
-
     trials = Trials()
     def fn(s):
         return s['x']
@@ -96,7 +98,6 @@ if __name__ == '__main__':
     rng = np.random.RandomState(5)
     fmin(fn, space, algo=tpe.suggest, max_evals=3, rstate=rng, trials=trials)
     print(get_from_trials(trials, 'result'))
-    sys.exit(0)
     outputs = []
     for i in range(10):
         rng = np.random.RandomState(123)
@@ -105,3 +106,86 @@ if __name__ == '__main__':
         inputs.append(next_hp)
         outputs.append((next_hp['x'] - 2) ** 2)
         print(next_hp)
+
+def encode_dict(x, structure=None, accept_val=lambda x:True):
+    if structure is None:
+        x = linearize_dict(x)
+        vals = x.values()
+        return vals
+    else:
+        structure_lin = linearize_dict(structure)
+        x = linearize_dict(x)
+        structure_lin = recur_update(structure_lin, x, accept_val=accept_val)
+        vals = structure_lin.values()
+        return vals
+
+def recur_update(d, u, accept_val=lambda v:True):
+    d = d.copy()
+    for k, v in u.iteritems():
+        if isinstance(v, Mapping):
+            if k in d:
+                if accept_val(d[k]):
+                    r = recur_update(d.get(k, {}), v)
+                    d[k] = r
+                else:
+                    del d[k]
+        else:
+            if k in d:
+                if accept_val(d[k]):
+                    d[k] = u[k]
+                else:
+                    del d[k]
+    return d
+
+def decode_dict(x, structure=None, accept_val=lambda v:True):
+    if structure is None:
+        x = delinearize_dict(x)
+    else:
+        structure_lin = linearize_dict(structure)
+        for (k, _), v in zip(structure_lin.items(), x):
+            structure_lin[k] = v
+        print(structure_lin)
+        x = structure_lin
+        x = delinearize_dict(x)
+        x = recur_update(structure, x, accept_val=accept_val)
+
+    return x
+
+
+class Identity:
+    """Identity transform."""
+
+    def fit(self, X):
+        return self
+
+    def transform(self, X):
+        return X
+
+    def inverse_transform(self, Xt):
+        return Xt
+
+class Constant(Dimension):
+
+    def __init__(self, val):
+        self.val = val
+
+    def rvs(self, n_samples=1, random_state=None):
+        return [self.val] * n_samples
+
+def get_next_skopt(inputs, outputs, space, rstate=None):
+    def func(x):
+        func.x = x
+        return 1
+    res = gp_minimize(func, space, n_calls=1, n_random_starts=0, x0=inputs, y0=outputs, random_state=rstate)
+    return func.x
+
+if __name__ == '__main__':
+    from skopt import dummy_minimize, gp_minimize
+    space = [
+        Choice( [Constant(None),  Categorical(['a', 'b']) ] )
+    ]
+    def func(x):
+
+        return x[0]
+    res = gp_minimize(func, space)
+    print(res)

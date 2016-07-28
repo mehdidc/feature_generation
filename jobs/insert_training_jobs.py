@@ -2,7 +2,7 @@ import json
 from collections import OrderedDict
 from lightjob.utils import summarize
 from lightjob.db import SUCCESS
-from hp import get_next_hyperopt
+from hp import get_next_hyperopt, encode_dict, decode_dict, get_next_skopt, Categorical
 from hyperopt import hp
 
 import numpy as np
@@ -1843,11 +1843,15 @@ def jobset33():
 
 
 def jobset34():
-    crit = 'knn_classification_accuracy'
     model = 'model64'
+    crit = 'knn_classification_accuracy'
+
+    def get_crit(j):
+        # minus because we want to maximize
+        return -float(np.min(j[crit].values()))
 
     def filter_func(job):
-        if job['stats'] != SUCCESS:
+        if job['state'] != SUCCESS:
             return False
         if 'stats' not in job:
             return False
@@ -1856,50 +1860,80 @@ def jobset34():
         if job['content']['model_name'] != model:
             return False
         return True
-    jobs = db.jobs_filter(filter_func)
+    jobs = db.jobs_filter(filter_func, where='jobset34')
     inputs = [j['content'] for j in jobs]
-    outputs = [j['stats'][crit] for j in jobs]
+    outputs = [get_crit(j['stats']) for j in jobs]
     print('len of prior params : {}'.format(len(inputs)))
 
-    model_params_space = OrderedDict(
-        use_wta_sparse=hp.choice('use_wta_sparse', (True, False)),
-        wta_sparse_perc=hp.uniform('wta_sparse_perc', 0, 1),
-        nb_layers=1 + hp.randint('nb_layers', 5),
-        nb_hidden_units=100 + hp.randint('nb_hidden_units', 2000))
-    space = OrderedDict(
-        model_params=model_params_space,
-        denoise=hp.choice('denoise', (hp.uniform('denoise_pr', 0, 1), None)),
-        noise=hp.choice('noise', ('zero_masking', 'salt_and_pepper')),
-        walkback=1 + hp.randint('walkback', 5),
-        walkback_mode='bengio_without_sampling',
-        autoencoding_loss='squared_error',
-        mode='minibatch',
-        contractive=False,
-        contractive_coef=None,
-        marginalized=False,
-        binarize_thresh=hp.choice('binarize_thresh', (None, 0.5)),
-        eval_stats=[crit],
-        model_name='model64',
-        dataset='digits',
-        budget_hours=4
-    )
+    space_skopt = [
+        Categorical([True, False]),  # use_wta_sparse
+        [0., 1.],  # use_wta_sparse_perc
+        [1, 5],  # nb_layers
+        [100, 2100],  # nb_hidden_units
+        [0., 1.],  # denoise
+        Categorical([True, False]),  # denoise_activated
+        ['zero_masking', 'salt_and_pepper'],
+        [1, 5],  # walkback
+        Categorical([None, 0.5])  # binarize_thresh
+    ]
+
+    def to_skopt(params):
+        return [
+            params['model_params']['use_wta_sparse'],
+            params['model_params']['wta_sparse_perc'],
+            params['model_params']['nb_layers'],
+            params['model_params']['nb_hidden_units'],
+            params['denoise'] if params['denoise'] is not None else 0,
+            params['denoise'] is not None,  # whether denoise activated
+            params['noise'],
+            params['walkback'],
+            params['binarize_thresh']
+        ]
+
+    def from_skopt(params):
+
+        model_params = OrderedDict(
+            use_wta_sparse=params[0],
+            wta_sparse_perc=params[1],
+            nb_layers=params[2],
+            nb_hidden_units=params[3]
+        )
+        params = OrderedDict(
+            model_params=model_params,
+            denoise=(params[4] if params[5] else None),
+            noise=params[6],
+            walkback=params[7],
+            walkback_mode='bengio_without_sampling',
+            autoencoding_loss='squared_error',
+            mode='minibatch',
+            contractive=False,
+            contractive_coef=None,
+            marginalized=False,
+            binarize_thresh=params[8],
+            model_name='model64',
+            dataset='digits',
+            budget_hours=4,
+        )
+        return params
+
+    inputs_ = map(to_skopt, inputs)
     seed = np.random.randint(0, 99999999)
     rng = np.random.RandomState(seed)
-    params = get_next_hyperopt(
-        inputs,
+    hp_next = get_next_skopt(
+        inputs_,
         outputs,
-        space,
-        algo='rand',
+        space_skopt,
         rstate=rng)
-    budget_hours = 4
-    model_name = 'model64'
-    dataset = 'digits'
+    params_next = from_skopt(hp_next)
+    budget_hours = params_next['budget_hours']
+    model_name = params_next['model_name']
+    dataset = params_next['dataset']
     jobset_name = "jobset34"
     cmd = build_cmd(model_name=model_name,
                     dataset=dataset,
-                    params=params,
+                    params=params_next,
                     budget_hours=budget_hours)
-    nb = job_write(params, cmd, where=jobset_name)
+    nb = job_write(params_next, cmd, where=jobset_name)
     return nb
 
 
@@ -1976,6 +2010,46 @@ def jobset36():
     model_name = 'model75'
     dataset = 'digits'
     jobset_name = "jobset36"
+
+    params['model_name'] = model_name
+    params['dataset'] = 'digits'
+    params['budget_hours'] = budget_hours
+
+    cmd = build_cmd(model_name=model_name,
+                    dataset=dataset,
+                    params=params,
+                    budget_hours=budget_hours)
+    nb = job_write(params, cmd, where=jobset_name)
+    return nb
+
+
+def jobset37():
+    rng = random
+    nb_layers = rng.randint(1, 7)
+    nb_filters = [2 ** rng.randint(5, 9) for _ in range(nb_layers)]
+    model_params = OrderedDict(
+        nb_layers=nb_layers,
+        nb_filters=nb_filters,
+        filter_size=rng.choice((3, 5)),
+        nonlin=rng.choice(('rectify', 'very_leaky_rectify'))
+    )
+    params = OrderedDict(
+        model_params=model_params,
+        denoise=None,
+        noise=None,
+        walkback=1,
+        walkback_mode='bengio_without_sampling',
+        autoencoding_loss='squared_error',
+        mode='random',
+        contractive=False,
+        contractive_coef=None,
+        marginalized=False,
+        binarize_thresh=None
+    )
+    budget_hours = 8
+    model_name = 'model76'
+    dataset = 'digits'
+    jobset_name = "jobset37"
 
     params['model_name'] = model_name
     params['dataset'] = 'digits'

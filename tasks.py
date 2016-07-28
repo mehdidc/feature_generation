@@ -122,7 +122,6 @@ def train(dataset=None,
     model_params = params.get("model_params", {})
     #nb_filters = model_params.get("nb_filters", 128)
     kw_builder = dict(
-        #nb_filters=nb_filters,
         w=w, h=h, c=c
     )
     kw_builder.update(model_params)

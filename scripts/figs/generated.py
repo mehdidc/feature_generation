@@ -8,6 +8,19 @@ from skimage.io import imread
 import json
 from collections import OrderedDict
 
+import sys
+
+def mkdir_path(path):
+    if not os.access(path, os.F_OK):
+        os.makedirs(path)
+
+
+if len(sys.argv) == 2 and sys.argv[1] == 'per_jobset':
+    per_jobset = True
+else:
+    per_jobset = False
+
+
 
 db = load_db()
 
@@ -29,6 +42,11 @@ for j in tqdm(J):
     plt.imshow(img, interpolation='none', cmap='gray')
     plt.axis('off')
     plt.title(jref_s, fontsize=8)
-    plt.savefig('figs/generated/{}.png'.format(id_))
+    if per_jobset is False:
+        plt.savefig('figs/generated/{}.png'.format(id_))
+    else:
+        where = jref['where']
+        mkdir_path('figs/generated/{}'.format(where))
+        plt.savefig('figs/generated/{}/{}.png'.format(where, id_))
     fig.tight_layout()
     plt.close(fig)
