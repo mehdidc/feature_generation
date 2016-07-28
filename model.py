@@ -4459,7 +4459,8 @@ def model77(w=32, h=32, c=1,
         l_out,
         nonlinearity=linear,
         name="output")
-    return layers_from_list_to_dict([l_in]+ hids + [l_coord, l_brush, l_out])
+    all_layers = [l_in] + hids + [l_coord, l_brush, l_out]
+    return layers_from_list_to_dict(all_layers)
 
 
 build_convnet_simple = model1
