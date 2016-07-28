@@ -1884,7 +1884,7 @@ def jobset34():
             params['model_params']['nb_layers'],
             params['model_params']['nb_hidden_units'],
             params['denoise'] if params['denoise'] is not None else 0,
-            params['denoise'] is not None,  # whether denoise activated
+            params['denoise'] is not None, #whether denoise is activated or not
             params['noise'],
             params['walkback'],
             params['binarize_thresh']
@@ -1938,6 +1938,7 @@ def jobset34():
 
 
 def jobset35():
+    # vertebrate convnet hyperopt search
     rng = random
     nb_layers = rng.randint(1, 7)
     nb_filters = [2 ** rng.randint(5, 9) for _ in range(nb_layers)]
@@ -1983,6 +1984,7 @@ def jobset35():
 
 
 def jobset36():
+    # Continuous brush stroke hyper-search
     rng = random
     nb_layers = rng.randint(1, 7)
     nb_units = [rng.randint(1, 20) * 100 for l in range(nb_layers)]
@@ -2024,6 +2026,7 @@ def jobset36():
 
 
 def jobset37():
+    # discrete brush stroke hyper-search
     rng = random
     nb_layers = rng.randint(1, 7)
     nb_filters = [2 ** rng.randint(5, 9) for _ in range(nb_layers)]
