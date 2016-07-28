@@ -1,2 +1,0 @@
-#!/bin/sh
-rm features/* rm recons/* features_combined/* out/* -f
