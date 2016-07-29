@@ -2024,9 +2024,11 @@ def jobset36():
 
 
 def jobset37():
+    import math
     # discrete brush stroke hyper-search
 
     values = db.get_values('stats.training.test_recons_error', where='jobset37')
+    values = list(values)
     inputs = [v['job']['content'] for v in values]
     outputs = [v['stats.training.test_recons_error'] for v in values]
 
@@ -2034,21 +2036,22 @@ def jobset37():
         (1, 7),  # nb_layers
         (5, 9),  # nb_filters1 expo
         (5, 9),  # nb_filters2 expo
-        (5, 9),  # nb_filters2 expo
         (5, 9),  # nb_filters3 expo
         (5, 9),  # nb_filters4 expo
         (5, 9),  # nb_filters5 expo
         (5, 9),  # nb_filters6 expo
+        (5, 9),  # nb_filters7 expo
         Categorical([3, 5]),  # filter_size
         Categorical(['rectify', 'very_leaky_rectify']),
     ]
 
     def from_skopt(params):
         nb_layers = params[0]
-        nb_filters = params[1:7]
+        nb_filters = params[1:8]
         nb_filters = map(lambda x: 2**x, nb_filters)
-        filter_size = params[7]
-        nonlin = params[8]
+        nb_filters = nb_filters[0:nb_layers]
+        filter_size = params[8]
+        nonlin = params[9]
         model_params = OrderedDict(
             nb_layers=nb_layers,
             nb_filters=nb_filters,
@@ -2075,7 +2078,8 @@ def jobset37():
 
     def to_skopt(params):
         m = params['model_params']
-        nb_filters = [m['nb_filters']] + [5] * (6 - len(m['nb_filters']))
+        nb_filters = m['nb_filters'] + [5] * (7 - len(m['nb_filters']))
+        nb_filters = map(lambda x:int(math.log(x, 2)), nb_filters)
         p = [m['nb_layers']] + nb_filters + [m['filter_size'], m['nonlin']]
         return p
 
@@ -2096,7 +2100,7 @@ def jobset37():
                     dataset=dataset,
                     params=params_next,
                     budget_hours=budget_hours)
-    #nb = job_write(params_next, cmd, where=jobset_name)
+    nb = job_write(params_next, cmd, where=jobset_name)
     return nb
 
 
