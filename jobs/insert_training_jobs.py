@@ -2100,7 +2100,7 @@ def jobset37():
     return nb
 
 
-def jobset38():
+def jobset38_(jobset_name, model_name):
     # Continuous brush stroke with recurrent layers hyper-search
     rng = random
     nb_fc_layers = rng.randint(1, 4)
@@ -2131,9 +2131,9 @@ def jobset38():
         binarize_thresh=None
     )
     budget_hours = 10
-    model_name = 'model77'
+    model_name = model_name
     dataset = 'digits'
-    jobset_name = "jobset38"
+    jobset_name = jobset_name
 
     params['model_name'] = model_name
     params['dataset'] = 'digits'
@@ -2145,6 +2145,14 @@ def jobset38():
                     budget_hours=budget_hours)
     nb = job_write(params, cmd, where=jobset_name)
     return nb
+
+
+def jobset38():
+    return jobset38_('jobset38', 'model77')
+
+
+def jobset39():
+    return jobset38_('jobset39', 'model78')
 
 
 @click.command()
