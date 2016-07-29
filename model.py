@@ -4462,6 +4462,55 @@ def model77(w=32, h=32, c=1,
     all_layers = [l_in] + hids + [l_coord, l_brush, l_out]
     return layers_from_list_to_dict(all_layers)
 
+def model78(w=32, h=32, c=1,
+            nb_fc_layers=3,
+            nb_recurrent_layers=1,
+            nb_recurrent_units=100,
+            nb_fc_units=1000,
+            n_steps=10,
+            patch_size=3,
+            nonlin='rectify'):
+    """
+    model77 but with sigmoid
+    """
+    def init_method():
+        return init.GlorotUniform(gain='relu')
+    if type(nb_fc_units) != list:
+        nb_fc_units = [nb_fc_units] * nb_fc_layers
+    if type(nb_recurrent_units) != list:
+        nb_recurrent_units = [nb_recurrent_units] * nb_recurrent_layers
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_hid = l_in
+    nonlin = get_nonlinearity[nonlin]
+    hids = []
+    for i in range(nb_fc_layers):
+        l_hid = layers.DenseLayer(
+            l_hid, nb_fc_units[i],
+            W=init_method(),
+            nonlinearity=nonlin,
+            name="hid{}".format(i + 1))
+        hids.append(l_hid)
+    l_hid = Repeat(l_hid, n_steps)
+    for i in range(nb_recurrent_layers):
+        l_hid = layers.GRULayer(l_hid, nb_recurrent_units[i])
+    l_coord = layers.GRULayer(l_hid, 5, name="coord")
+    l_hid = layers.ReshapeLayer(l_coord, ([0], n_steps, 5), name="hid3")
+    l_brush = BrushLayer(
+        l_hid,
+        w, h,
+        n_steps=n_steps,
+        patch=np.ones((patch_size, patch_size)),
+        name="brush")
+    l_out = layers.ReshapeLayer(l_brush, ([0], c, w, h), name="output")
+    l_out = layers.BiasLayer(l_out, b=init.Constant(-1.))
+    l_out = layers.NonlinearityLayer(
+        l_out,
+        nonlinearity=sigmoid,
+        name="output")
+    all_layers = [l_in] + hids + [l_coord, l_brush, l_out]
+    return layers_from_list_to_dict(all_layers)
+
+
 
 build_convnet_simple = model1
 build_convnet_simple_2 = model2

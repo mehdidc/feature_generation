@@ -33,6 +33,7 @@ def genstats(jobs, db, force=False, n_jobs=-1, filter_stats=None):
 
 
 def update_stats(job, stats, db):
+    print(stats)
     db.job_update(job["summary"], dict(stats=stats))
 
 
@@ -144,7 +145,7 @@ def compute_stats(job, force=False, filter_stats=None):
         stats['knn_classification_accuracy'] = compute_knn_classification_accuracy(folder, hash_matrix, ref_job)
     if should_compute('training', stats):
         logger.info('compute training stats')
-        stats.update(compute_training_stats(folder, ref_job))
+        stats['training'] = compute_training_stats(folder, ref_job)
     logger.info('Finished on {}, stats : {}'.format(s, stats))
     return stats
 
@@ -177,9 +178,8 @@ def compute_training_stats(folder, ref_job):
     keys = stats[0].keys()
     for k in keys:
         stats_dict[k] = [s[k] for s in stats if k in s]
-        stats_dict[k] = stats_dict[k][-1]
-    return {'training': stats_dict}
-
+        stats_dict[k] = float(stats_dict[k][-1])
+    return stats_dict
 
 def compute_modelness(job_folder, hash_matrix, model_path):
     import pickle
