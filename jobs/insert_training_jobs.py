@@ -2132,7 +2132,8 @@ def jobset38_(jobset_name, model_name):
         contractive=False,
         contractive_coef=None,
         marginalized=False,
-        binarize_thresh=None
+        binarize_thresh=None,
+        optimization=dict(max_nb_epochs=9999999999)
     )
     budget_hours = 10
     model_name = model_name
