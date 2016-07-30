@@ -13,6 +13,8 @@ import numpy as np
 from batch_norm import NormalizeLayer, ScaleAndShiftLayer, DecoderNormalizeLayer, DenoiseLayer, FakeLayer
 from lasagne.layers import batch_norm
 
+import theano
+
 get_nonlinearity = dict(
     linear=linear,
     sigmoid=sigmoid,
@@ -3419,7 +3421,7 @@ def model65(nb_filters=64, filter_size=3, w=32, h=32, c=1, down=2,
 
 def model66(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     """
-    my new architecture idea, based on model14 :
+    my new vertebrate architecture idea, based on model14 :
             conv1       - conv2         -  conv3
             sparseconv1 - sparseconv2   -  sparseconv3
             out1        - conv2_back1   -  conv3_back1
@@ -4012,7 +4014,7 @@ def model71(nb_filters=64, w=32, h=32, c=1, sparsity=True):
 
 def model72(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     """
-    square brush
+    Discritized brush stroke
     """
     if type(nb_filters) != list:
         nb_filters = [nb_filters] * 3
@@ -4462,6 +4464,7 @@ def model77(w=32, h=32, c=1,
     all_layers = [l_in] + hids + [l_coord, l_brush, l_out]
     return layers_from_list_to_dict(all_layers)
 
+
 def model78(w=32, h=32, c=1,
             nb_fc_layers=3,
             nb_recurrent_layers=1,
@@ -4510,6 +4513,120 @@ def model78(w=32, h=32, c=1,
     all_layers = [l_in] + hids + [l_coord, l_brush, l_out]
     return layers_from_list_to_dict(all_layers)
 
+
+def model79(nb_filters=64, w=32, h=32, c=1, sparsity=True):
+    """
+    vertebrate with parallel convs
+    """
+    if type(nb_filters) != list:
+        nb_filters = [nb_filters] * 3
+    sparse_layers = []
+
+    def sparse(l):
+        name = l.name
+        l = layers.NonlinearityLayer(
+            l, wta_spatial,
+            name="wta_spatial_{}".format(name))
+        sparse_layers.append(l)
+        l = layers.NonlinearityLayer(
+            l, wta_channel_strided(stride=4),
+            name="wta_channel_{}".format(name))
+        sparse_layers.append(l)
+        return l
+
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_conv1 = layers.Conv2DLayer(
+        l_in,
+        num_filters=nb_filters[0],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv1")
+    l_conv1_sparse = sparse(l_conv1)
+    l_conv2 = layers.Conv2DLayer(
+        l_conv1,
+        num_filters=nb_filters[1],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv2")
+    l_conv2_sparse = sparse(l_conv2)
+    l_conv3 = layers.Conv2DLayer(
+        l_conv2,
+        num_filters=nb_filters[2],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv3")
+    l_conv3_sparse = sparse(l_conv3)
+
+    l_conv3_back = l_conv3_sparse
+    for i in range(2):
+        shape = (l_conv3_back.output_shape[1], nb_filters[2 - i - 1], 5, 5)
+        W = init.GlorotUniform().sample(shape)
+        mask = np.zeros_like(W).astype(np.float32)
+        k = np.arange(W.shape[0])
+        mask[k, k, :, :] = 1
+        W = theano.shared(W)
+        W = W * mask
+        l_conv3_back = layers.Conv2DLayer(
+            l_conv3_back,
+            num_filters=nb_filters[2 - i - 1],
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=W,
+            pad='full'
+        )
+
+    l_conv2_back = l_conv2_sparse
+    for i in range(1):
+        shape = (l_conv2_back.output_shape[1], nb_filters[0], 5, 5)
+        W = init.GlorotUniform().sample(shape)
+        mask = np.zeros_like(W).astype(np.float32)
+        k = np.arange(W.shape[0])
+        mask[k, k, :, :] = 1
+        W = theano.shared(W)
+        W = W * mask
+        l_conv2_back = layers.Conv2DLayer(
+            l_conv2_back,
+            num_filters=nb_filters[0],
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=W,
+            pad='full'
+        )
+    l_conv1_back = l_conv1_sparse
+    l_out1 = layers.Conv2DLayer(
+        l_conv1_back,
+        num_filters=c,
+        filter_size=(5, 5),
+        nonlinearity=linear,
+        W=init.GlorotUniform(),
+        pad='full',
+        name='out1')
+    l_out2 = layers.Conv2DLayer(
+        l_conv2_back,
+        num_filters=c,
+        filter_size=(5, 5),
+        nonlinearity=linear,
+        W=init.GlorotUniform(),
+        pad='full',
+        name='out2')
+    l_out3 = layers.Conv2DLayer(
+        l_conv3_back,
+        num_filters=c,
+        filter_size=(5, 5),
+        nonlinearity=linear,
+        W=init.GlorotUniform(),
+        pad='full',
+        name='out3')
+    out_layers = [l_out1, l_out2, l_out3]
+    l_out = layers.ElemwiseMergeLayer(out_layers, T.add)
+    l_out = layers.NonlinearityLayer(l_out, sigmoid, name='output')
+    all_layers = ([l_in, l_conv1, l_conv2, l_conv3] +
+                  sparse_layers +
+                  [l_out1, l_out2, l_out3, l_out])
+    return layers_from_list_to_dict(all_layers)
 
 
 build_convnet_simple = model1
