@@ -172,9 +172,8 @@ def train(dataset=None,
     capsule.report(capsule.batch_optimizer.stats[-1])
     print("Ok finished training")
 
-    if params.get('eval_stats') is not None:
-        assert update_db
-        stats = params.get('eval_stats')
+    if update_db:
+        stats = params.get('eval_stats', ['training'])
         db = load_db()
         job = db.get_job_by_summary(job_summary)
         db.close()
