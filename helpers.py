@@ -5,6 +5,10 @@ import os
 from lasagnekit.easy import iterate_minibatches
 import lasagne
 
+def norm(x):
+    return (x - x.min()) / (x.max() - x.min() + 1e-12)
+
+
 
 def wta_spatial(X):
     # From http://arxiv.org/pdf/1409.2752v2.pdf
@@ -201,16 +205,20 @@ class Deconv2DLayer(lasagne.layers.Layer):
 class BrushLayer(lasagne.layers.Layer):
 
     def __init__(self, incoming, w, h,
-                 patch=np.ones((3, 3)), n_steps=10, **kwargs):
+                 patch=np.ones((3, 3)), n_steps=10, return_seq=False, **kwargs):
         super(BrushLayer, self).__init__(incoming, **kwargs)
         self.incoming = incoming
         self.w = w
         self.h = h
         self.n_steps = n_steps
         self.patch = patch.astype(np.float32)
+        self.return_seq = return_seq
 
     def get_output_shape_for(self, input_shape):
-        return (input_shape[0],) + (self.w, self.h)
+        if self.return_seq:
+            return (input_shape[0],) + (self.n_steps, self.w, self.h)
+        else:
+            return (input_shape[0],) + (self.w, self.h)
 
     def get_output_for(self, input, **kwargs):
         def apply_func(X):
@@ -225,17 +233,10 @@ class BrushLayer(lasagne.layers.Layer):
                 X[:, 2], X[:, 3],
                 X[:, 4])
 
-            def norm(x):
-                return (x - x.min()) / (x.max() - x.min() + 1e-12)
-
             gx = norm(gx) * w
             gy = norm(gy) * h
             sx = norm(sx) * w
             sy = norm(sy) * h
-            #gx = T.exp(gx)
-            #gy = T.exp(gy)
-            #sx = T.exp(sx)
-            #sy = T.exp(sy)
             sigma = T.exp(log_sigma)
 
             a, _ = np.indices((w, pw))
@@ -288,7 +289,10 @@ class BrushLayer(lasagne.layers.Layer):
             return o
 
         def reduce_func(prev, new):
-            return prev + new
+            if self.return_seq:
+                return new
+            else:
+                return prev + new
 
         output_shape = self.get_output_shape_for(input.shape)
         init_val = T.zeros(output_shape)
@@ -300,7 +304,10 @@ class BrushLayer(lasagne.layers.Layer):
                 init_val,
                 self.n_steps)
         output = output.dimshuffle(1, 0, 2, 3)
-        return output[:, -1]
+        if self.return_seq:
+            return output
+        else:
+            return output[:, -1]
 
 
 def recurrent_accumulation(X, apply_func, reduce_func,
@@ -335,6 +342,13 @@ class Repeat(lasagne.layers.Layer):
         stacked = theano.tensor.stack(*tensors)
         dim = [1, 0] + range(2, input.ndim + 1)
         return stacked.dimshuffle(dim)
+
+
+def over_op(prev, new):
+    prev = norm(prev)
+    new = norm(new)
+    return prev + new * (1 - prev)
+
 
 if __name__ == '__main__':
     from lasagne import layers

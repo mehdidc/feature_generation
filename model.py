@@ -5,6 +5,7 @@ from lasagne.nonlinearities import (
 from lasagnekit.layers import Deconv2DLayer, Depool2DLayer
 from helpers import Deconv2DLayer as deconv2d
 
+from helpers import over_op
 from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse
 from helpers import Repeat
 from helpers import BrushLayer
@@ -3525,6 +3526,7 @@ def model66(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     all_layers = [l_in, l_conv1, l_conv2, l_conv3] + sparse_layers + [l_out1, l_out2, l_out3, l_out]
     return layers_from_list_to_dict(all_layers)
 
+
 def model67(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     """
     like model66 but with sum instead of multiplication
@@ -4106,7 +4108,7 @@ def model73(nb_filters=64, w=32, h=32, c=1,
     """
     parametrized version of model67
     """
-    merge_op = {'sum': T.add, 'mul': T.mul}[merge_op]
+    merge_op = {'sum': T.add, 'mul': T.mul, 'over': over_op}[merge_op]
     if type(filter_size) != list:
         filter_size = [filter_size] * nb_layers
     if type(nb_filters) != list:
@@ -4505,7 +4507,7 @@ def model78(w=32, h=32, c=1,
         patch=np.ones((patch_size, patch_size)),
         name="brush")
     l_out = layers.ReshapeLayer(l_brush, ([0], c, w, h), name="output")
-    l_out = layers.BiasLayer(l_out, b=init.Constant(-1.))
+    l_out = layers.BiasLayer(l_out, b=init.Constant(-1.)) # because we are assuming the prev layer is between 0 and 1, we 'center' it at the beginning
     l_out = layers.NonlinearityLayer(
         l_out,
         nonlinearity=sigmoid,
@@ -4626,6 +4628,154 @@ def model79(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     all_layers = ([l_in, l_conv1, l_conv2, l_conv3] +
                   sparse_layers +
                   [l_out1, l_out2, l_out3, l_out])
+    return layers_from_list_to_dict(all_layers)
+
+def model80(nb_filters=64, w=32, h=32, c=1, sparsity=True):
+    """
+    model67 but with occlusion
+    """
+    if type(nb_filters) != list:
+        nb_filters = [nb_filters] * 3
+    sparse_layers = []
+
+    def sparse(l):
+        name = l.name
+        l = layers.NonlinearityLayer(
+                l, wta_spatial,
+                name="wta_spatial_{}".format(name))
+        sparse_layers.append(l)
+        l = layers.NonlinearityLayer(
+                l, wta_channel_strided(stride=4),
+                name="wta_channel_{}".format(name))
+        sparse_layers.append(l)
+        return l
+
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_conv1 = layers.Conv2DLayer(
+            l_in,
+            num_filters=nb_filters[0],
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            name="conv1")
+    l_conv1_sparse = sparse(l_conv1)
+    l_conv2 = layers.Conv2DLayer(
+            l_conv1,
+            num_filters=nb_filters[1],
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            name="conv2")
+    l_conv2_sparse = sparse(l_conv2)
+    l_conv3 = layers.Conv2DLayer(
+             l_conv2,
+             num_filters=nb_filters[2],
+             filter_size=(5, 5),
+             nonlinearity=rectify,
+             W=init.GlorotUniform(),
+             name="conv3")
+    l_conv3_sparse = sparse(l_conv3)
+
+    l_conv3_back = l_conv3_sparse
+    for i in range(2):
+        l_conv3_back = layers.Conv2DLayer(
+            l_conv3_back,
+            num_filters=nb_filters[2 - i - 1],
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            pad='full'
+        )
+
+    l_conv2_back = l_conv2_sparse
+    for i in range(1):
+        l_conv2_back = layers.Conv2DLayer(
+            l_conv2_back,
+            num_filters=nb_filters[0],
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            pad='full'
+        )
+    l_conv1_back = l_conv1_sparse
+    l_out1 = layers.Conv2DLayer(
+            l_conv1_back,
+            num_filters=c,
+            filter_size=(5, 5),
+            nonlinearity=linear,
+            W=init.GlorotUniform(),
+            pad='full',
+            name='out1')
+    l_out2 = layers.Conv2DLayer(
+            l_conv2_back,
+            num_filters=c,
+            filter_size=(5, 5),
+            nonlinearity=linear,
+            W=init.GlorotUniform(),
+            pad='full',
+            name='out2')
+    l_out3 = layers.Conv2DLayer(
+            l_conv3_back,
+            num_filters=c,
+            filter_size=(5, 5),
+            nonlinearity=linear,
+            W=init.GlorotUniform(),
+            pad='full',
+            name='out3')
+    out_layers = [l_out1, l_out2, l_out3]
+    l_out = layers.ElemwiseMergeLayer(out_layers, over_op)
+    l_out = layers.NonlinearityLayer(l_out, linear, name='output')
+    all_layers = [l_in, l_conv1, l_conv2, l_conv3] + sparse_layers + [l_out1, l_out2, l_out3, l_out]
+    return layers_from_list_to_dict(all_layers)
+
+
+def model81(w=32, h=32, c=1,
+            nb_fc_layers=3,
+            nb_recurrent_layers=1,
+            nb_recurrent_units=100,
+            nb_fc_units=1000,
+            n_steps=10,
+            patch_size=3,
+            nonlin='rectify'):
+    """
+    model78 but with brush layer with return_seq = True
+    """
+    def init_method():
+        return init.GlorotUniform(gain='relu')
+    if type(nb_fc_units) != list:
+        nb_fc_units = [nb_fc_units] * nb_fc_layers
+    if type(nb_recurrent_units) != list:
+        nb_recurrent_units = [nb_recurrent_units] * nb_recurrent_layers
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_hid = l_in
+    nonlin = get_nonlinearity[nonlin]
+    hids = []
+    for i in range(nb_fc_layers):
+        l_hid = layers.DenseLayer(
+            l_hid, nb_fc_units[i],
+            W=init_method(),
+            nonlinearity=nonlin,
+            name="hid{}".format(i + 1))
+        hids.append(l_hid)
+    l_hid = Repeat(l_hid, n_steps)
+    for i in range(nb_recurrent_layers):
+        l_hid = layers.GRULayer(l_hid, nb_recurrent_units[i])
+    l_coord = layers.GRULayer(l_hid, 5, name="coord")
+    l_hid = layers.ReshapeLayer(l_coord, ([0], n_steps, 5), name="hid3")
+    l_brush = BrushLayer(
+        l_hid,
+        w, h,
+        n_steps=n_steps,
+        patch=np.ones((patch_size, patch_size)),
+        name="brush")
+    l_out = layers.ExpressionLayer(l_brush, lambda x:x.sum(axis=1, keepdims=True), name="output")
+    l_out = layers.ReshapeLayer(l_brush, ([0], c, w, h), name="output")
+    l_out = layers.BiasLayer(l_out, b=init.Constant(-1.)) # because we are assuming the prev layer is between 0 and 1, we 'center' it at the beginning
+    l_out = layers.NonlinearityLayer(
+        l_out,
+        nonlinearity=sigmoid,
+        name="output")
+    all_layers = [l_in] + hids + [l_coord, l_brush, l_out]
     return layers_from_list_to_dict(all_layers)
 
 
