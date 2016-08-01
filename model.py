@@ -4767,9 +4767,11 @@ def model81(w=32, h=32, c=1,
         w, h,
         n_steps=n_steps,
         patch=np.ones((patch_size, patch_size)),
+        return_seq=True,
         name="brush")
-    l_out = layers.ExpressionLayer(l_brush, lambda x:x.sum(axis=1, keepdims=True), name="output")
-    l_out = layers.ReshapeLayer(l_brush, ([0], c, w, h), name="output")
+    print(l_brush.output_shape)
+    l_out = layers.ExpressionLayer(l_brush, lambda x: x[:, -1, :, :], name="output", output_shape='auto')
+    l_out = layers.ReshapeLayer(l_out, ([0], c, w, h), name="output")
     l_out = layers.BiasLayer(l_out, b=init.Constant(-1.)) # because we are assuming the prev layer is between 0 and 1, we 'center' it at the beginning
     l_out = layers.NonlinearityLayer(
         l_out,

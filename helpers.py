@@ -290,11 +290,11 @@ class BrushLayer(lasagne.layers.Layer):
 
         def reduce_func(prev, new):
             if self.return_seq:
-                return new
+                return new + prev
             else:
                 return prev + new
 
-        output_shape = self.get_output_shape_for(input.shape)
+        output_shape = (input.shape[0],) + (self.w, self.h)
         init_val = T.zeros(output_shape)
         output, _ = recurrent_accumulation(
                 # 'time' should be the first dimension
