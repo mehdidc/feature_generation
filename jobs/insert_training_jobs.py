@@ -2020,7 +2020,7 @@ def jobset36():
                     params=params,
                     budget_hours=budget_hours)
     nb = job_write(params, cmd, where=jobset_name)
-    return nb
+    return b
 
 
 def jobset37():
@@ -2104,7 +2104,7 @@ def jobset37():
     return nb
 
 
-def jobset38_(jobset_name, model_name):
+def jobset_recurrent_brush_stroke(jobset_name, model_name, update=lambda p:p):
     # Continuous brush stroke with recurrent layers hyper-search
     rng = random
     nb_fc_layers = rng.randint(1, 4)
@@ -2135,6 +2135,7 @@ def jobset38_(jobset_name, model_name):
         binarize_thresh=None,
         optimization=dict(max_nb_epochs=9999999999)
     )
+    params = update(params)
     budget_hours = 10
     model_name = model_name
     dataset = 'digits'
@@ -2153,11 +2154,19 @@ def jobset38_(jobset_name, model_name):
 
 
 def jobset38():
-    return jobset38_('jobset38', 'model77')
+    return jobset_recurrent_brush_stroke('jobset38', 'model77')
 
 
 def jobset39():
-    return jobset38_('jobset39', 'model78')
+    return jobset_recurrent_brush_stroke('jobset39', 'model78')
+
+
+def jobset40():
+
+    def update(params):
+        params['model_params']['stride'] = False
+        return params
+    return jobset_recurrent_brush_stroke('jobset40', 'model81', update=update)
 
 
 @click.command()

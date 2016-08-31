@@ -205,7 +205,7 @@ class Deconv2DLayer(lasagne.layers.Layer):
 class BrushLayer(lasagne.layers.Layer):
 
     def __init__(self, incoming, w, h,
-                 patch=np.ones((3, 3)), n_steps=10, return_seq=False, **kwargs):
+                 patch=np.ones((3, 3)), n_steps=10, return_seq=False, stride=True, **kwargs):
         super(BrushLayer, self).__init__(incoming, **kwargs)
         self.incoming = incoming
         self.w = w
@@ -213,6 +213,7 @@ class BrushLayer(lasagne.layers.Layer):
         self.n_steps = n_steps
         self.patch = patch.astype(np.float32)
         self.return_seq = return_seq
+        self.stride = stride
 
     def get_output_shape_for(self, input_shape):
         if self.return_seq:
@@ -233,10 +234,19 @@ class BrushLayer(lasagne.layers.Layer):
                 X[:, 2], X[:, 3],
                 X[:, 4])
 
+            # gx : x position
+            # gy : y position
+            # sx : etendu de x
+            # sy : etendu de y
+
             gx = norm(gx) * w
             gy = norm(gy) * h
-            sx = norm(sx) * w
-            sy = norm(sy) * h
+            if self.stride:
+                sx = norm(sx) * w
+                sy = norm(sy) * h
+            else:
+                sx = T.ones_like(sx)
+                sy = T.ones_like(sy)
             sigma = T.exp(log_sigma)
 
             a, _ = np.indices((w, pw))

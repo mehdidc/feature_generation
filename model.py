@@ -4736,10 +4736,11 @@ def model81(w=32, h=32, c=1,
             nb_fc_units=1000,
             n_steps=10,
             patch_size=3,
-            w_out=-1,h_out=-1,
+            w_out=-1, h_out=-1,
+            stride=True,
             nonlin='rectify'):
     """
-    model78 but with brush layer with return_seq = True and up-scaling
+    model78 but with brush layer with return_seq = True and up-scaling and possibility to not have stride
     """
     def init_method():
         return init.GlorotUniform(gain='relu')
@@ -4771,11 +4772,12 @@ def model81(w=32, h=32, c=1,
         l_hid,
         w_out, h_out,
         n_steps=n_steps,
-        patch=np.ones((patch_size, patch_size)),
+        patch=np.ones((patch_size * (w_out/w), patch_size * (h_out/h) )),
         return_seq=True,
+        stride=stride,
         name="brush")
     print(l_brush.output_shape)
-    l_out = layers.ExpressionLayer(l_brush, lambda x: x[:, 0, :, :], name="output", output_shape='auto')
+    l_out = layers.ExpressionLayer(l_brush, lambda x: x[:, -1, :, :], name="output", output_shape='auto')
     l_out = layers.ReshapeLayer(l_out, ([0], c, w_out, h_out), name="output")
     l_out_bias = layers.BiasLayer(l_out, b=init.Constant(-1.), name='bias') # because we are assuming the prev layer is between 0 and 1, we 'center' it at the beginning
     l_out = layers.NonlinearityLayer(
@@ -4784,6 +4786,7 @@ def model81(w=32, h=32, c=1,
         name="output")
     all_layers = [l_in] + hids + [l_coord, l_brush, l_out_bias, l_out]
     return layers_from_list_to_dict(all_layers)
+
 
 
 build_convnet_simple = model1
@@ -4796,7 +4799,7 @@ build_convnet_simple_7 = model7
 build_convnet_simple_8 = model8
 build_convnet_simple_9 = model9
 build_convnet_simple_10 = model10
-build_convnet_simple_11 = model11
+build_convnet_simple_11 = model12
 build_convnet_simple_12 = model12
 build_convnet_simple_13 = model13
 build_convnet_simple_14 = model14
