@@ -10,7 +10,6 @@ import numpy as np
 import glob
 import random
 
-random.seed(2)
 
 w, h = 3, 3
 db = load_db()
@@ -21,6 +20,8 @@ for j in tqdm(J):
     folder = "jobs/results/{}".format(id_)
     filenames = glob.glob(os.path.join(folder, 'final', '*.png'))
     filenames = sorted(filenames)
+
+    random.seed(2)
     random.shuffle(filenames)
     filenames = filenames[0:w*h]
 

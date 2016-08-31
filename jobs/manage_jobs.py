@@ -18,7 +18,8 @@ def main():
 @click.option('--state', default=None, help='state', required=False)
 @click.option('--dontcare', default=False, help='dont care if delete', required=False)
 @click.option('--details', default=False, help='show details', required=False)
-def do(action, where, type, ref_where, state, dontcare, details):
+@click.option('--finished-after', default='', help='came after', required=False)
+def do(action, where, type, ref_where, state, dontcare, details, finished_after):
     db = load_db()
     kw = {}
     if where:
@@ -48,8 +49,19 @@ def do(action, where, type, ref_where, state, dontcare, details):
 
     jobs = sorted(jobs, key=get_key)
     if action == 'show':
+        if finished_after != '':
+            ref_date = pd.to_datetime(finished_after)
+        else:
+            ref_date = None
         for j in jobs:
             j = dict(j)
+
+            if ref_date:
+                if not ('life' in j and j['life']):
+                    continue
+                dt = pd.to_datetime(j['life'][-1]['dt'])
+                if(dt < ref_date):
+                    continue
             if details:
                 print(json.dumps(j, indent=4))
             else:
