@@ -4735,10 +4735,11 @@ def model81(w=32, h=32, c=1,
             nb_fc_units=1000,
             n_steps=10,
             patch_size=3,
-            w_out=-1, h_out=-1,
-            stride=True, # if True, use strides else set them to 1
-            sigma=None, # if None, use sigma else set it to the given value  of sigma
-            normalize='maxmin', # ways to normalize : maxmin (like batch normalization but normalizes to 0..1)/sigmoid (applies sigmoid)/none
+            w_out=-1,  # for up-scaling
+            h_out=-1, # for up-scaling
+            stride=True,  # if True, use strides else set them to 1
+            sigma=None,  # if None, use sigma else set it to the given value  of sigma
+            normalize='maxmin',  # ways to normalize : maxmin (like batch normalization but normalizes to 0..1)/sigmoid (applies sigmoid)/none
             reduce='sum', # ways to aggregate the brush layers : sum/over
             nonlin='rectify'):
     """

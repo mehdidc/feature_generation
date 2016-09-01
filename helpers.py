@@ -370,9 +370,10 @@ class Repeat(lasagne.layers.Layer):
 
 
 def over_op(prev, new):
-    prev = norm(prev)
-    new = norm(new)
+    prev = (prev)
+    new = (new)
     return prev + new * (1 - prev)
+
 
 def sum_op(prev, new):
     return prev + new
