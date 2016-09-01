@@ -413,6 +413,10 @@ def build_capsule_(layers, data, nbl, nbc,
                         rec_errors.append(rec_error)
                     rec_error_mean = np.mean(rec_errors)
                     status["{}_recons_error".format(name)] = rec_error_mean
+
+
+        if np.isnan(status['loss_train']):
+            raise KeyboardInterrupt('Nan detected, quit')
         if (datetime.now() - begin).total_seconds() >= budget_sec:
             logger.info("Budget finished.quit.")
             raise KeyboardInterrupt("Budget finished.quit.")
