@@ -4738,6 +4738,7 @@ def model81(w=32, h=32, c=1,
             patch_size=3,
             w_out=-1, h_out=-1,
             stride=True,
+            sigma=1,
             nonlin='rectify'):
     """
     model78 but with brush layer with return_seq = True and up-scaling and possibility to not have stride
@@ -4775,6 +4776,7 @@ def model81(w=32, h=32, c=1,
         patch=np.ones((patch_size * (w_out/w), patch_size * (h_out/h) )),
         return_seq=True,
         stride=stride,
+        sigma=sigma,
         name="brush")
     print(l_brush.output_shape)
     l_out = layers.ExpressionLayer(l_brush, lambda x: x[:, -1, :, :], name="output", output_shape='auto')

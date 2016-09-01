@@ -5,9 +5,9 @@ import os
 from lasagnekit.easy import iterate_minibatches
 import lasagne
 
-def norm(x):
-    return (x - x.min()) / (x.max() - x.min() + 1e-12)
 
+def norm(x):
+    return (x - x.min()) / (x.max() - x.min() + (x.max()==x.min()) + 1e-12)
 
 
 def wta_spatial(X):
@@ -205,7 +205,12 @@ class Deconv2DLayer(lasagne.layers.Layer):
 class BrushLayer(lasagne.layers.Layer):
 
     def __init__(self, incoming, w, h,
-                 patch=np.ones((3, 3)), n_steps=10, return_seq=False, stride=True, **kwargs):
+                 patch=np.ones((3, 3)), n_steps=10,
+                 return_seq=False,
+                 stride=True,
+                 sigma=None,
+                 reduce_func=lambda x,y:x+y,
+                 **kwargs):
         super(BrushLayer, self).__init__(incoming, **kwargs)
         self.incoming = incoming
         self.w = w
@@ -214,6 +219,8 @@ class BrushLayer(lasagne.layers.Layer):
         self.patch = patch.astype(np.float32)
         self.return_seq = return_seq
         self.stride = stride
+        self.sigma = sigma
+        self.reduce_func = reduce_func
 
     def get_output_shape_for(self, input_shape):
         if self.return_seq:
@@ -241,13 +248,17 @@ class BrushLayer(lasagne.layers.Layer):
 
             gx = norm(gx) * w
             gy = norm(gy) * h
-            if self.stride:
+            if self.stride is True:
                 sx = norm(sx) * w
                 sy = norm(sy) * h
             else:
                 sx = T.ones_like(sx)
                 sy = T.ones_like(sy)
-            sigma = T.exp(log_sigma)
+
+            if self.sigma is None:
+                sigma = T.exp(log_sigma)
+            else:
+                sigma = T.ones_like(log_sigma)
 
             a, _ = np.indices((w, pw))
             a = a.astype(np.float32)
@@ -299,20 +310,17 @@ class BrushLayer(lasagne.layers.Layer):
             return o
 
         def reduce_func(prev, new):
-            if self.return_seq:
-                return new + prev
-            else:
-                return prev + new
+            return self.reduce_func(prev, new)
 
         output_shape = (input.shape[0],) + (self.w, self.h)
         init_val = T.zeros(output_shape)
         output, _ = recurrent_accumulation(
-                # 'time' should be the first dimension
-                input.dimshuffle(1, 0, 2),
-                apply_func,
-                reduce_func,
-                init_val,
-                self.n_steps)
+            # 'time' should be the first dimension
+            input.dimshuffle(1, 0, 2),
+            apply_func,
+            reduce_func,
+            init_val,
+            self.n_steps)
         output = output.dimshuffle(1, 0, 2, 3)
         if self.return_seq:
             return output
@@ -338,6 +346,7 @@ def recurrent_accumulation(X, apply_func, reduce_func,
                                   n_steps=n_steps,
                                   **scan_kwargs)
     return result, updates
+
 
 class Repeat(lasagne.layers.Layer):
     def __init__(self, incoming, n, **kwargs):
