@@ -4,9 +4,8 @@ from lasagne.nonlinearities import (
         linear, sigmoid, rectify, very_leaky_rectify, softmax, tanh)
 from lasagnekit.layers import Deconv2DLayer, Depool2DLayer
 from helpers import Deconv2DLayer as deconv2d
-
-from helpers import over_op
-from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse
+from helpers import over_op, sum_op
+from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse, norm_maxmin
 from helpers import Repeat
 from helpers import BrushLayer
 import theano.tensor as T
@@ -4737,12 +4736,17 @@ def model81(w=32, h=32, c=1,
             n_steps=10,
             patch_size=3,
             w_out=-1, h_out=-1,
-            stride=True,
-            sigma=1,
+            stride=True, # if True, use strides else set them to 1
+            sigma=None, # if None, use sigma else set it to the given value  of sigma
+            normalize='maxmin', # ways to normalize : maxmin (like batch normalization but normalizes to 0..1)/sigmoid (applies sigmoid)/none
+            reduce='sum', # ways to aggregate the brush layers : sum/over
             nonlin='rectify'):
     """
-    model78 but with brush layer with return_seq = True and up-scaling and possibility to not have stride
+
+    model78 but with brush layer with
+    return_seq = True and up-scaling and possibility to not have stride
     """
+
     def init_method():
         return init.GlorotUniform(gain='relu')
     if type(nb_fc_units) != list:
@@ -4769,6 +4773,11 @@ def model81(w=32, h=32, c=1,
         l_hid = layers.GRULayer(l_hid, nb_recurrent_units[i])
     l_coord = layers.GRULayer(l_hid, 5, name="coord")
     l_hid = layers.ReshapeLayer(l_coord, ([0], n_steps, 5), name="hid3")
+
+    normalize_func = {'maxmin': norm_maxmin,
+                      'sigmoid': T.nnet.sigmoid,
+                      'none': lambda x: x}[normalize]
+    reduce_func = {'sum': sum_op, 'over': over_op}[reduce]
     l_brush = BrushLayer(
         l_hid,
         w_out, h_out,
@@ -4777,18 +4786,21 @@ def model81(w=32, h=32, c=1,
         return_seq=True,
         stride=stride,
         sigma=sigma,
+        normalize_func=normalize_func,
+        reduce_func=reduce_func,
         name="brush")
-    print(l_brush.output_shape)
     l_out = layers.ExpressionLayer(l_brush, lambda x: x[:, -1, :, :], name="output", output_shape='auto')
     l_out = layers.ReshapeLayer(l_out, ([0], c, w_out, h_out), name="output")
-    l_out_bias = layers.BiasLayer(l_out, b=init.Constant(-1.), name='bias') # because we are assuming the prev layer is between 0 and 1, we 'center' it at the beginning
+    l_out_bias = layers.BiasLayer(
+        l_out,
+        b=init.Constant(-1.),
+        name='bias') # because we are assuming the prev layer is between 0 and 1, we 'center' it at the beginning
     l_out = layers.NonlinearityLayer(
         l_out_bias,
         nonlinearity=sigmoid,
         name="output")
     all_layers = [l_in] + hids + [l_coord, l_brush, l_out_bias, l_out]
     return layers_from_list_to_dict(all_layers)
-
 
 
 build_convnet_simple = model1

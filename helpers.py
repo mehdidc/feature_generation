@@ -7,7 +7,11 @@ import lasagne
 
 
 def norm(x):
-    return (x - x.min()) / (x.max() - x.min() + (x.max()==x.min()) + 1e-12)
+    return (x - x.min()) / (x.max() - x.min() + T.eq(x.max(), x.min()) + 1e-12)
+
+
+def norm_maxmin(x):
+    return norm(x)
 
 
 def wta_spatial(X):
@@ -210,6 +214,7 @@ class BrushLayer(lasagne.layers.Layer):
                  stride=True,
                  sigma=None,
                  reduce_func=lambda x,y:x+y,
+                 normalize_func=norm,
                  **kwargs):
         super(BrushLayer, self).__init__(incoming, **kwargs)
         self.incoming = incoming
@@ -221,6 +226,7 @@ class BrushLayer(lasagne.layers.Layer):
         self.stride = stride
         self.sigma = sigma
         self.reduce_func = reduce_func
+        self.norm = normalize_func
 
     def get_output_shape_for(self, input_shape):
         if self.return_seq:
@@ -246,11 +252,11 @@ class BrushLayer(lasagne.layers.Layer):
             # sx : etendu de x
             # sy : etendu de y
 
-            gx = norm(gx) * w
-            gy = norm(gy) * h
+            gx = self.norm(gx) * w
+            gy = self.norm(gy) * h
             if self.stride is True:
-                sx = norm(sx) * w
-                sy = norm(sy) * h
+                sx = self.norm(sx) * w
+                sy = self.norm(sy) * h
             else:
                 sx = T.ones_like(sx)
                 sy = T.ones_like(sy)
@@ -368,6 +374,8 @@ def over_op(prev, new):
     new = norm(new)
     return prev + new * (1 - prev)
 
+def sum_op(prev, new):
+    return prev + new
 
 if __name__ == '__main__':
     from lasagne import layers
