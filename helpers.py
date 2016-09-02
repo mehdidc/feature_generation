@@ -375,7 +375,14 @@ def over_op(prev, new):
     return prev + new * (1 - prev)
 
 
+def correct_over_op(alpha):
+    def fn(prev, new):
+        return (prev * alpha + new * alpha * (1 - alpha)) / (2 - alpha)
+    return fn
+
+
 def sum_op(prev, new):
+    # fix this
     return prev + new
 
 if __name__ == '__main__':

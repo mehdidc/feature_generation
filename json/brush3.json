@@ -1,0 +1,21 @@
+{
+    "model_name": "model75",
+    "model_params": {
+        "n_steps": 10,
+        "nb_layers": 1,
+        "patch_size": 10,
+        "nb_units": 2000
+    },
+    "dataset": "digits",
+    "data_params": {
+    },
+    "mode": "random",
+    "budget_hours": 24,
+    "optimization": {
+        "algo": "adadelta",
+        "initial_lr": 0.01,
+        "max_nb_epochs": 500
+    },
+    "mode": "minibatch",
+    "report_rec_error": false
+}

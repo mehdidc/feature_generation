@@ -4,7 +4,7 @@ from lasagne.nonlinearities import (
         linear, sigmoid, rectify, very_leaky_rectify, softmax, tanh)
 from lasagnekit.layers import Deconv2DLayer, Depool2DLayer
 from helpers import Deconv2DLayer as deconv2d
-from helpers import over_op, sum_op
+from helpers import correct_over_op, over_op, sum_op
 from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse, norm_maxmin
 from helpers import Repeat
 from helpers import BrushLayer
@@ -4740,6 +4740,7 @@ def model81(w=32, h=32, c=1,
             stride=True,  # if True, use strides else set them to 1
             sigma=None,  # if None, use sigma else set it to the given value  of sigma
             normalize='maxmin',  # ways to normalize : maxmin (like batch normalization but normalizes to 0..1)/sigmoid (applies sigmoid)/none
+            alpha=0.5,
             reduce='sum', # ways to aggregate the brush layers : sum/over
             nonlin='rectify'):
     """
@@ -4778,7 +4779,9 @@ def model81(w=32, h=32, c=1,
     normalize_func = {'maxmin': norm_maxmin,
                       'sigmoid': T.nnet.sigmoid,
                       'none': lambda x: x}[normalize]
-    reduce_func = {'sum': sum_op, 'over': over_op}[reduce]
+    reduce_func = {'sum': sum_op, 'over': over_op, 'correct_over': correct_over_op}[reduce]
+    if reduce_func == correct_over_op:
+        reduce_func = reduce_func(alpha)
     l_brush = BrushLayer(
         l_hid,
         w_out, h_out,
