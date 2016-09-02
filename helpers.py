@@ -377,7 +377,7 @@ def over_op(prev, new):
 
 def correct_over_op(alpha):
     def fn(prev, new):
-        return (prev * alpha + new * alpha * (1 - alpha)) / (2 - alpha)
+        return (prev * (1 - alpha) + new) / (2 - alpha)
     return fn
 
 

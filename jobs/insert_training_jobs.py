@@ -2180,6 +2180,20 @@ def jobset41():
         return params
     return jobset_recurrent_brush_stroke('jobset41', 'model81', update=update)
 
+def jobset42():
+
+    def update(params):
+        rng = random
+        params['model_params']['stride'] = False
+        params['model_params']['sigma'] = 1
+        params['model_params']['normalize'] = 'sigmoid'
+        params['model_params']['reduce'] = 'correct_over'
+        params['model_params']['alpha'] = rng.uniform(0, 1)
+        return params
+    return jobset_recurrent_brush_stroke('jobset42', 'model81', update=update)
+
+
+
 
 @click.command()
 @click.option('--where', default='', help='jobset name', required=False)

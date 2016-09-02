@@ -20,10 +20,16 @@
     "sigma": null,
     "stride": false,
     "normalize": "sigmoid",
-    "reduce": "over"
+    "reduce": "over",
+    "alpha": 0.5
 },
 "noise": null,
-"optimization": {"max_nb_epochs": 9999999999},
+"optimization": {
+    "max_nb_epochs": 9999999999,
+    "algo": "adam",
+    "learning_rate": 0.001
+},
+"mode": "minibatch",
 "walkback": 1,
 "walkback_mode": "bengio_without_sampling"
 }
