@@ -149,8 +149,9 @@ def train(dataset=None,
             dummy_y = np.zeros((1,)).astype(np.int32)
             V.update({"y": dummy_y})
     elif mode == 'minibatch':
-        V = {"X": capsule.preprocess(data.X),
-             "X_true": capsule.preprocess(data.X)}
+        X = data.X
+        V = {"X": capsule.preprocess(X),
+             "X_true": capsule.preprocess(X)}
         # y not handled for now
     else:
         raise Exception('not supported mode {}'.format(mode))
@@ -668,7 +669,18 @@ def build_capsule_(layers, data, nbl, nbc,
                 dummyvars.update({"y": dummy})
             capsule._build(dummyvars)
         elif mode == "minibatch":
-            V = {"X": capsule.preprocess(data.X), "X_true": capsule.preprocess(data.X)}
+
+            if train_params.get('subsample'):
+                X = data.X
+                subsample = train_params.get('subsample')
+                indices = np.arange(X.shape[0])
+                np.random.shuffle(indices)
+                indices = indices[0:subsample]
+                X = X[indices]
+                print(X.shape)
+            else:
+                X = data.X
+            V = {"X": capsule.preprocess(X), "X_true": capsule.preprocess(X)}
             capsule._build(V)
     elif compile_ == "functions_only":
         capsule._build_functions()

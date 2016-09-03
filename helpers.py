@@ -381,6 +381,15 @@ def correct_over_op(alpha):
     return fn
 
 
+def max_op(prev, new):
+    return T.maximum(prev, new)
+
+
+def thresh_op(theta):
+    def fn(prev, new):
+        return (new > theta) * new +  (new <= theta ) * prev
+    return fn
+
 def sum_op(prev, new):
     # fix this
     return prev + new

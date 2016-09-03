@@ -13,13 +13,6 @@ if __name__ == '__main__':
             shutil.rmtree(path)
         else:
             os.remove(path)
-
-    for j in db.jobs_with(state=SUCCESS, type="generation"):
-        j = dict(j)
-        # generation job of the training job
-        folder = 'jobs/results/{}'.format(j['summary'])
-        rm(os.path.join(folder, 'iterations'))
-
     for j in db.jobs_with(state=SUCCESS, type="training"):
         j = dict(j)
         # training job
@@ -27,3 +20,11 @@ if __name__ == '__main__':
         rm(os.path.join(folder, 'features'))
         rm(os.path.join(folder, 'recons'))
         rm(os.path.join(folder, 'out'))
+
+    for j in db.jobs_with(state=SUCCESS, type="generation"):
+        j = dict(j)
+        # generation job of the training job
+        folder = 'jobs/results/{}'.format(j['summary'])
+        rm(os.path.join(folder, 'iterations'))
+
+

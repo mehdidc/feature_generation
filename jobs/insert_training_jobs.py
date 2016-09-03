@@ -2180,6 +2180,7 @@ def jobset41():
         return params
     return jobset_recurrent_brush_stroke('jobset41', 'model81', update=update)
 
+
 def jobset42():
 
     def update(params):
@@ -2191,6 +2192,19 @@ def jobset42():
         params['model_params']['alpha'] = rng.uniform(0, 1)
         return params
     return jobset_recurrent_brush_stroke('jobset42', 'model81', update=update)
+
+
+def jobset43():
+
+    def update(params):
+        rng = random
+        params['model_params']['stride'] = False
+        params['model_params']['sigma'] = rng.choice((None, 1))
+        params['model_params']['normalize'] = 'sigmoid'
+        params['model_params']['reduce'] = 'max'
+        return params
+    return jobset_recurrent_brush_stroke('jobset43', 'model81', update=update)
+
 
 
 

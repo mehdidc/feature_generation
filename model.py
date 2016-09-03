@@ -2,9 +2,9 @@ from lasagne import layers, init
 from lasagnekit.easy import layers_from_list_to_dict
 from lasagne.nonlinearities import (
         linear, sigmoid, rectify, very_leaky_rectify, softmax, tanh)
-from lasagnekit.layers import Deconv2DLayer, Depool2DLayer
+from lasagnekit.layers import Deconv2DLayer
 from helpers import Deconv2DLayer as deconv2d
-from helpers import correct_over_op, over_op, sum_op
+from helpers import correct_over_op, over_op, sum_op, max_op, thresh_op
 from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse, norm_maxmin
 from helpers import Repeat
 from helpers import BrushLayer
@@ -4742,7 +4742,9 @@ def model81(w=32, h=32, c=1,
             normalize='maxmin',  # ways to normalize : maxmin (like batch normalization but normalizes to 0..1)/sigmoid (applies sigmoid)/none
             alpha=0.5,
             reduce='sum', # ways to aggregate the brush layers : sum/over
-            nonlin='rectify'):
+            nonlin='rectify',
+            theta=0.5,
+            nonlin_out='sigmoid'):
     """
 
     model78 but with brush layer with
@@ -4779,9 +4781,11 @@ def model81(w=32, h=32, c=1,
     normalize_func = {'maxmin': norm_maxmin,
                       'sigmoid': T.nnet.sigmoid,
                       'none': lambda x: x}[normalize]
-    reduce_func = {'sum': sum_op, 'over': over_op, 'correct_over': correct_over_op}[reduce]
-    if reduce_func == correct_over_op:
-        reduce_func = reduce_func(alpha)
+    reduce_func = {'sum': sum_op,
+                   'over': over_op,
+                   'max': max_op,
+                   'thresh': thresh_op(theta),
+                   'correct_over': correct_over_op(alpha)}[reduce]
     l_brush = BrushLayer(
         l_hid,
         w_out, h_out,
@@ -4801,7 +4805,7 @@ def model81(w=32, h=32, c=1,
         name='bias') # because we are assuming the prev layer is between 0 and 1, we 'center' it at the beginning
     l_out = layers.NonlinearityLayer(
         l_out_bias,
-        nonlinearity=sigmoid,
+        nonlinearity=get_nonlinearity[nonlin_out],
         name="output")
     all_layers = [l_in] + hids + [l_coord, l_brush, l_out_bias, l_out]
     return layers_from_list_to_dict(all_layers)
