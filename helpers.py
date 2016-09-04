@@ -215,6 +215,7 @@ class BrushLayer(lasagne.layers.Layer):
                  sigma=None,
                  reduce_func=lambda x,y:x+y,
                  normalize_func=norm,
+                 nonlin_func=lambda x:x,
                  **kwargs):
         super(BrushLayer, self).__init__(incoming, **kwargs)
         self.incoming = incoming
@@ -227,6 +228,7 @@ class BrushLayer(lasagne.layers.Layer):
         self.sigma = sigma
         self.reduce_func = reduce_func
         self.norm = normalize_func
+        self.nonlin_func = nonlin_func
 
     def get_output_shape_for(self, input_shape):
         if self.return_seq:
@@ -316,7 +318,7 @@ class BrushLayer(lasagne.layers.Layer):
             return o
 
         def reduce_func(prev, new):
-            return self.reduce_func(prev, new)
+            return self.nonlin_func(self.reduce_func(prev, new))
 
         output_shape = (input.shape[0],) + (self.w, self.h)
         init_val = T.zeros(output_shape)
@@ -373,6 +375,12 @@ def over_op(prev, new):
     prev = (prev)
     new = (new)
     return prev + new * (1 - prev)
+
+
+def normalized_over_op(prev, new):
+    prev = (prev)
+    new = (new)
+    return (prev>0.5) * (new > 0.5) * new + (prev<=0.5)*(new>0.5) * new +  (prev>0.5)*(new<=0.5)*prev+(prev<=0.5)*(new<=0.5)*T.maximum(prev,new)
 
 
 def correct_over_op(alpha):

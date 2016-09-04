@@ -4,7 +4,7 @@ from lasagne.nonlinearities import (
         linear, sigmoid, rectify, very_leaky_rectify, softmax, tanh)
 from lasagnekit.layers import Deconv2DLayer
 from helpers import Deconv2DLayer as deconv2d
-from helpers import correct_over_op, over_op, sum_op, max_op, thresh_op
+from helpers import correct_over_op, over_op, sum_op, max_op, thresh_op, normalized_over_op
 from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse, norm_maxmin
 from helpers import Repeat
 from helpers import BrushLayer
@@ -4733,6 +4733,9 @@ def model81(w=32, h=32, c=1,
             nb_recurrent_layers=1,
             nb_recurrent_units=100,
             nb_fc_units=1000,
+            nb_conv_layers=0,
+            nb_conv_filters=64,
+            size_conv_filters=3,
             n_steps=10,
             patch_size=3,
             w_out=-1,  # for up-scaling
@@ -4744,6 +4747,7 @@ def model81(w=32, h=32, c=1,
             reduce='sum', # ways to aggregate the brush layers : sum/over
             nonlin='rectify',
             theta=0.5,
+            nonlin_brush='linear',
             nonlin_out='sigmoid'):
     """
 
@@ -4755,6 +4759,12 @@ def model81(w=32, h=32, c=1,
         return init.GlorotUniform(gain='relu')
     if type(nb_fc_units) != list:
         nb_fc_units = [nb_fc_units] * nb_fc_layers
+
+    if type(nb_conv_filters) != list:
+        nb_conv_filters = [nb_conv_filters] * nb_conv_layers
+    if type(size_conv_filters) != list:
+        size_conv_filters = [size_conv_filters] * nb_conv_layers
+
     if type(nb_recurrent_units) != list:
         nb_recurrent_units = [nb_recurrent_units] * nb_recurrent_layers
     if w_out == -1:
@@ -4764,7 +4774,18 @@ def model81(w=32, h=32, c=1,
     l_in = layers.InputLayer((None, c, w, h), name="input")
     l_hid = l_in
     nonlin = get_nonlinearity[nonlin]
+
     hids = []
+    for i in range(nb_conv_layers):
+        l_hid = layers.Conv2DLayer(
+            l_hid,
+            num_filters=nb_conv_filters[i],
+            filter_size=(size_conv_filters[i], size_conv_filters[i]),
+            nonlinearity=nonlin,
+            W=init_method(),
+            name='conv_hid{}'.format(i + 1))
+        hids.append(l_hid)
+
     for i in range(nb_fc_layers):
         l_hid = layers.DenseLayer(
             l_hid, nb_fc_units[i],
@@ -4783,9 +4804,12 @@ def model81(w=32, h=32, c=1,
                       'none': lambda x: x}[normalize]
     reduce_func = {'sum': sum_op,
                    'over': over_op,
+                   'normalized_over': normalized_over_op,
                    'max': max_op,
                    'thresh': thresh_op(theta),
                    'correct_over': correct_over_op(alpha)}[reduce]
+
+    nonlin_brush = get_nonlinearity[nonlin_brush]
     l_brush = BrushLayer(
         l_hid,
         w_out, h_out,
@@ -4796,6 +4820,7 @@ def model81(w=32, h=32, c=1,
         sigma=sigma,
         normalize_func=normalize_func,
         reduce_func=reduce_func,
+        nonlin_func=nonlin_brush,
         name="brush")
     l_out = layers.ExpressionLayer(l_brush, lambda x: x[:, -1, :, :], name="output", output_shape='auto')
     l_out = layers.ReshapeLayer(l_out, ([0], c, w_out, h_out), name="output")

@@ -744,6 +744,7 @@ def check(filename="out.pkl",
             prefix=prefix,
             compile_="functions_only",
             **model_params)
+    capsule.hypers = model_params
     if type(params) == list:
         pass
     elif type(params) == dict:
