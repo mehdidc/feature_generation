@@ -455,14 +455,25 @@ def load_data(dataset="digits",
         from probaprogram.shape import Sampler, to_img2, render
         if w is None and h is None:
             w, h = 28, 28
-        sampler = Sampler(attach_parts=True, nbpoints=(2, 5), nbparts=(1, 5))
+        c = 1
+        sampler = Sampler(attach_parts=True, nbpoints=(2, 4), nbparts=(1, 2))
         class Data(object):
+            def __init__(self, batches_per_chunk=100, batch_size=batch_size):
+                self.cnt = 0
+                self.batches_per_chunk = batches_per_chunk
+                self.batch_size = batch_size
             def load(self):
-                X = [to_img2(render(sampler.sample(), num=500, sx=w, sy=h), w=w, h=h)
-                     for i in range(batch_size)]
-                X = np.array(X)
-                X = X.reshape((X.shape[0], -1))
-                self.X = X
+                if self.cnt % self.batches_per_chunk == 0:
+                    print('Loading chunk of size {}'.format(batch_size * self.batches_per_chunk))
+                    X = [to_img2(render(sampler.sample(), num=50, sx=w, sy=h), thickness=1, w=w, h=h)
+                         for i in range(batch_size * self.batches_per_chunk)]
+                    X = np.array(X, dtype=np.float32)
+                    X = X.reshape((X.shape[0], -1))
+                    self.X_cache = X
+                    self.cnt = 0
+                start = self.cnt * self.batch_size
+                self.X = self.X_cache[start:start + self.batch_size]
+                self.cnt += 1
         data = Data()
 
     data.load()

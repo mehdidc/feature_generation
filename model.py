@@ -10,6 +10,8 @@ from helpers import Repeat
 from helpers import BrushLayer
 import theano.tensor as T
 import numpy as np
+
+
 from batch_norm import NormalizeLayer, ScaleAndShiftLayer, DecoderNormalizeLayer, DenoiseLayer, FakeLayer
 from lasagne.layers import batch_norm
 
