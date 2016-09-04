@@ -4743,6 +4743,7 @@ def model81(w=32, h=32, c=1,
             stride=True,  # if True, use strides else set them to 1
             sigma=None,  # if None, use sigma else set it to the given value  of sigma
             normalize='maxmin',  # ways to normalize : maxmin (like batch normalization but normalizes to 0..1)/sigmoid (applies sigmoid)/none
+            pooling=True,
             alpha=0.5,
             reduce='sum', # ways to aggregate the brush layers : sum/over
             nonlin='rectify',
@@ -4784,7 +4785,11 @@ def model81(w=32, h=32, c=1,
             nonlinearity=nonlin,
             W=init_method(),
             name='conv_hid{}'.format(i + 1))
+
         hids.append(l_hid)
+
+        if pooling:
+            l_hid = layers.Pool2DLayer(l_hid, (2, 2))
 
     for i in range(nb_fc_layers):
         l_hid = layers.DenseLayer(

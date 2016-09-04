@@ -451,6 +451,19 @@ def load_data(dataset="digits",
         im = im.astype(np.float32)
         data = Manual(im)
         data.img_dim = (w, h)
+    elif dataset == "strokes":
+        from probaprogram.shape import Sampler, to_img2, render
+        if w is None and h is None:
+            w, h = 28, 28
+        sampler = Sampler(attach_parts=True, nbpoints=(2, 5), nbparts=(1, 5))
+        class Data(object):
+            def load(self):
+                X = [to_img2(render(sampler.sample(), num=500, sx=w, sy=h), w=w, h=h)
+                     for i in range(batch_size)]
+                X = np.array(X)
+                X = X.reshape((X.shape[0], -1))
+                self.X = X
+        data = Data()
 
     data.load()
     data.w = w
