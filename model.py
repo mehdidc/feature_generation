@@ -13,7 +13,7 @@ import theano.tensor as T
 import numpy as np
 
 
-from batch_norm import NormalizeLayer, ScaleAndShiftLayer, DecoderNormalizeLayer, DenoiseLayer, FakeLayer
+from batch_norm import NormalizeLayer, ScaleAndShiftLayer, DecoderNormalizeLayer, DenoiseLayer, FakeLayer, SimpleScaleAndShiftLayer
 from lasagne.layers import batch_norm
 
 import theano
@@ -4854,11 +4854,11 @@ def model82(w=32, h=32, c=1,
             sigma=None,
             normalize='maxmin',
             alpha=0.5,
-            reduce='sum',
+            theta=0.5,
+
+            out_reduce='sum',
             inp_reduce='sum',
             nonlin='rectify',
-            theta=0.5,
-            nonlin_brush='linear',
             nonlin_out='sigmoid',
             nb_fc_units=1000,
             nb_fc_layers=0):
@@ -4891,16 +4891,16 @@ def model82(w=32, h=32, c=1,
                    'thresh': thresh_op(theta),
                    'prev':  lambda a, b: a,
                    'new': lambda a, b: b,
+                   'sub': lambda a, b: a - T.nnet.sigmoid(b),
                    'correct_over': correct_over_op(alpha)}
 
     l_in = layers.InputLayer((None, c, w, h), name="input")
     nonlin = get_nonlinearity[nonlin]
-    nonlin_brush = get_nonlinearity[nonlin_brush]
 
     patch = np.ones((patch_size * (w_out/w), patch_size * (h_out/h)))
 
     brush_in = layers.InputLayer((None, nb_recurrent_units[0]))
-    brush_in = layers.DenseLayer(brush_in, 5, nonlinearity=nonlin)
+    brush_in = layers.DenseLayer(brush_in, 5, nonlinearity=linear)
     brush_in = layers.ReshapeLayer(brush_in, ([0], 1, 5))
     l_brush = BrushLayer(
         brush_in,
@@ -4919,10 +4919,20 @@ def model82(w=32, h=32, c=1,
         return prev_inp
 
     def decorate_in(inp, prev_out):
-        return reduce_func[inp_reduce](inp, prev_out)
+        return reduce_func[inp_reduce](inp, downscale(prev_out))
+
+    def downscale(x):
+        if w_out > w and h_out > h:
+            x = x.reshape((x.shape[0], w_out, h_out))
+            x = x.reshape((x.shape[0], w_out / w, w, h_out / h, h))
+            x = x.mean(axis=(1, 3))
+            x = x.reshape((x.shape[0], w * h))
+            return x
+        else:
+            return x
 
     def update_out(prev_out, new_out):
-        return reduce_func[reduce](prev_out, new_out)
+        return reduce_func[out_reduce](prev_out, new_out)
 
     l_in_ = layers.ReshapeLayer(l_in, ([0], w * h))
 
@@ -4952,16 +4962,19 @@ def model82(w=32, h=32, c=1,
         lambda x: x[:, -1, :, :],
         name="output",
         output_shape='auto')
-    l_out = layers.ReshapeLayer(l_out, ([0], c, w_out, h_out), name="output")
-    l_out_bias = layers.BiasLayer(
+
+    l_raw_out = layers.ReshapeLayer(
         l_out,
-        b=init.Constant(-1.),
-        name='bias')
+        ([0], c, w_out, h_out),
+        name="raw_output")
+    l_scaled_out = layers.ScaleLayer(l_raw_out, scales=init.Constant(2.), name="scaled_output")
+    l_biased_out = layers.BiasLayer(l_scaled_out, b=init.Constant(-1), name="biased_output")
+
     l_out = layers.NonlinearityLayer(
-        l_out_bias,
+        l_biased_out,
         nonlinearity=get_nonlinearity[nonlin_out],
         name="output")
-    all_layers = [l_in] + hids + [l_canvas, l_out_bias, l_out]
+    all_layers = [l_in] + hids + [l_canvas, l_raw_out, l_scaled_out, l_biased_out, l_out]
     return layers_from_list_to_dict(all_layers)
 
 

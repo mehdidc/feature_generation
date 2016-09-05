@@ -456,7 +456,7 @@ def load_data(dataset="digits",
         if w is None and h is None:
             w, h = 28, 28
         c = 1
-        sampler = Sampler(attach_parts=True, nbpoints=(2, 4), nbparts=(1, 2))
+        sampler = Sampler(attach_parts=True, nbpoints=(2, 4), nbparts=(1, 3))
         class Data(object):
             def __init__(self, batches_per_chunk=100, batch_size=batch_size):
                 self.cnt = 0

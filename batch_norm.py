@@ -354,3 +354,27 @@ class ScaleAndShiftLayer(lasagne.layers.Layer):
         beta = T.addbroadcast(self.beta, *self.axes)
         gamma = T.addbroadcast(self.gamma, *self.axes)
         return input*gamma + beta
+
+class SimpleScaleAndShiftLayer(lasagne.layers.Layer):
+    """
+    This layer is a modified version of code originally written by
+    Jan Schluter.
+    Used with the NormalizeLayer to construct a batchnormalization layer.
+    Params
+    ------
+    incoming: `Layer` instance or expected input shape
+    axes: int or tuple of int denoting the axes to normalize over;
+        defaults to all axes except for the second if omitted (this will
+        do the correct thing for dense layers and convolutional layers)
+    """
+
+    def __init__(self, incoming, beta=lasagne.init.Constant(0), gamma=lasagne.init.Constant(1), **kwargs):
+        super(SimpleScaleAndShiftLayer, self).__init__(incoming, **kwargs)
+        shape = (1,) + (self.input_shape)[1:]
+        self.beta = self.add_param(beta, shape, name='beta',
+                                   trainable=True, regularizable=True)
+        self.gamma = self.add_param(gamma, shape, name='gamma',
+                                    trainable=True, regularizable=False)
+
+    def get_output_for(self, input, deterministic=False, **kwargs):
+        return input*self.gamma + self.beta
