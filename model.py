@@ -3,6 +3,7 @@ from lasagnekit.easy import layers_from_list_to_dict
 from lasagne.nonlinearities import (
         linear, sigmoid, rectify, very_leaky_rectify, softmax, tanh)
 from lasagnekit.layers import Deconv2DLayer
+from helpers import FeedbackGRULayer
 from helpers import Deconv2DLayer as deconv2d
 from helpers import correct_over_op, over_op, sum_op, max_op, thresh_op, normalized_over_op
 from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse, norm_maxmin
@@ -4840,6 +4841,127 @@ def model81(w=32, h=32, c=1,
         nonlinearity=get_nonlinearity[nonlin_out],
         name="output")
     all_layers = [l_in] + hids + [l_coord, l_brush, l_out_bias, l_out]
+    return layers_from_list_to_dict(all_layers)
+
+
+def model82(w=32, h=32, c=1,
+            nb_recurrent_units=100,
+            n_steps=10,
+            patch_size=3,
+            w_out=-1,
+            h_out=-1,
+            stride=True,
+            sigma=None,
+            normalize='maxmin',
+            alpha=0.5,
+            reduce='sum',
+            inp_reduce='sum',
+            nonlin='rectify',
+            theta=0.5,
+            nonlin_brush='linear',
+            nonlin_out='sigmoid',
+            nb_fc_units=1000,
+            nb_fc_layers=0):
+
+    """
+
+    model81 but with input feedback
+    """
+
+    if type(nb_recurrent_units) != list:
+        nb_recurrent_units = [nb_recurrent_units]
+
+    if type(nb_fc_units) != list:
+        nb_fc_units = [nb_fc_units] * nb_fc_layers
+
+    def init_method():
+        return init.GlorotUniform(gain='relu')
+    if w_out == -1:
+        w_out = w
+    if h_out == -1:
+        h_out = h
+
+    normalize_func = {'maxmin': norm_maxmin,
+                      'sigmoid': T.nnet.sigmoid,
+                      'none': lambda x: x}[normalize]
+    reduce_func = {'sum': sum_op,
+                   'over': over_op,
+                   'normalized_over': normalized_over_op,
+                   'max': max_op,
+                   'thresh': thresh_op(theta),
+                   'prev':  lambda a, b: a,
+                   'new': lambda a, b: b,
+                   'correct_over': correct_over_op(alpha)}
+
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    nonlin = get_nonlinearity[nonlin]
+    nonlin_brush = get_nonlinearity[nonlin_brush]
+
+    patch = np.ones((patch_size * (w_out/w), patch_size * (h_out/h)))
+
+    brush_in = layers.InputLayer((None, nb_recurrent_units[0]))
+    brush_in = layers.DenseLayer(brush_in, 5, nonlinearity=nonlin)
+    brush_in = layers.ReshapeLayer(brush_in, ([0], 1, 5))
+    l_brush = BrushLayer(
+        brush_in,
+        w_out, h_out,
+        n_steps=1,
+        patch=patch,
+        return_seq=False,
+        stride=stride,
+        sigma=sigma,
+        normalize_func=normalize_func,
+        reduce_func=lambda prev, new: prev,
+        nonlin_func=get_nonlinearity['linear'])
+    l_brush_ = layers.ReshapeLayer(l_brush, ([0], w_out * h_out))
+
+    def update_in(prev_inp, prev_out):
+        return prev_inp
+
+    def decorate_in(inp, prev_out):
+        return reduce_func[inp_reduce](inp, prev_out)
+
+    def update_out(prev_out, new_out):
+        return reduce_func[reduce](prev_out, new_out)
+
+    l_in_ = layers.ReshapeLayer(l_in, ([0], w * h))
+
+    in_repr = l_in
+    hids = []
+    for i in range(nb_fc_layers):
+        in_repr = layers.DenseLayer(
+            in_repr, nb_fc_units[i],
+            W=init_method(),
+            nonlinearity=nonlin,
+            name="hid{}".format(i + 1))
+        hids.append(in_repr)
+
+    l_canvas = FeedbackGRULayer(
+        l_in_,
+        num_units=nb_recurrent_units[0],
+        update_in=update_in,
+        update_out=update_out,
+        decorate_in=decorate_in,
+        hid_to_out=l_brush_,
+        in_to_repr=in_repr,
+        n_steps=n_steps)
+    l_canvas = layers.ReshapeLayer(
+        l_canvas, ([0], n_steps, w_out, h_out), name="brush")
+    l_out = layers.ExpressionLayer(
+        l_canvas,
+        lambda x: x[:, -1, :, :],
+        name="output",
+        output_shape='auto')
+    l_out = layers.ReshapeLayer(l_out, ([0], c, w_out, h_out), name="output")
+    l_out_bias = layers.BiasLayer(
+        l_out,
+        b=init.Constant(-1.),
+        name='bias')
+    l_out = layers.NonlinearityLayer(
+        l_out_bias,
+        nonlinearity=get_nonlinearity[nonlin_out],
+        name="output")
+    all_layers = [l_in] + hids + [l_canvas, l_out_bias, l_out]
     return layers_from_list_to_dict(all_layers)
 
 

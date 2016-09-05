@@ -4,6 +4,7 @@ import theano
 import os
 from lasagnekit.easy import iterate_minibatches
 import lasagne
+from layers import FeedbackGRULayer
 
 
 def norm(x):
@@ -226,7 +227,7 @@ class BrushLayer(lasagne.layers.Layer):
         self.return_seq = return_seq
         self.stride = stride
         self.sigma = sigma
-        self.reduce_func = reduce_func
+        self.reduce_func_ = reduce_func
         self.norm = normalize_func
         self.nonlin_func = nonlin_func
 
@@ -236,97 +237,94 @@ class BrushLayer(lasagne.layers.Layer):
         else:
             return (input_shape[0],) + (self.w, self.h)
 
+    def apply_func(self, X):
+        w = self.w
+        h = self.h
+        pw = self.patch.shape[0]
+        ph = self.patch.shape[1]
+
+        gx, gy = X[:, 0], X[:, 1],
+        # gx : x position
+        # gy : y position
+        # sx : x stride
+        # sy : y stride
+        gx = self.norm(gx) * w
+        gy = self.norm(gy) * h
+
+        if self.stride is True:
+            sx, sy = X[:, 2], X[:, 3]
+            sx = self.norm(sx) * w
+            sy = self.norm(sy) * h
+        else:
+            sx = T.ones_like(gx)
+            sy = T.ones_like(gx)
+
+        if self.sigma is None:
+            log_sigma = X[:, 4]
+            sigma = T.exp(log_sigma)
+        else:
+            sigma = T.ones_like(gx)
+
+        a, _ = np.indices((w, pw))
+        a = a.astype(np.float32)
+        a = a.T
+        a = theano.shared(a)
+        b, _ = np.indices((h, ph))
+        b = b.astype(np.float32)
+        b = b.T
+        b = theano.shared(b)
+        # shape of a (pw, w)
+        # shape of b (ph, h)
+        # shape of sx : (nb_examples,)
+        # shape of sy : (nb_examples,)
+        ux = gx.dimshuffle(0, 'x') + (T.arange(1, pw + 1) - pw/2. - 0.5) * sx.dimshuffle(0, 'x')
+        # shape of ux : (nb_examples, pw)
+        a_ = a.dimshuffle('x', 0, 1)
+        ux_ = ux.dimshuffle(0, 1, 'x')
+        sigma_ = sigma.dimshuffle(0, 'x', 'x')
+        Fx = T.exp(-(a_ - ux_) ** 2 / (2 * sigma_ ** 2))#+ 1e-12
+        eps = 1e-8
+        # that is,  ...(1, pw, w) - (nb_examples, pw, 1) / ... (nb_examples, 1, 1)
+        # shape of Fx : (nb_examples, pw, w)
+
+        Fx = Fx / (Fx.sum(axis=2, keepdims=True) + eps)
+
+        #Fx = theano.printing.Print('this is a very important value')(Fx)
+
+        uy = gy.dimshuffle(0, 'x') + (T.arange(1, ph + 1) - ph/2. - 0.5) * sy.dimshuffle(0, 'x')
+        # shape of uy : (nb_examples, ph)
+        b_ = b.dimshuffle('x', 0, 1)
+        uy_ = uy.dimshuffle(0, 1, 'x')
+        sigma_ = sigma.dimshuffle(0, 'x', 'x')
+        Fy = T.exp(-(b_ - uy_) ** 2 / (2 * sigma_ ** 2)) + 1e-12
+        # that is,  ...(1, ph, h) - (nb_examples, ph, 1) / ... (nb_examples, 1, 1)
+        # shape of Fy : (nb_examples, ph, h)
+        Fy = Fy / (Fy.sum(axis=2, keepdims=True) + eps)
+        patch = theano.shared(self.patch)
+        # patch : (pw, ph)
+        # Fx : (nb_examples, pw, w)
+        # Fy : (nb_examples, ph, h)
+        o = T.tensordot(patch, Fy, axes=[1, 1])
+        # -> shape (pw, nb_examples, h)
+        o = o.transpose((1, 2, 0))
+        # -> shape (nb_examples, h, pw)
+        o = T.batched_dot(o, Fx)
+        # -> shape (nb_examples, h, w)
+        o = o.transpose((0, 2, 1))
+        # -> shape (nb_examples, w, h)
+        return o
+
+    def reduce_func(self, prev, new):
+        return self.nonlin_func(self.reduce_func_(prev, new))
+
     def get_output_for(self, input, **kwargs):
-        def apply_func(X):
-
-            w = self.w
-            h = self.h
-            pw = self.patch.shape[0]
-            ph = self.patch.shape[1]
-
-            gx, gy, sx, sy, log_sigma = (
-                X[:, 0], X[:, 1],
-                X[:, 2], X[:, 3],
-                X[:, 4])
-
-            # gx : x position
-            # gy : y position
-            # sx : etendu de x
-            # sy : etendu de y
-
-            gx = self.norm(gx) * w
-            gy = self.norm(gy) * h
-            if self.stride is True:
-                sx = self.norm(sx) * w
-                sy = self.norm(sy) * h
-            else:
-                sx = T.ones_like(sx)
-                sy = T.ones_like(sy)
-
-            if self.sigma is None:
-                sigma = T.exp(log_sigma)
-            else:
-                sigma = T.ones_like(log_sigma)
-
-            a, _ = np.indices((w, pw))
-            a = a.astype(np.float32)
-            a = a.T
-            a = theano.shared(a)
-            b, _ = np.indices((h, ph))
-            b = b.astype(np.float32)
-            b = b.T
-            b = theano.shared(b)
-            # shape of a (pw, w)
-            # shape of b (ph, h)
-            # shape of sx : (nb_examples,)
-            # shape of sy : (nb_examples,)
-            ux = gx.dimshuffle(0, 'x') + (T.arange(1, pw + 1) - pw/2. - 0.5) * sx.dimshuffle(0, 'x')
-            # shape of ux : (nb_examples, pw)
-            a_ = a.dimshuffle('x', 0, 1)
-            ux_ = ux.dimshuffle(0, 1, 'x')
-            sigma_ = sigma.dimshuffle(0, 'x', 'x')
-            Fx = T.exp(-(a_ - ux_) ** 2 / (2 * sigma_ ** 2))#+ 1e-12
-            eps = 1e-8
-            # that is,  ...(1, pw, w) - (nb_examples, pw, 1) / ... (nb_examples, 1, 1)
-            # shape of Fx : (nb_examples, pw, w)
-
-            Fx = Fx / (Fx.sum(axis=2, keepdims=True) + eps)
-
-            #Fx = theano.printing.Print('this is a very important value')(Fx)
-
-            uy = gy.dimshuffle(0, 'x') + (T.arange(1, ph + 1) - ph/2. - 0.5) * sy.dimshuffle(0, 'x')
-            # shape of uy : (nb_examples, ph)
-            b_ = b.dimshuffle('x', 0, 1)
-            uy_ = uy.dimshuffle(0, 1, 'x')
-            sigma_ = sigma.dimshuffle(0, 'x', 'x')
-            Fy = T.exp(-(b_ - uy_) ** 2 / (2 * sigma_ ** 2)) + 1e-12
-            # that is,  ...(1, ph, h) - (nb_examples, ph, 1) / ... (nb_examples, 1, 1)
-            # shape of Fy : (nb_examples, ph, h)
-            Fy = Fy / (Fy.sum(axis=2, keepdims=True) + eps)
-            patch = theano.shared(self.patch)
-            # patch : (pw, ph)
-            # Fx : (nb_examples, pw, w)
-            # Fy : (nb_examples, ph, h)
-            o = T.tensordot(patch, Fy, axes=[1, 1])
-            # -> shape (pw, nb_examples, h)
-            o = o.transpose((1, 2, 0))
-            # -> shape (nb_examples, h, pw)
-            o = T.batched_dot(o, Fx)
-            # -> shape (nb_examples, h, w)
-            o = o.transpose((0, 2, 1))
-            # -> shape (nb_examples, w, h)
-            return o
-
-        def reduce_func(prev, new):
-            return self.nonlin_func(self.reduce_func(prev, new))
-
         output_shape = (input.shape[0],) + (self.w, self.h)
         init_val = T.zeros(output_shape)
         output, _ = recurrent_accumulation(
             # 'time' should be the first dimension
             input.dimshuffle(1, 0, 2),
-            apply_func,
-            reduce_func,
+            self.apply_func,
+            self.reduce_func,
             init_val,
             self.n_steps)
         output = output.dimshuffle(1, 0, 2, 3)
@@ -401,6 +399,7 @@ def thresh_op(theta):
 def sum_op(prev, new):
     # fix this
     return prev + new
+
 
 if __name__ == '__main__':
     from lasagne import layers
