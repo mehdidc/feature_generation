@@ -476,6 +476,40 @@ def load_data(dataset="digits",
                 self.cnt += 1
         data = Data()
 
+    elif dataset == "iam":
+        from skimage.io import imread_collection
+        from lasagnekit.datasets.manual import Manual
+        from lasagnekit.datasets.transformed import Transformed
+
+        folder = "{}/iam/**/**/*.png".format(os.getenv("DATA_PATH"))
+        #folder = "{}/iam/a01/a01-000u/*.png".format(os.getenv("DATA_PATH"))
+
+        collection = imread_collection(folder)
+        data = Manual(collection)
+        if w is None and h is None:
+            w = 28
+            h = 28
+        c = 1
+
+        def preprocess(X):
+            img = np.random.choice(collection)
+            X_out = np.empty((batch_size, c, w, h))
+            crop_pos_y = np.random.randint(0, img.shape[0] - h, size=batch_size)
+            crop_pos_x = np.random.randint(0, img.shape[1] - w, size=batch_size)
+            for i in range(batch_size):
+                x = crop_pos_x[i]
+                y = crop_pos_y[i]
+                X_out[i, 0] = img[y:y+h, x:x+w]
+            X_out = X_out.reshape((X_out.shape[0], -1))
+            X_out = X_out / 255.
+            X_out = 1 - X_out
+            print(X_out.shape)
+            X_out = X_out.astype(np.float32)
+            return X_out
+        data = Transformed(data, preprocess, per_example=False)
+        data.load()
+        print(data.X.shape)
+
     data.load()
     data.w = w
     data.h = h
