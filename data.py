@@ -458,7 +458,7 @@ def load_data(dataset="digits",
         c = 1
         sampler = Sampler(attach_parts=True, nbpoints=(2, 4), nbparts=(1, 3))
         class Data(object):
-            def __init__(self, batches_per_chunk=100, batch_size=batch_size):
+            def __init__(self, batches_per_chunk=1000, batch_size=batch_size):
                 self.cnt = 0
                 self.batches_per_chunk = batches_per_chunk
                 self.batch_size = batch_size
@@ -478,46 +478,50 @@ def load_data(dataset="digits",
 
     elif dataset == "iam":
         from skimage.io import imread_collection
+        from skimage.filters import threshold_otsu
         from lasagnekit.datasets.manual import Manual
         from lasagnekit.datasets.transformed import Transformed
-
+        from skimage.transform import resize
         folder = "{}/iam/**/**/*.png".format(os.getenv("DATA_PATH"))
         #folder = "{}/iam/a01/a01-000u/*.png".format(os.getenv("DATA_PATH"))
         collection = imread_collection(folder)
-        data = Manual(collection)
+        collection = list(collection)
         if w is None and h is None:
             w = 64
             h = 64
         c = 1
-        def preprocess(X):
+        def gen(nb):
             img = np.random.choice(collection)
-            X_out = np.empty((batch_size, c, w, h))
-            for i in range(batch_size):
+            X_out = np.empty((nb, c, w, h))
+            for i in range(nb):
                 im = np.ones((w, h)) * 255
                 while ((1 - im/255.) > 0.5).sum() == 0:
-                    crop_pos_y = np.random.randint(0, img.shape[0] - h)
-                    crop_pos_x = np.random.randint(0, img.shape[1] - w)
+                    ch = min(img.shape[0], 64)
+                    cw = min(img.shape[1], 64)
+                    #print(cw, ch)
+                    crop_pos_y = np.random.randint(0, img.shape[0] - ch + 1)
+                    crop_pos_x = np.random.randint(0, img.shape[1] - cw + 1)
                     x = crop_pos_x
                     y = crop_pos_y
-                    im = img[y:y+h, x:x+w]
-                    break
+                    im = img[y:y+ch, x:x+cw]
+                    im = im / 255.
+                    im = 1 - im
+                    im = resize(im, (w, h))
+                    thresh = threshold_otsu(im)
+                    im = im > thresh
                 X_out[i, 0] = im
             X_out = X_out.reshape((X_out.shape[0], -1))
-            X_out = X_out / 255.
-            X_out = 1 - X_out
-            X_out = X_out > 0.5
             X_out = X_out.astype(np.float32)
             return X_out
-        data = Transformed(data, preprocess, per_example=False)
 
         class Data(object):
-            def __init__(self, batches_per_chunk=100, batch_size=batch_size):
+            def __init__(self, batches_per_chunk=1, batch_size=batch_size):
                 self.cnt = 0
                 self.batches_per_chunk = batches_per_chunk
                 self.batch_size = batch_size
             def load(self):
                 if self.cnt % self.batches_per_chunk == 0:
-                    X = gen(self.batch_size * self.batches)
+                    X = gen(self.batch_size * self.batches_per_chunk)
                     X = X.reshape((X.shape[0], -1))
                     self.X_cache = X
                     self.cnt = 0
@@ -525,8 +529,6 @@ def load_data(dataset="digits",
                 self.X = self.X_cache[start:start + self.batch_size]
                 self.cnt += 1
         data = Data()
-
-
         data.load()
         print(data.X.shape)
 
