@@ -3,7 +3,7 @@ from lasagnekit.easy import layers_from_list_to_dict
 from lasagne.nonlinearities import (
         linear, sigmoid, rectify, very_leaky_rectify, softmax, tanh)
 from lasagnekit.layers import Deconv2DLayer
-from helpers import FeedbackGRULayer
+from helpers import FeedbackGRULayer, TensorDenseLayer
 from helpers import Deconv2DLayer as deconv2d
 from helpers import correct_over_op, over_op, sum_op, max_op, thresh_op, normalized_over_op
 from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse, norm_maxmin
@@ -4752,6 +4752,7 @@ def model81(w=32, h=32, c=1,
             nonlin='rectify',
             theta=0.5,
             nonlin_brush='linear',
+            coords_linear_layer=False,
             nonlin_out='sigmoid'):
     """
 
@@ -4804,7 +4805,11 @@ def model81(w=32, h=32, c=1,
     l_hid = Repeat(l_hid, n_steps)
     for i in range(nb_recurrent_layers):
         l_hid = layers.GRULayer(l_hid, nb_recurrent_units[i])
-    l_coord = layers.GRULayer(l_hid, 5, name="coord")
+
+    if coords_linear_layer:
+        l_coord = TensorDenseLayer(l_hid, 5, nonlinearity=linear, name="coord")
+    else:
+        l_coord = layers.GRULayer(l_hid, 5, name="coord")
     l_hid = layers.ReshapeLayer(l_coord, ([0], n_steps, 5), name="hid3")
 
     normalize_func = {'maxmin': norm_maxmin,

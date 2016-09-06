@@ -4,7 +4,7 @@ import theano
 import os
 from lasagnekit.easy import iterate_minibatches
 import lasagne
-from layers import FeedbackGRULayer
+from layers import FeedbackGRULayer, TensorDenseLayer
 
 
 def norm(x):
