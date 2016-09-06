@@ -481,14 +481,14 @@ def load_data(dataset="digits",
         from lasagnekit.datasets.manual import Manual
         from lasagnekit.datasets.transformed import Transformed
 
-        folder = "{}/iam/**/**/*.png".format(os.getenv("DATA_PATH"))
-        #folder = "{}/iam/a01/a01-000u/*.png".format(os.getenv("DATA_PATH"))
+        #folder = "{}/iam/**/**/*.png".format(os.getenv("DATA_PATH"))
+        folder = "{}/iam/a01/a01-000u/*.png".format(os.getenv("DATA_PATH"))
 
         collection = imread_collection(folder)
         data = Manual(collection)
         if w is None and h is None:
-            w = 28
-            h = 28
+            w = 64
+            h = 64
         c = 1
 
         def preprocess(X):
@@ -503,7 +503,7 @@ def load_data(dataset="digits",
             X_out = X_out.reshape((X_out.shape[0], -1))
             X_out = X_out / 255.
             X_out = 1 - X_out
-            print(X_out.shape)
+            X_out = X_out > 0.5
             X_out = X_out.astype(np.float32)
             return X_out
         data = Transformed(data, preprocess, per_example=False)

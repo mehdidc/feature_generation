@@ -267,15 +267,15 @@ def build_capsule_(layers, data, nbl, nbc,
         X_pred = rec(preprocess(X_orig))
         if layers['input'].output_shape[1] == 3:
             X_orig = X_orig.reshape((X_orig.shape[0], 3, w, h)).transpose((0, 2, 3, 1))
-            img_orig = dispims_color(X_orig, border=1)
+            img_orig = dispims_color(X_orig, border=1, bordercolor=(200, 200, 200))
             X_pred = X_pred.reshape((X_pred.shape[0], 3, w, h)).transpose((0, 2, 3, 1))
             img_pred = dispims_color(X_pred, border=1)
             img = np.concatenate((img_orig, img_pred), axis=1)
         elif layers['input'].output_shape[1] == 1:
             X_orig = (X_orig.reshape((X_orig.shape[0], 1, w, h)) * np.ones((1, 3, 1, 1))).transpose((0, 2, 3, 1))
-            img_orig = dispims_color(X_orig, border=1)
+            img_orig = dispims_color(X_orig, border=1, bordercolor=(200, 200, 200))
             X_pred = (X_pred.reshape((X_pred.shape[0], 1, w, h)) * np.ones((1, 3, 1, 1))).transpose((0, 2, 3, 1))
-            img_pred = dispims_color(X_pred, border=1)
+            img_pred = dispims_color(X_pred, border=1, bordercolor=(200, 200, 200))
             img = np.concatenate((img_orig, img_pred), axis=1)
         imsave("{}/recons/{:08d}.png".format(prefix, ep), img)
         # save features (raw)
@@ -381,7 +381,9 @@ def build_capsule_(layers, data, nbl, nbc,
             status["avg_loss_train"] = B * last_avg + (1 - B) * status[loss]
             fix = 1 - B ** (1 + t)
             status["avg_loss_train_fix"] = status["avg_loss_train"] / fix
-
+            c, w, h = layers["input"].output_shape[1:]
+            # because squared_error does not divided by nb of pixels
+            status['normalized_avg_loss_train_fix'] = status['avg_loss_train_fix'] / (w*h*c)
         N = 200
         if is_predictive and hasattr(data, "test") and t % N == 0:
             preds = []
@@ -417,6 +419,7 @@ def build_capsule_(layers, data, nbl, nbc,
 
 
         if np.isnan(status['loss_train']):
+            print('Nan detected, quit')
             raise KeyboardInterrupt('Nan detected, quit')
         if (datetime.now() - begin).total_seconds() >= budget_sec:
             logger.info("Budget finished.quit.")
