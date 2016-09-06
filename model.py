@@ -4903,6 +4903,7 @@ def model82(w=32, h=32, c=1,
     nonlin = get_nonlinearity[nonlin]
 
     patch = np.ones((patch_size * (w_out/w), patch_size * (h_out/h)))
+    #patch /= np.prod(patch.shape)
 
     brush_in = layers.InputLayer((None, nb_recurrent_units[0]))
     brush_in = layers.DenseLayer(brush_in, 5, nonlinearity=linear)
