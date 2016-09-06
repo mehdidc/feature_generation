@@ -481,25 +481,27 @@ def load_data(dataset="digits",
         from lasagnekit.datasets.manual import Manual
         from lasagnekit.datasets.transformed import Transformed
 
-        #folder = "{}/iam/**/**/*.png".format(os.getenv("DATA_PATH"))
-        folder = "{}/iam/a01/a01-000u/*.png".format(os.getenv("DATA_PATH"))
-
+        folder = "{}/iam/**/**/*.png".format(os.getenv("DATA_PATH"))
+        #folder = "{}/iam/a01/a01-000u/*.png".format(os.getenv("DATA_PATH"))
         collection = imread_collection(folder)
         data = Manual(collection)
         if w is None and h is None:
             w = 64
             h = 64
         c = 1
-
         def preprocess(X):
             img = np.random.choice(collection)
             X_out = np.empty((batch_size, c, w, h))
-            crop_pos_y = np.random.randint(0, img.shape[0] - h, size=batch_size)
-            crop_pos_x = np.random.randint(0, img.shape[1] - w, size=batch_size)
             for i in range(batch_size):
-                x = crop_pos_x[i]
-                y = crop_pos_y[i]
-                X_out[i, 0] = img[y:y+h, x:x+w]
+                im = np.ones((w, h)) * 255
+                while ((1 - im/255.) > 0.5).sum() == 0:
+                    crop_pos_y = np.random.randint(0, img.shape[0] - h)
+                    crop_pos_x = np.random.randint(0, img.shape[1] - w)
+                    x = crop_pos_x
+                    y = crop_pos_y
+                    im = img[y:y+h, x:x+w]
+                    break
+                X_out[i, 0] = im
             X_out = X_out.reshape((X_out.shape[0], -1))
             X_out = X_out / 255.
             X_out = 1 - X_out
@@ -507,6 +509,24 @@ def load_data(dataset="digits",
             X_out = X_out.astype(np.float32)
             return X_out
         data = Transformed(data, preprocess, per_example=False)
+
+        class Data(object):
+            def __init__(self, batches_per_chunk=100, batch_size=batch_size):
+                self.cnt = 0
+                self.batches_per_chunk = batches_per_chunk
+                self.batch_size = batch_size
+            def load(self):
+                if self.cnt % self.batches_per_chunk == 0:
+                    X = gen(self.batch_size * self.batches)
+                    X = X.reshape((X.shape[0], -1))
+                    self.X_cache = X
+                    self.cnt = 0
+                start = self.cnt * self.batch_size
+                self.X = self.X_cache[start:start + self.batch_size]
+                self.cnt += 1
+        data = Data()
+
+
         data.load()
         print(data.X.shape)
 

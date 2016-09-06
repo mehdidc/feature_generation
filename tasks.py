@@ -267,15 +267,15 @@ def build_capsule_(layers, data, nbl, nbc,
         X_pred = rec(preprocess(X_orig))
         if layers['input'].output_shape[1] == 3:
             X_orig = X_orig.reshape((X_orig.shape[0], 3, w, h)).transpose((0, 2, 3, 1))
-            img_orig = dispims_color(X_orig, border=1, bordercolor=(200, 200, 200))
+            img_orig = dispims_color(X_orig, border=1, bordercolor=(1, 1, 1))
             X_pred = X_pred.reshape((X_pred.shape[0], 3, w, h)).transpose((0, 2, 3, 1))
             img_pred = dispims_color(X_pred, border=1)
             img = np.concatenate((img_orig, img_pred), axis=1)
         elif layers['input'].output_shape[1] == 1:
             X_orig = (X_orig.reshape((X_orig.shape[0], 1, w, h)) * np.ones((1, 3, 1, 1))).transpose((0, 2, 3, 1))
-            img_orig = dispims_color(X_orig, border=1, bordercolor=(200, 200, 200))
+            img_orig = dispims_color(X_orig, border=1, bordercolor=(1, 1, 1))
             X_pred = (X_pred.reshape((X_pred.shape[0], 1, w, h)) * np.ones((1, 3, 1, 1))).transpose((0, 2, 3, 1))
-            img_pred = dispims_color(X_pred, border=1, bordercolor=(200, 200, 200))
+            img_pred = dispims_color(X_pred, border=1, bordercolor=(1, 1, 1))
             img = np.concatenate((img_orig, img_pred), axis=1)
         imsave("{}/recons/{:08d}.png".format(prefix, ep), img)
         # save features (raw)
