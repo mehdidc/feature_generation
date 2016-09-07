@@ -490,15 +490,15 @@ def load_data(dataset="digits",
             w = 64
             h = 64
         c = 1
+
         def gen(nb):
-            img = np.random.choice(collection)
             X_out = np.empty((nb, c, w, h))
             for i in range(nb):
+                img = np.random.choice(collection)
                 im = np.ones((w, h)) * 255
                 while ((1 - im/255.) > 0.5).sum() == 0:
                     ch = min(img.shape[0], 64)
                     cw = min(img.shape[1], 64)
-                    #print(cw, ch)
                     crop_pos_y = np.random.randint(0, img.shape[0] - ch + 1)
                     crop_pos_x = np.random.randint(0, img.shape[1] - cw + 1)
                     x = crop_pos_x

@@ -4,7 +4,7 @@
 "budget_hours": 10,
 "contractive": false,
 "contractive_coef": null,
-"dataset": "digits",
+"dataset": "iam",
 "denoise": null,
 "marginalized": false,
 "model_name": "model82",
