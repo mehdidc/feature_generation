@@ -475,15 +475,24 @@ def load_data(dataset="digits",
                 self.X = self.X_cache[start:start + self.batch_size]
                 self.cnt += 1
         data = Data()
+    elif dataset == "iam_hdf5":
+        import h5py
+        filename = "{}/iam/dataset.hdf5".format(os.getenv("DATA_PATH"))
+        w, h = 64, 64
+        c = 1
+        hf = h5py.File(filename)
+        X = hf['X']
+        data = Manual(X=X)
+        data.img_dim = (64, 64)
+        data.load()
+        print(data.X.shape)
 
     elif dataset == "iam":
         from skimage.io import imread_collection
         from skimage.filters import threshold_otsu
-        from lasagnekit.datasets.manual import Manual
-        from lasagnekit.datasets.transformed import Transformed
         from skimage.transform import resize
         folder = "{}/iam/**/**/*.png".format(os.getenv("DATA_PATH"))
-        #folder = "{}/iam/a01/a01-000u/*.png".format(os.getenv("DATA_PATH"))
+        # folder = "{}/iam/a01/a01-000u/*.png".format(os.getenv("DATA_PATH"))
         collection = imread_collection(folder)
         collection = list(collection)
         if w is None and h is None:
