@@ -4866,6 +4866,7 @@ def model82(w=32, h=32, c=1,
             nonlin='rectify',
             nonlin_out='sigmoid',
             nb_fc_units=1000,
+            normalize_patch=False,
             nb_fc_layers=0):
 
     """
@@ -4894,7 +4895,7 @@ def model82(w=32, h=32, c=1,
                    'normalized_over': normalized_over_op,
                    'max': max_op,
                    'thresh': thresh_op(theta),
-                   'prev':  lambda a, b: a,
+                   'prev': lambda a, b: a,
                    'new': lambda a, b: b,
                    'sub': lambda a, b: a - T.nnet.sigmoid(b),
                    'correct_over': correct_over_op(alpha)}
@@ -4903,7 +4904,8 @@ def model82(w=32, h=32, c=1,
     nonlin = get_nonlinearity[nonlin]
 
     patch = np.ones((patch_size * (w_out/w), patch_size * (h_out/h)))
-    #patch /= np.prod(patch.shape)
+    if normalize_patch:
+        patch /= np.prod(patch.shape)
 
     brush_in = layers.InputLayer((None, nb_recurrent_units[0]))
     brush_in = layers.DenseLayer(brush_in, 5, nonlinearity=linear)
