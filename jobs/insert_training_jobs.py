@@ -2252,6 +2252,25 @@ def jobset46():
         return params
     return jobset_recurrent_brush_stroke('jobset46', 'model82', update=update)
 
+def jobset47():
+
+    def update(params):
+        rng = random
+        params['model_params']['stride'] = False
+        params['model_params']['sigma'] = rng.choice((None, 1))
+        params['model_params']['normalize'] = 'sigmoid'
+        params['model_params']['out_reduce'] = rng.choice(('sum', 'over', 'max'))
+        params['model_params']['inp_reduce'] = rng.choice(('sum', 'over', 'prev'))
+        del params['model_params']['nb_recurrent_layers']
+        params['model_params']['nb_recurrent_units'] = params['model_params']['nb_recurrent_units'][0]
+        params['dataset'] = 'iam'
+        params['force_w'] = 28
+        params['force_h'] = 28
+        return params
+    return jobset_recurrent_brush_stroke('jobset47', 'model82', update=update)
+
+
+
 
 
 

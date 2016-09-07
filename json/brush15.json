@@ -1,0 +1,35 @@
+{
+"autoencoding_loss": "squared_error",
+"binarize_thresh": null,
+"budget_hours": 10,
+"contractive": false,
+"contractive_coef": null,
+"dataset": "digits",
+"denoise": null,
+"marginalized": false,
+"model_name": "model82",
+"model_params": {   
+        "inp_reduce": "over",
+        "n_steps": 45,
+        "nb_fc_layers": 2,
+        "nb_fc_units": [1000, 100],
+        "nb_recurrent_units": 200,
+        "nonlin": "rectify",
+        "normalize": "sigmoid",
+        "out_reduce": "sum",
+        "patch_size": 2,
+        "sigma": 1,
+        "stride": false
+},
+"force_w": 28, 
+"force_h": 28,
+"noise": null,
+"optimization": {
+    "max_nb_epochs": 9999999999,
+    "patience_nb_epochs": 500
+},
+"mode": "random",
+"walkback": 1,
+"report_rec_error": false,
+"walkback_mode": "bengio_without_sampling"
+}
