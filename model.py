@@ -5101,11 +5101,19 @@ def model83(w=32, h=32, c=1,
     for i in range(nb_recurrent_layers):
         l_hid = recurrent_model(l_hid, nb_recurrent_units[i])
 
-    l_coord = TensorDenseLayer(l_hid, 5, nonlinearity=linear, name="coord")
-    #l_hid = layers.ReshapeLayer(l_coord, ([0], n_steps, 5), name="hid3")
+    nb = (2 +  # coords +
+          (1 if x_sigma == 'predicted' else 0) +
+          (1 if y_sigma == 'predicted' else 0) +
+          (1 if x_stride == 'predicted' else 0) +
+          (1 if y_stride == 'predicted' else 0) +
+          (c if color == 'predicted' else 0) +
+          (1 if patch_index == 'predicted' else 0))
+    nb = max(nb, 5)
+    l_coord = TensorDenseLayer(l_hid, nb, nonlinearity=linear, name="coord")
 
     # DECODING PART
-    patches = np.ones((1, c, patch_size, patch_size))
+
+    patches = np.ones((1, c, patch_size * (h_out/h), patch_size * (w_out/w)))
     patches = patches.astype(np.float32)
 
     l_brush = GenericBrushLayer(
@@ -5114,7 +5122,7 @@ def model83(w=32, h=32, c=1,
         n_steps=n_steps,
         patches=patches,
         col='rgb' if c == 3 else 'grayscale',
-        return_seq=False,
+        return_seq=True,
         reduce_func=reduce_funcs[reduce_func],
         to_proba_func=proba_funcs[proba_func],
         normalize_func=normalize_funcs[normalize_func],
@@ -5131,7 +5139,12 @@ def model83(w=32, h=32, c=1,
         eps=eps,
         name="brush"
     )
-    l_raw_out = l_brush
+    l_raw_out = layers.ExpressionLayer(
+        l_brush,
+        lambda x: x[:, -1, :, :],
+        name="raw_output",
+        output_shape='auto')
+
     l_scaled_out = layers.ScaleLayer(
         l_raw_out, scales=init.Constant(2.), name="scaled_output")
     l_biased_out = layers.BiasLayer(
@@ -5144,7 +5157,7 @@ def model83(w=32, h=32, c=1,
 
     all_layers = ([l_in] +
                   hids +
-                  [l_coord, l_brush, l_raw_out, l_biased_out, l_out])
+                  [l_coord, l_brush, l_raw_out, l_biased_out, l_scaled_out,  l_out])
     return layers_from_list_to_dict(all_layers)
 
 

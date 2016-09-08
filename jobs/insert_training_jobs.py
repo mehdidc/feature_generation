@@ -2141,7 +2141,7 @@ def jobset_recurrent_brush_stroke(jobset_name, model_name, update=lambda p:p):
     jobset_name = jobset_name
 
     params['model_name'] = model_name
-    params['dataset'] = 'digits'
+    params['dataset'] = dataset
     params['budget_hours'] = budget_hours
 
     params = update(params)
@@ -2270,6 +2270,62 @@ def jobset47():
     return jobset_recurrent_brush_stroke('jobset47', 'model82', update=update)
 
 
+def jobset48():
+
+    def update(params):
+        rng = random
+        sigma = rng.choice((1, 0.5, 'predicted'))
+        model_params = dict(
+            nonlin_out='sigmoid',
+            reduce_func=rng.choice(('sum', 'over', 'max')),
+            normalize_func='sigmoid',
+            x_sigma=sigma,
+            y_sigma=sigma,
+            x_stride=1,
+            y_stride=1,
+            patch_index=0,
+            color='predicted',
+            x_min=0,
+            x_max='width',
+            y_min=0,
+            y_max='height',
+            recurrent_model=rng.choice(('gru', 'lstm', 'rnn')),
+            eps=0
+        )
+        params['model_params'].update(model_params)
+        params['dataset'] = 'aloi'
+        return params
+
+    return jobset_recurrent_brush_stroke('jobset48', 'model83', update=update)
+
+
+def jobset49():
+
+    def update(params):
+        rng = random
+        sigma = rng.choice((1, 0.5, 'predicted'))
+        model_params = dict(
+            nonlin_out='sigmoid',
+            reduce_func=rng.choice(('sum', 'over', 'max')),
+            normalize_func='sigmoid',
+            x_sigma=sigma,
+            y_sigma=sigma,
+            x_stride=1,
+            y_stride=1,
+            patch_index=0,
+            color='predicted',
+            x_min=0,
+            x_max='width',
+            y_min=0,
+            y_max='height',
+            recurrent_model=rng.choice(('gru', 'lstm', 'rnn')),
+            eps=0
+        )
+        params['model_params'].update(model_params)
+        params['dataset'] = 'omniglot'
+        return params
+
+    return jobset_recurrent_brush_stroke('jobset49', 'model83', update=update)
 
 
 

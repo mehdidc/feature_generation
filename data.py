@@ -218,6 +218,7 @@ def load_data(dataset="digits",
         data = load_once(FlatIcon)(size=(w, h), nb=nb, mode=mode)
         data.load()
         data.y = None
+
         def preprocess(X):
             X = X[:, :, :, 0]
             X = X.reshape((X.shape[0], -1))
@@ -226,7 +227,6 @@ def load_data(dataset="digits",
         data.load()
         if include_test:
             data_train, data_test = split(data, test_size=0.15, random_state=42)
-
         data = SubSampled(data_train, batch_size)
         data.load()
         data.train = data_train
@@ -308,7 +308,6 @@ def load_data(dataset="digits",
         data = Rescaled(data, (w, h))
         data = Transformed(data, preprocess, per_example=False)
         data.load()
-        print(data.X.shape)
 
     elif dataset == 'chairs':
         from lasagnekit.datasets.chairs import Chairs
@@ -316,7 +315,7 @@ def load_data(dataset="digits",
         if w is None and h is None:
             w, h = 64, 64
         c = 3
-        data = Chairs(size=(w, h), nb=batch_size)
+        data = Chairs(size=(w, h), nb=batch_size, crop=True, crop_to=200)
         data.load()
         print(data.X.shape)
 
@@ -325,6 +324,7 @@ def load_data(dataset="digits",
             X = X.reshape((X.shape[0], -1))
             return X
         data = Transformed(data, preprocess, per_example=False)
+
         data.load()
         print(data.X.shape)
     elif dataset == 'icons':
@@ -349,7 +349,7 @@ def load_data(dataset="digits",
         from lasagnekit.datasets.imagecollection import ImageCollection
         from lasagnekit.datasets.transformed import Transformed
         if w is None and h is None:
-            w, h = 33, 32
+            w, h = 32, 32
         c = 3
         folder = "{}/aloi".format(os.getenv("DATA_PATH"))
         data = ImageCollection(size=(w, h), nb=batch_size, folder=folder, recur=True)
