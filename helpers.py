@@ -5,7 +5,7 @@ import os
 from lasagnekit.easy import iterate_minibatches
 import lasagne
 from layers import FeedbackGRULayer, TensorDenseLayer
-
+from sparsemax_theano import sparsemax
 
 def norm(x):
     return (x - x.min()) / (x.max() - x.min() + T.eq(x.max(), x.min()) + 1e-12)
@@ -402,6 +402,12 @@ def sum_op(prev, new):
     return prev + new
 
 
+def axis_softmax(x, axis=1):
+    e_x = T.exp(x - x.max(axis=axis, keepdims=True))
+    out = e_x / e_x.sum(axis=axis, keepdims=True)
+    return out
+
+
 class GenericBrushLayer(lasagne.layers.Layer):
 
     def __init__(self, incoming, w, h,
@@ -410,12 +416,14 @@ class GenericBrushLayer(lasagne.layers.Layer):
                  n_steps=10,
                  return_seq=False,
                  reduce_func=sum_op,
+                 to_proba_func=T.nnet.softmax,
                  normalize_func=T.nnet.sigmoid,
                  x_sigma='predicted',
                  y_sigma='predicted',
                  x_stride='predicted',
                  y_stride='predicted',
                  patch_index='predicted',
+                 color='predicted',
                  x_min=0,
                  x_max='width',
                  y_min=0,
@@ -446,6 +454,11 @@ class GenericBrushLayer(lasagne.layers.Layer):
                      obtain probabilities, otherwise it is an int
                      which denotes the index of the chosen patch, that is,
                      patches[patch_index]
+        color : if 'predicted' taken from input then merge to patch colors.
+                if 'patch' then use patch colors only.
+                otherwise it should be a number if col is 'grayscale' or
+                a 3-tuple if col is 'rgb' and then then same color is
+                merged to the patches at all time steps.
         x_min : the minimum value for the coords in the w scale
         x_max : if 'width' it is equal to w, else use the provided value
 
@@ -467,6 +480,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
 
         self.reduce_func = reduce_func
         self.normalize_func = normalize_func
+        self.to_proba_func = to_proba_func
         self.x_sigma = x_sigma
         self.y_sigma = y_sigma
         self.x_stride = x_stride
@@ -476,21 +490,26 @@ class GenericBrushLayer(lasagne.layers.Layer):
         self.y_min = y_min
         self.y_max = h if y_max == 'height' else y_max
         self.patch_index = patch_index
+        self.color = color
         self.eps = 0
 
-        self.assign = {}
+        self._nb_input_features = incoming.output_shape[2]
+        self.assign_ = {}
 
     def get_output_shape_for(self, input_shape):
         if self.return_seq:
-            return (input_shape[0],) + (self.n_steps, self.w, self.h)
+            return (input_shape[0], self.n_steps,
+                    self.nb_col_channels, self.w, self.h)
         else:
-            return (input_shape[0],) + (self.w, self.h)
+            return (input_shape[0], self.nb_col_channels, self.w, self.h)
 
     def apply_func(self, X):
         w = self.w
         h = self.h
-        ph = self.patch.shape[2]
-        pw = self.patch.shape[3]
+        nb_patches = self.patches.shape[0]
+        ph = self.patches.shape[2]
+        pw = self.patches.shape[3]
+        nb_features = self._nb_input_features
 
         gx, gy = X[:, 0], X[:, 1]
 
@@ -529,6 +548,25 @@ class GenericBrushLayer(lasagne.layers.Layer):
             pointer += 1
         else:
             y_sigma = T.ones_like(gy) * self.y_sigma
+
+        if self.patch_index == 'predicted':
+            patch_index = X[:, pointer:pointer + nb_patches]
+            self.assign_['patch_index'] = (pointer, pointer + nb_patches)
+            pointer += nb_patches
+        else:
+            patch_index = self.patch_index
+
+        if self.color == 'predicted':
+            colors = X[:, pointer:pointer + self.nb_col_channels]
+            colors = self.normalize_func(colors)
+            self.assign_['color'] = (pointer, pointer + self.nb_col_channels)
+            pointer += self.nb_col_channels
+        elif self.color == 'patches':
+            colors = theano.shared(T.ones((1, 1, 1, 1)))
+        else:
+            colors = self.color
+
+        assert nb_features >= pointer, "The number of input features to Brush should be {} insteaf of {} (or at least bigger)".format(pointer, nb_features)
 
         a, _ = np.indices((w, pw))
         a = a.astype(np.float32)
@@ -572,8 +610,25 @@ class GenericBrushLayer(lasagne.layers.Layer):
         # -> shape (nb_examples, nbp, c, h, pw)
         o = T.batched_tensordot(o, Fx, axes=[4, 1])
         # -> shape (nb_examples, nbp, c, h, w)
-        o = o.sum(axis=1)
-        # -> shape (nb_examples, c, h, w)
+
+        if self.patch_index == 'predicted':
+            patch_index_ = self.to_proba_func(patch_index)
+            patch_index_ = patch_index_.dimshuffle(0, 1, 'x', 'x', 'x')
+            o = o * patch_index_
+            o = o.sum(axis=1)
+            # -> shape (nb_examples, c, h, w)
+        else:
+            o = o[:, patch_index]
+            # -> shape (nb_examples, c, h, w)
+
+        if self.color == 'predicted':
+            o = o * colors.dimshuffle(0, 1, 'x', 'x')
+        elif self.color == 'patches':
+            pass
+        else:
+            colors_ = theano.shared(np.array(colors))
+            colors_ = colors_.dimshuffle('x', 0, 'x', 'x')
+            o = o * colors_
         return o
 
     def reduce_func(self, prev, new):
@@ -584,6 +639,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
             (input.shape[0],) +
             (self.nb_col_channels, self.h, self.w))
         init_val = T.zeros(output_shape)
+        init_val = T.unbroadcast(init_val, 0, 1, 2, 3)
         output, _ = recurrent_accumulation(
             # 'time' should be the first dimension
             input.dimshuffle(1, 0, 2),
@@ -598,17 +654,63 @@ class GenericBrushLayer(lasagne.layers.Layer):
             return output[:, -1]
 
 
-def test_batch_layer():
+def test_generic_batch_layer():
     from lasagne import layers
-    n_steps = 10
-    inp = layers.InputLayer((None, n_steps, 5))
-    brush = BrushLayer(inp, 28, 28, n_steps=n_steps)
+    from lasagnekit.misc.plot_weights import dispims_color
+    from skimage.io import imsave
+    n_steps = 2
+    nb_features = 8
+    inp = layers.InputLayer((None, n_steps, nb_features))
+    p1 = [
+        [0, 0, 1, 0, 0],
+        [0, 0, 1, 0, 0],
+        [0, 1, 1, 1, 0],
+        [1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1],
+    ]
+    p2 = [
+        [1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1],
+    ]
+    patches = np.zeros((2, 3, 5, 5))
+    patches[0, :] = np.array(p1)
+    patches[1, :] = np.array(p2)
+    patches = patches.astype(np.float32)
+
+    brush = GenericBrushLayer(
+        inp,
+        64, 64,
+        n_steps=n_steps,
+        patches=patches,
+        col='rgb',
+        return_seq=False,
+        reduce_func=over_op,
+        to_proba_func=sparsemax,
+        normalize_func=T.nnet.sigmoid,
+        x_sigma=0.5,#'predicted',
+        y_sigma=0.5,#'predicted',
+        x_stride=1,#'predicted',
+        y_stride=1,#,'predicted',
+        patch_index='predicted',
+        color='predicted',
+        #color=(1., 0, 0),
+        x_min=0,
+        x_max='width',
+        y_min=0,
+        y_max='height',
+        eps=1e-12)
     X = T.tensor3()
     fn = theano.function([X], layers.get_output(brush, X))
-
-    X_example = np.random.uniform(0, 1, size=(100, n_steps, 5))
+    X_example = np.random.normal(0, 1, size=(100, n_steps, nb_features))
     X_example = X_example.astype(np.float32)
-    print(fn(X_example).shape)
+    y = fn(X_example)
+    print(y.min(), y.max())
+    y = y.transpose((0, 2, 3, 1))
+    img = dispims_color(y, border=1, bordercolor=(0.3, 0.3, 0.3))
+    imsave('out.png', img)
 
 if __name__ == '__main__':
-    test_batch_layer()
+    test_generic_batch_layer()
