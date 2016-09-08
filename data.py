@@ -146,6 +146,29 @@ def load_data(dataset="digits",
                     included[data.test.y == cl] = True
                 data.test.X = data.test.X[included]
                 data.test.y = data.test.y[included]
+    if dataset == "cropped_digits":
+        from lasagnekit.datasets.mnist import MNIST
+        from lasagnekit.datasets.transformed import Transformed
+        from lasagnekit.datasets.helpers import load_once
+        c = 1
+        cr = 6
+        w, h = 28 - cr * 2, 28 - cr * 2
+        def preprocess(X):
+            return X.reshape((X.shape[0], 28, 28))[:, cr:-cr, cr:-cr].reshape((X.shape[0], w*h))
+        train_data = load_once(MNIST)(which='train')
+        train_data = load_once(Transformed)(train_data, preprocess, per_example=False)
+        train_data.load()
+        train_data.img_dim = (w, h)
+
+        test_data = MNIST(which='test')
+        test_data = Transformed(test_data, preprocess, per_example=False)
+        test_data.load()
+        test_data.img_dim = (w, h)
+
+        data = train_data
+        data.train = train_data
+        data.test = test_data
+        print(data.img_dim)
 
     if dataset == "olivetti":
         from sklearn.datasets import fetch_olivetti_faces
@@ -498,15 +521,20 @@ def load_data(dataset="digits",
     elif dataset == "iam_hdf5":
         import h5py
         from lasagnekit.datasets.manual import Manual
+        from lasagnekit.datasets.rescaled import Rescaled
+
         filename = "{}/iam/dataset.hdf5".format(os.getenv("DATA_PATH"))
-        w, h = 64, 64
+        if w is not None and h is not None:
+            w, h = 64, 64
         c = 1
         hf = h5py.File(filename)
         X = hf['X']
         X = X[0:len(X)]
         print(X.shape)
         data = Manual(X=X)
-        data.img_dim = (64, 64)
+        if w != 64 or h != 64:
+            data = Rescaled(data, (w, h))
+        data.img_dim = (w, h)
         data.load()
         print(data.X.shape)
 
@@ -553,6 +581,7 @@ def load_data(dataset="digits",
                 self.cnt = 0
                 self.batches_per_chunk = batches_per_chunk
                 self.batch_size = batch_size
+
             def load(self):
                 if self.cnt % self.batches_per_chunk == 0:
                     X = gen(self.batch_size * self.batches_per_chunk)
@@ -564,7 +593,6 @@ def load_data(dataset="digits",
                 self.cnt += 1
         data = Data()
         data.load()
-        print(data.X.shape)
 
     data.load()
     data.w = w

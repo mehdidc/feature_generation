@@ -396,12 +396,209 @@ def thresh_op(theta):
         return (new > theta) * new +  (new <= theta ) * prev
     return fn
 
+
 def sum_op(prev, new):
     # fix this
     return prev + new
 
 
-if __name__ == '__main__':
+class GenericBrushLayer(lasagne.layers.Layer):
+
+    def __init__(self, incoming, w, h,
+                 patches=np.ones((1, 1, 3, 3)),
+                 col='grayscale',
+                 n_steps=10,
+                 return_seq=False,
+                 reduce_func=sum_op,
+                 normalize_func=T.nnet.sigmoid,
+                 x_sigma='predicted',
+                 y_sigma='predicted',
+                 x_stride='predicted',
+                 y_stride='predicted',
+                 patch_index='predicted',
+                 x_min=0,
+                 x_max='width',
+                 y_min=0,
+                 y_max='height',
+                 eps=0,
+                 **kwargs):
+        """
+        w : width of resulting image
+        h : height of resulting image
+        patches : (nb_patches, color, ph, pw)
+        col : 'grayscale'/'rgb' or give the nb of channels as an int
+        n_steps : int
+        return_seq : True returns the seq (nb_examples, n_steps, c, h, w)
+                    False returns (nb_examples, -1, c, h, w)
+        reduce_func : function used to update the output, takes prev
+                      output as first argument and new output
+                      as second one.
+        normalize_func : function used to normalize between 0 and 1
+        x_sigma : if 'predicted' taken from input else use the provided
+                  value
+        y_sigma : if 'predicted' taken from input else use the provided
+                  value
+        x_stride : if 'predicted' taken from input else use the provided
+                   value
+        y_stride : if 'predicted' taken from input else use the provided
+                   value
+        patch_index: if 'predicted' taken from input then apply to_proba_func to
+                     obtain probabilities, otherwise it is an int
+                     which denotes the index of the chosen patch, that is,
+                     patches[patch_index]
+        x_min : the minimum value for the coords in the w scale
+        x_max : if 'width' it is equal to w, else use the provided value
+
+        y_min : the minimum value for the coords in the w scale
+        y_max : if 'height' it is equal to h, else use the provided value
+
+        """
+        super(GenericBrushLayer, self).__init__(incoming, **kwargs)
+        self.incoming = incoming
+        self.w = w
+        self.h = h
+        self.nb_col_channels = (3 if col == 'rgb' else
+                                1 if col == 'grayscale'
+                                else col)
+        assert self.nb_col_channels in (1, 3)
+        self.n_steps = n_steps
+        self.patches = patches
+        self.return_seq = return_seq
+
+        self.reduce_func = reduce_func
+        self.normalize_func = normalize_func
+        self.x_sigma = x_sigma
+        self.y_sigma = y_sigma
+        self.x_stride = x_stride
+        self.y_stride = y_stride
+        self.x_min = x_min
+        self.x_max = w if x_max == 'width' else x_max
+        self.y_min = y_min
+        self.y_max = h if y_max == 'height' else y_max
+        self.patch_index = patch_index
+        self.eps = 0
+
+        self.assign = {}
+
+    def get_output_shape_for(self, input_shape):
+        if self.return_seq:
+            return (input_shape[0],) + (self.n_steps, self.w, self.h)
+        else:
+            return (input_shape[0],) + (self.w, self.h)
+
+    def apply_func(self, X):
+        w = self.w
+        h = self.h
+        ph = self.patch.shape[2]
+        pw = self.patch.shape[3]
+
+        gx, gy = X[:, 0], X[:, 1]
+
+        gx = self.normalize_func(gx) * self.x_max + self.x_min
+        gy = self.normalize_func(gy) * self.y_max + self.y_min
+
+        pointer = 2
+        if self.x_stride == 'predicted':
+            sx = X[:, pointer]
+            sx = self.normalize_func(gx) * self.x_max + self.x_min
+            self.assign_['x_stride'] = pointer
+            pointer += 1
+        else:
+            sx = T.ones_like(gx) * self.x_stride
+
+        if self.y_stride == 'predicted':
+            sy = X[:, pointer]
+            sy = self.normalize_func(gy) * self.y_max + self.y_min
+            self.assign_['y_stride'] = pointer
+            pointer += 1
+        else:
+            sy = T.ones_like(gy) * self.y_stride
+
+        if self.x_sigma == 'predicted':
+            log_x_sigma = X[:, pointer]
+            x_sigma = T.exp(log_x_sigma)
+            self.assign_['x_sigma'] = pointer
+            pointer += 1
+        else:
+            x_sigma = T.ones_like(gx) * self.x_sigma
+
+        if self.y_sigma == 'predicted':
+            log_y_sigma = X[:, pointer]
+            y_sigma = T.exp(log_y_sigma)
+            self.assign_['y_sigma'] = pointer
+            pointer += 1
+        else:
+            y_sigma = T.ones_like(gy) * self.y_sigma
+
+        a, _ = np.indices((w, pw))
+        a = a.astype(np.float32)
+        a = a.T
+        a = theano.shared(a)
+        b, _ = np.indices((h, ph))
+        b = b.astype(np.float32)
+        b = b.T
+        b = theano.shared(b)
+        # shape of a (pw, w)
+        # shape of b (ph, h)
+        # shape of sx : (nb_examples,)
+        # shape of sy : (nb_examples,)
+        ux = (gx.dimshuffle(0, 'x') +
+              (T.arange(1, pw + 1) - pw/2. - 0.5) * sx.dimshuffle(0, 'x'))
+        # shape of ux : (nb_examples, pw)
+        a_ = a.dimshuffle('x', 0, 1)
+        ux_ = ux.dimshuffle(0, 1, 'x')
+
+        x_sigma_ = x_sigma.dimshuffle(0, 'x', 'x')
+        y_sigma_ = y_sigma.dimshuffle(0, 'x', 'x')
+
+        Fx = T.exp(-(a_ - ux_) ** 2 / (2 * x_sigma_ ** 2))
+        Fx = Fx / (Fx.sum(axis=2, keepdims=True) + self.eps)
+
+        uy = (gy.dimshuffle(0, 'x') +
+              (T.arange(1, ph + 1) - ph/2. - 0.5) * sy.dimshuffle(0, 'x'))
+        # shape of uy : (nb_examples, ph)
+        b_ = b.dimshuffle('x', 0, 1)
+        uy_ = uy.dimshuffle(0, 1, 'x')
+        Fy = T.exp(-(b_ - uy_) ** 2 / (2 * y_sigma_ ** 2))
+        # shape of Fy : (nb_examples, ph, h)
+        Fy = Fy / (Fy.sum(axis=2, keepdims=True) + self.eps)
+        patches = theano.shared(self.patches)
+        # patches : (nbp, c, ph, pw)
+        # Fy : (nb_examples, ph, h)
+        # Fx : (nb_examples, pw, w)
+        o = T.tensordot(patches, Fy, axes=[2, 1])
+        # -> shape (nbp, c, pw, nb_examples, h)
+        o = o.transpose((3, 0, 1, 4, 2))
+        # -> shape (nb_examples, nbp, c, h, pw)
+        o = T.batched_tensordot(o, Fx, axes=[4, 1])
+        # -> shape (nb_examples, nbp, c, h, w)
+        o = o.sum(axis=1)
+        # -> shape (nb_examples, c, h, w)
+        return o
+
+    def reduce_func(self, prev, new):
+        return self.reduce_func(prev, new)
+
+    def get_output_for(self, input, **kwargs):
+        output_shape = (
+            (input.shape[0],) +
+            (self.nb_col_channels, self.h, self.w))
+        init_val = T.zeros(output_shape)
+        output, _ = recurrent_accumulation(
+            # 'time' should be the first dimension
+            input.dimshuffle(1, 0, 2),
+            self.apply_func,
+            self.reduce_func,
+            init_val,
+            self.n_steps)
+        output = output.dimshuffle(1, 0, 2, 3, 4)
+        if self.return_seq:
+            return output
+        else:
+            return output[:, -1]
+
+
+def test_batch_layer():
     from lasagne import layers
     n_steps = 10
     inp = layers.InputLayer((None, n_steps, 5))
@@ -412,3 +609,6 @@ if __name__ == '__main__':
     X_example = np.random.uniform(0, 1, size=(100, n_steps, 5))
     X_example = X_example.astype(np.float32)
     print(fn(X_example).shape)
+
+if __name__ == '__main__':
+    test_batch_layer()
