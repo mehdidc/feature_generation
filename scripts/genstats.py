@@ -178,6 +178,15 @@ def compute_training_stats(folder, ref_job):
     keys = stats[0].keys()
     for k in keys:
         stats_dict[k] = [s[k] for s in stats if k in s]
+        n = len(stats_dict[k])
+        d = {}
+        d['5per'] = float(stats_dict[k][int(n*0.05)])
+        d['10per'] = float(stats_dict[k][int(n*0.1)])
+        d['30per'] = float(stats_dict[k][int(n*0.3)])
+        d['50per'] = float(stats_dict[k][int(n*0.5)])
+        d['70per'] = float(stats_dict[k][int(n*0.7)])
+        d['90per'] = float(stats_dict[k][int(n*0.9)])
+        stats_dict[k + '_details'] = d
         stats_dict[k] = float(stats_dict[k][-1])
     return stats_dict
 

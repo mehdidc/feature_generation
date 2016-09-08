@@ -3,6 +3,7 @@ import os
 from skimage.io import imread
 from lasagnekit.datasets.helpers import split
 
+
 def load_data(dataset="digits",
               w=None, h=None,
               include_test=False,
@@ -12,11 +13,13 @@ def load_data(dataset="digits",
         c = 1
         w, h = 28, 28
         prob = 0.1
+
         class Random(object):
 
             def __init__(self, shape):
                 self.shape = shape
                 self.img_dim = shape[1:]
+
             def load(self):
                 self.X = np.random.uniform(size=self.shape) <= prob
                 self.X = self.X.reshape((self.shape[0], -1))
@@ -24,6 +27,23 @@ def load_data(dataset="digits",
 
         data = Random((batch_size, c, w, h))
         data.load()
+    elif dataset == 'omniglot':
+        from lasagnekit.datasets.omniglot import Omniglot
+        from lasagnekit.datasets.transformed import Transformed
+        if w is None and h is None:
+            w = 28
+            h = 28
+        c = 1
+        data = Omniglot(size=(w, h), nb=batch_size)
+
+        def preprocess(X):
+            X = 1 - X
+            X = X[:, :, :, 0]
+            return X
+        data = Transformed(data, preprocess, per_example=False)
+        data.load()
+        print(data.X.shape)
+
     if dataset == 'fonts_big':
         import h5py
         from lasagnekit.datasets.manual import Manual
@@ -477,11 +497,14 @@ def load_data(dataset="digits",
         data = Data()
     elif dataset == "iam_hdf5":
         import h5py
+        from lasagnekit.datasets.manual import Manual
         filename = "{}/iam/dataset.hdf5".format(os.getenv("DATA_PATH"))
         w, h = 64, 64
         c = 1
         hf = h5py.File(filename)
         X = hf['X']
+        X = X[0:len(X)]
+        print(X.shape)
         data = Manual(X=X)
         data.img_dim = (64, 64)
         data.load()

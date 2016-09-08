@@ -28,7 +28,7 @@
     "max_nb_epochs": 9999999999,
     "patience_nb_epochs": 500
 },
-"mode": "random",
+"mode": "minibatch",
 "walkback": 1,
 "report_rec_error": false,
 "walkback_mode": "bengio_without_sampling"

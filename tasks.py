@@ -417,6 +417,7 @@ def build_capsule_(layers, data, nbl, nbc,
                     rec_error_mean = np.mean(rec_errors)
                     status["{}_recons_error".format(name)] = rec_error_mean
 
+        status['normalized_loss_train'] = status['loss_train'] / (w*h*c)
 
         if np.isnan(status['loss_train']):
             print('Nan detected, quit')
