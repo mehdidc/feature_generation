@@ -17,8 +17,8 @@
         "nonlin": "very_leaky_rectify",
         "normalize": "sigmoid",
         "out_reduce": "max",
-        "patch_size": 3,
-        "sigma": null,
+        "patch_size": 6,
+        "sigma": 1,
         "stride": false
 },
 "force_w": 64, 
@@ -28,8 +28,8 @@
     "max_nb_epochs": 9999999999,
     "patience_nb_epochs": 500
 },
-"mode": "minibatch",
 "walkback": 1,
+"mode": "minibatch",
 "report_rec_error": false,
 "walkback_mode": "bengio_without_sampling"
 }

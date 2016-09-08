@@ -354,6 +354,7 @@ def build_capsule_(layers, data, nbl, nbc,
     # called each epoch for monitoring
     report_rec_error = train_params.get('report_rec_error', True)
     def update_status(self, status):
+        c, w, h = layers["input"].output_shape[1:]
         status['duration'] = (datetime.now() - self.last_checkpoint).total_seconds()
         self.last_checkpoint = datetime.now()
         t = status["epoch"]

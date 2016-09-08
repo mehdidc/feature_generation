@@ -514,6 +514,7 @@ def load_data(dataset="digits",
         from skimage.io import imread_collection
         from skimage.filters import threshold_otsu
         from skimage.transform import resize
+        from skimage.util import pad
         folder = "{}/iam/**/**/*.png".format(os.getenv("DATA_PATH"))
         # folder = "{}/iam/a01/a01-000u/*.png".format(os.getenv("DATA_PATH"))
         collection = imread_collection(folder)
@@ -538,6 +539,7 @@ def load_data(dataset="digits",
                     im = img[y:y+ch, x:x+cw]
                     im = im / 255.
                     im = 1 - im
+                    im = pad(im, 10, 'constant', constant_values=(0, 0))
                     im = resize(im, (w, h))
                     thresh = threshold_otsu(im)
                     im = im > thresh
