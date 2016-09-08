@@ -5010,6 +5010,13 @@ proba_funcs = {
     'softmax': T.nnet.softmax,
     'sparsemax': sparsemax
 }
+
+recurrent_models = {
+    'lstm': layers.LSTMLayer,
+    'gru': layers.GRULayer,
+    'rnn': layers.RecurrentLayer
+}
+
 def model83(w=32, h=32, c=1,
             nb_fc_layers=3,
             nb_recurrent_layers=1,
@@ -5038,6 +5045,7 @@ def model83(w=32, h=32, c=1,
             x_max='width',
             y_min=0,
             y_max='height',
+            recurrent_model='gru',
             eps=0):
 
     """
@@ -5078,6 +5086,7 @@ def model83(w=32, h=32, c=1,
 
         if pooling:
             l_hid = layers.Pool2DLayer(l_hid, (2, 2))
+            hids.append(l_hid)
 
     for i in range(nb_fc_layers):
         l_hid = layers.DenseLayer(
@@ -5087,14 +5096,17 @@ def model83(w=32, h=32, c=1,
             name="hid{}".format(i + 1))
         hids.append(l_hid)
     l_hid = Repeat(l_hid, n_steps)
+
+    recurrent_model = recurrent_models[recurrent_model]
     for i in range(nb_recurrent_layers):
-        l_hid = layers.GRULayer(l_hid, nb_recurrent_units[i])
+        l_hid = recurrent_model(l_hid, nb_recurrent_units[i])
 
     l_coord = TensorDenseLayer(l_hid, 5, nonlinearity=linear, name="coord")
     #l_hid = layers.ReshapeLayer(l_coord, ([0], n_steps, 5), name="hid3")
 
     # DECODING PART
     patches = np.ones((1, c, patch_size, patch_size))
+    patches = patches.astype(np.float32)
 
     l_brush = GenericBrushLayer(
         l_coord,
