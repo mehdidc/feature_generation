@@ -8,15 +8,23 @@ from helpers import Deconv2DLayer as deconv2d
 from helpers import correct_over_op, over_op, sum_op, max_op, thresh_op, normalized_over_op
 from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse, norm_maxmin
 from helpers import Repeat
-from helpers import BrushLayer
+from helpers import BrushLayer, GenericBrushLayer
 import theano.tensor as T
 import numpy as np
 
 
-from batch_norm import NormalizeLayer, ScaleAndShiftLayer, DecoderNormalizeLayer, DenoiseLayer, FakeLayer, SimpleScaleAndShiftLayer
+from batch_norm import (
+    NormalizeLayer,
+    ScaleAndShiftLayer,
+    DecoderNormalizeLayer,
+    DenoiseLayer,
+    FakeLayer)
 from lasagne.layers import batch_norm
 
 import theano
+from sparsemax_theano import sparsemax
+
+
 
 get_nonlinearity = dict(
     linear=linear,
@@ -4983,6 +4991,148 @@ def model82(w=32, h=32, c=1,
         nonlinearity=get_nonlinearity[nonlin_out],
         name="output")
     all_layers = [l_in] + hids + [l_canvas, l_raw_out, l_scaled_out, l_biased_out, l_out]
+    return layers_from_list_to_dict(all_layers)
+
+
+normalize_funcs = {
+    'maxmin': norm_maxmin,
+    'sigmoid': T.nnet.sigmoid,
+    'none': lambda x: x}
+
+reduce_funcs = {
+    'sum': sum_op,
+    'over': over_op,
+    'normalized_over': normalized_over_op,
+    'max': max_op,
+}
+
+proba_funcs = {
+    'softmax': T.nnet.softmax,
+    'sparsemax': sparsemax
+}
+def model83(w=32, h=32, c=1,
+            nb_fc_layers=3,
+            nb_recurrent_layers=1,
+            nb_recurrent_units=100,
+            nb_fc_units=1000,
+            nb_conv_layers=0,
+            nb_conv_filters=64,
+            size_conv_filters=3,
+            nonlin='relu',
+            nonlin_out='sigmoid',
+            pooling=True,
+            n_steps=10,
+            patch_size=3,
+            w_out=-1,
+            h_out=-1,
+            reduce_func='sum',
+            proba_func='sparsemax',
+            normalize_func='sigmoid',
+            x_sigma=0.5,
+            y_sigma=0.5,
+            x_stride=1,
+            y_stride=1,
+            patch_index=0,
+            color='predicted',
+            x_min=0,
+            x_max='width',
+            y_min=0,
+            y_max='height',
+            eps=0):
+
+    """
+    the new GenericBrushLayer
+    """
+    ###  ENCODING part
+    def init_method():
+        return init.GlorotUniform(gain='relu')
+    if type(nb_fc_units) != list:
+        nb_fc_units = [nb_fc_units] * nb_fc_layers
+
+    if type(nb_conv_filters) != list:
+        nb_conv_filters = [nb_conv_filters] * nb_conv_layers
+    if type(size_conv_filters) != list:
+        size_conv_filters = [size_conv_filters] * nb_conv_layers
+
+    if type(nb_recurrent_units) != list:
+        nb_recurrent_units = [nb_recurrent_units] * nb_recurrent_layers
+    if w_out == -1:
+        w_out = w
+    if h_out == -1:
+        h_out = h
+
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_hid = l_in
+    nonlin = get_nonlinearity[nonlin]
+
+    hids = []
+    for i in range(nb_conv_layers):
+        l_hid = layers.Conv2DLayer(
+            l_hid,
+            num_filters=nb_conv_filters[i],
+            filter_size=(size_conv_filters[i], size_conv_filters[i]),
+            nonlinearity=nonlin,
+            W=init_method(),
+            name='conv_hid{}'.format(i + 1))
+        hids.append(l_hid)
+
+        if pooling:
+            l_hid = layers.Pool2DLayer(l_hid, (2, 2))
+
+    for i in range(nb_fc_layers):
+        l_hid = layers.DenseLayer(
+            l_hid, nb_fc_units[i],
+            W=init_method(),
+            nonlinearity=nonlin,
+            name="hid{}".format(i + 1))
+        hids.append(l_hid)
+    l_hid = Repeat(l_hid, n_steps)
+    for i in range(nb_recurrent_layers):
+        l_hid = layers.GRULayer(l_hid, nb_recurrent_units[i])
+
+    l_coord = TensorDenseLayer(l_hid, 5, nonlinearity=linear, name="coord")
+    #l_hid = layers.ReshapeLayer(l_coord, ([0], n_steps, 5), name="hid3")
+
+    # DECODING PART
+    patches = np.ones((1, c, patch_size, patch_size))
+
+    l_brush = GenericBrushLayer(
+        l_coord,
+        w_out, h_out,
+        n_steps=n_steps,
+        patches=patches,
+        col='rgb' if c == 3 else 'grayscale',
+        return_seq=False,
+        reduce_func=reduce_funcs[reduce_func],
+        to_proba_func=proba_funcs[proba_func],
+        normalize_func=normalize_funcs[normalize_func],
+        x_sigma=x_sigma,
+        y_sigma=y_sigma,
+        x_stride=x_stride,
+        y_stride=y_stride,
+        patch_index=patch_index,
+        color=color,
+        x_min=x_min,
+        x_max=x_max,
+        y_min=y_min,
+        y_max=y_max,
+        eps=eps,
+        name="brush"
+    )
+    l_raw_out = l_brush
+    l_scaled_out = layers.ScaleLayer(
+        l_raw_out, scales=init.Constant(2.), name="scaled_output")
+    l_biased_out = layers.BiasLayer(
+        l_scaled_out, b=init.Constant(-1), name="biased_output")
+
+    l_out = layers.NonlinearityLayer(
+        l_biased_out,
+        nonlinearity=get_nonlinearity[nonlin_out],
+        name="output")
+
+    all_layers = ([l_in] +
+                  hids +
+                  [l_coord, l_brush, l_raw_out, l_biased_out, l_out])
     return layers_from_list_to_dict(all_layers)
 
 
