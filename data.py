@@ -352,7 +352,7 @@ def load_data(dataset="digits",
         from lasagnekit.datasets.chairs import Chairs
         from lasagnekit.datasets.transformed import Transformed
         if w is None and h is None:
-            w, h = 64, 64
+            w, h = 32, 32
         c = 3
         data = Chairs(size=(w, h), nb=batch_size, crop=True, crop_to=200)
         data.load()
