@@ -713,5 +713,24 @@ def test_generic_batch_layer():
     img = dispims_color(y, border=1, bordercolor=(0.3, 0.3, 0.3))
     imsave('out.png', img)
 
+
+class DataGen(object):
+
+    def __init__(self, gen_func, batches_per_chunk=1, batch_size=128):
+        self.cnt = 0
+        self.batches_per_chunk = batches_per_chunk
+        self.batch_size = batch_size
+        self.gen_func = gen_func
+
+    def load(self):
+        if self.cnt % self.batches_per_chunk == 0:
+            X = self.gen_func(self.batch_size * self.batches_per_chunk)
+            X = X.reshape((X.shape[0], -1))
+            self.X_cache = X
+            self.cnt = 0
+        start = self.cnt * self.batch_size
+        self.X = self.X_cache[start:start + self.batch_size]
+        self.cnt += 1
+
 if __name__ == '__main__':
     test_generic_batch_layer()

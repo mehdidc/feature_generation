@@ -2,6 +2,7 @@ import numpy as np
 import os
 from skimage.io import imread
 from lasagnekit.datasets.helpers import split
+from helpers import DataGen
 
 
 def load_data(dataset="digits",
@@ -147,6 +148,7 @@ def load_data(dataset="digits",
                 data.test.X = data.test.X[included]
                 data.test.y = data.test.y[included]
     if dataset == "cropped_digits":
+        from lasagnekit.datasets.subsampled import SubSampled
         from lasagnekit.datasets.mnist import MNIST
         from lasagnekit.datasets.transformed import Transformed
         from lasagnekit.datasets.helpers import load_once
@@ -169,6 +171,38 @@ def load_data(dataset="digits",
         data.train = train_data
         data.test = test_data
         print(data.img_dim)
+
+    if dataset == "random_cropped_digits":
+        from lasagnekit.datasets.subsampled import SubSampled
+        from lasagnekit.datasets.mnist import MNIST
+        from lasagnekit.datasets.transformed import Transformed
+        from lasagnekit.datasets.helpers import load_once
+        from skimage.transform import resize
+        if w is None and h is None:
+            w, h = 8, 8
+        c = 1
+        mnist = MNIST(which='train')
+        mnist.load()
+
+        def gen(nb):
+            X = mnist.X
+            nb = X.shape[0]
+            X = X.reshape((X.shape[0], 28, 28))
+            X_out = np.empty((nb, c, w, h))
+            for i in range(nb):
+                idx = np.random.randint(nb)
+                img = X[idx]
+                y = np.random.randint(0, 28 - h + 1)
+                x = np.random.randint(0, 28 - w + 1)
+                im = img[y:y+h, x:x+w]
+                im = resize(im, (h, w))
+                X_out[i, 0] = im
+            X_out = X_out.reshape((X_out.shape[0], -1))
+            X_out = X_out.astype(np.float32)
+            return X_out
+
+        data = DataGen(gen_func=gen, batch_size=batch_size, batches_per_chunk=100)
+        data.load()
 
     if dataset == "olivetti":
         from sklearn.datasets import fetch_olivetti_faces
