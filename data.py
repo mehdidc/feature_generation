@@ -173,7 +173,6 @@ def load_data(dataset="digits",
         print(data.img_dim)
 
     if dataset == "random_cropped_digits":
-        from lasagnekit.datasets.subsampled import SubSampled
         from lasagnekit.datasets.mnist import MNIST
         from lasagnekit.datasets.transformed import Transformed
         from lasagnekit.datasets.helpers import load_once
@@ -186,23 +185,29 @@ def load_data(dataset="digits",
 
         def gen(nb):
             X = mnist.X
-            nb = X.shape[0]
             X = X.reshape((X.shape[0], 28, 28))
-            X_out = np.empty((nb, c, w, h))
+            X_out = np.zeros((nb, c, w, h))
             for i in range(nb):
-                idx = np.random.randint(nb)
-                img = X[idx]
-                y = np.random.randint(0, 28 - h + 1)
-                x = np.random.randint(0, 28 - w + 1)
-                im = img[y:y+h, x:x+w]
-                im = resize(im, (h, w))
-                X_out[i, 0] = im
+                while True:
+                    idx = np.random.randint(X.shape[0])
+                    img = X[idx]
+                    y = np.random.randint(0, 28 - h + 1)
+                    x = np.random.randint(0, 28 - w + 1)
+                    im = img[y:y+h, x:x+w]
+                    if im.sum() < 0.1*(w*h):
+                        continue
+                    X_out[i, 0] = im
+                    break
             X_out = X_out.reshape((X_out.shape[0], -1))
             X_out = X_out.astype(np.float32)
             return X_out
 
-        data = DataGen(gen_func=gen, batch_size=batch_size, batches_per_chunk=100)
+        data = DataGen(
+            gen_func=gen, batch_size=batch_size,
+            nb_chunks=1000)
+        data.img_dim = (h, w)
         data.load()
+        print('loaded')
 
     if dataset == "olivetti":
         from sklearn.datasets import fetch_olivetti_faces

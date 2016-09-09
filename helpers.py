@@ -716,15 +716,15 @@ def test_generic_batch_layer():
 
 class DataGen(object):
 
-    def __init__(self, gen_func, batches_per_chunk=1, batch_size=128):
+    def __init__(self, gen_func, nb_chunks=1, batch_size=128):
         self.cnt = 0
-        self.batches_per_chunk = batches_per_chunk
+        self.nb_chunks = nb_chunks
         self.batch_size = batch_size
         self.gen_func = gen_func
 
     def load(self):
-        if self.cnt % self.batches_per_chunk == 0:
-            X = self.gen_func(self.batch_size * self.batches_per_chunk)
+        if self.cnt == self.nb_chunks or self.cnt == 0:
+            X = self.gen_func(self.batch_size * self.nb_chunks)
             X = X.reshape((X.shape[0], -1))
             self.X_cache = X
             self.cnt = 0
