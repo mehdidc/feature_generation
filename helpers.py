@@ -658,7 +658,7 @@ def test_generic_batch_layer():
     from lasagne import layers
     from lasagnekit.misc.plot_weights import dispims_color
     from skimage.io import imsave
-    n_steps = 2
+    n_steps = 1
     nb_features = 8
     inp = layers.InputLayer((None, n_steps, nb_features))
     p1 = [
@@ -675,9 +675,10 @@ def test_generic_batch_layer():
         [1, 1, 1, 1, 1],
         [1, 1, 1, 1, 1],
     ]
-    patches = np.zeros((2, 3, 5, 5))
-    patches[0, :] = np.array(p1)
-    patches[1, :] = np.array(p2)
+    patches = np.zeros((1, 3, 32, 32))
+    #patches[0, :] = np.array(p1)
+    #patches[1, :] = np.array(p2)
+    patches[:] = 1.
     patches = patches.astype(np.float32)
 
     brush = GenericBrushLayer(
@@ -695,16 +696,16 @@ def test_generic_batch_layer():
         x_stride=1,#'predicted',
         y_stride=1,#,'predicted',
         patch_index='predicted',
-        color='predicted',
-        #color=(1., 0, 0),
+        #color='predicted',
+        color=(1., 0, 0),
         x_min=0,
         x_max='width',
         y_min=0,
         y_max='height',
-        eps=1e-12)
+        eps=0)
     X = T.tensor3()
     fn = theano.function([X], layers.get_output(brush, X))
-    X_example = np.random.normal(0, 1, size=(100, n_steps, nb_features))
+    X_example = np.random.normal(0, 0.5, size=(100, n_steps, nb_features))
     X_example = X_example.astype(np.float32)
     y = fn(X_example)
     print(y.min(), y.max())
