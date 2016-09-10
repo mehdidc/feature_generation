@@ -2358,6 +2358,35 @@ def jobset50():
     return jobset_recurrent_brush_stroke('jobset50', 'model83', update=update)
 
 
+def jobset51():
+
+    def update(params):
+        rng = random
+        sigma = rng.choice((1, 0.5, 'predicted'))
+        model_params = dict(
+            nonlin_out='msigmoid',
+            reduce_func=rng.choice(('sum', 'over', 'max')),
+            normalize_func='sigmoid',
+            x_sigma=sigma,
+            y_sigma=sigma,
+            x_stride=1,
+            y_stride=1,
+            patch_index=0,
+            color='predicted',
+            x_min=0,
+            x_max='width',
+            y_min=0,
+            y_max='height',
+            recurrent_model=rng.choice(('gru', 'lstm', 'rnn')),
+            eps=0
+        )
+        params['model_params'].update(model_params)
+        params['dataset'] = 'chairs'
+        return params
+
+    return jobset_recurrent_brush_stroke('jobset51', 'model83', update=update)
+
+
 
 
 @click.command()
