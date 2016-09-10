@@ -351,6 +351,9 @@ def load_data(dataset="digits",
     elif dataset == 'chairs':
         from lasagnekit.datasets.chairs import Chairs
         from lasagnekit.datasets.transformed import Transformed
+        from lasagnekit.datasets.helpers import load_once
+        from lasagnekit.datasets.subsampled import SubSampled
+
         if w is None and h is None:
             w, h = 32, 32
         c = 3
@@ -358,16 +361,22 @@ def load_data(dataset="digits",
             return x
         def post(x):
             return x
-        dt = Chairs(size=(w, h), nb=batch_size, crop=True, crop_to=200, postprocess_example=post, preprocess_example=pre)
-        def gen(nb):
-            dt.load()
-            X = dt.X.reshape((dt.X.shape[0], w, h, c))
+        data = load_once(Chairs)(
+            size=(w, h),
+            nb=86366,
+            #nb=batch_size * nb_chunks,
+            crop=True,
+            crop_to=200,
+            mode='all',
+            postprocess_example=post,
+            preprocess_example=pre)
+        data.load()
+        def preprocess(X):
             X = X.transpose((0, 3, 1, 2))
             X = X.reshape((X.shape[0], -1))
             return X
-        data = DataGen(
-            gen_func=gen, batch_size=batch_size,
-            nb_chunks=1000)
+        data = Transformed(data, preprocess, per_example=False)
+        data = SubSampled(data, batch_size)
         data.load()
         print(data.X.shape)
 

@@ -729,6 +729,7 @@ class DataGen(object):
             self.X_cache = X
             self.cnt = 0
         start = self.cnt * self.batch_size
+        print(start, self.batch_size, self.X_cache.shape)
         self.X = self.X_cache[start:start + self.batch_size]
         self.cnt += 1
 
