@@ -354,7 +354,60 @@ def load_data(dataset="digits",
         if w is None and h is None:
             w, h = 32, 32
         c = 3
-        data = Chairs(size=(w, h), nb=batch_size, crop=True, crop_to=200)
+        def pre(x):
+            return x
+        def post(x):
+            return x
+        dt = Chairs(size=(w, h), nb=batch_size, crop=True, crop_to=200, postprocess_example=post, preprocess_example=pre)
+        def gen(nb):
+            dt.load()
+            X = dt.X.reshape((dt.X.shape[0], w, h, c))
+            X = X.transpose((0, 3, 1, 2))
+            X = X.reshape((X.shape[0], -1))
+            return X
+        data = DataGen(
+            gen_func=gen, batch_size=batch_size,
+            nb_chunks=1000)
+        data.load()
+        print(data.X.shape)
+
+    elif dataset == 'chairs_black_background':
+        from lasagnekit.datasets.chairs import Chairs
+        from lasagnekit.datasets.transformed import Transformed
+        from skimage.filters import threshold_otsu
+        from skimage.filters.rank import median
+        from skimage.morphology import disk
+        from skimage.restoration import denoise_nl_means
+        from scipy import ndimage
+        import time
+        if w is None and h is None:
+            w, h = 32, 32
+        c = 3
+        def post(x):
+            return x
+        def pre(x):
+            """
+            from sklearn.cluster import KMeans
+            clus = KMeans(n_clusters=3)
+            shape = x.shape
+            x = x.reshape((x.shape[0]*x.shape[1], x.shape[2]))
+            clus.fit(x)
+            centers = clus.cluster_centers_
+            dist = np.abs(centers - np.array([255, 255, 255])).sum(axis=1)
+            inds = np.argsort(dist)
+            centers = centers[inds]
+            x = x.reshape(shape)
+            mask = (x < centers[0]) & (x < centers[1])
+            """
+            x = ndimage.gaussian_filter(x, 0.8)
+            shape = x.shape
+            white = np.array([255, 255, 255])
+            x = x.reshape((x.shape[0]*x.shape[1], x.shape[2]))
+            dist =  np.abs(x - white).sum(axis=1)
+            x[dist == 0] = 0
+            x = x.reshape(shape)
+            return x
+        data = Chairs(size=(w, h), nb=batch_size, crop=True, crop_to=200, postprocess_example=post, preprocess_example=pre)
         data.load()
         print(data.X.shape)
 
@@ -366,6 +419,9 @@ def load_data(dataset="digits",
 
         data.load()
         print(data.X.shape)
+
+
+
     elif dataset == 'icons':
         from lasagnekit.datasets.imagecollection import ImageCollection
         from lasagnekit.datasets.transformed import Transformed

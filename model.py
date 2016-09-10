@@ -25,14 +25,14 @@ import theano
 from sparsemax_theano import sparsemax
 
 
-
 get_nonlinearity = dict(
     linear=linear,
     sigmoid=sigmoid,
     rectify=rectify,
     very_leaky_rectify=very_leaky_rectify,
     softmax=softmax,
-    tanh=tanh
+    tanh=tanh,
+    msigmoid=lambda x:1 - sigmoid(x)
 )
 
 
@@ -5051,7 +5051,7 @@ def model83(w=32, h=32, c=1,
     """
     the new GenericBrushLayer
     """
-    ###  ENCODING part
+    ##  ENCODING part
     def init_method():
         return init.GlorotUniform(gain='relu')
     if type(nb_fc_units) != list:
@@ -5154,7 +5154,6 @@ def model83(w=32, h=32, c=1,
         l_biased_out,
         nonlinearity=get_nonlinearity[nonlin_out],
         name="output")
-
     all_layers = ([l_in] +
                   hids +
                   [l_coord, l_brush, l_raw_out, l_biased_out, l_scaled_out,  l_out])
