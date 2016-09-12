@@ -2363,7 +2363,7 @@ def jobset51():
     def update(params):
         rng = random
         sigma = rng.choice((1, 0.5, 'predicted'))
-        stride = rng.choice((1, 'predicted'))
+        stride = 1
         model_params = dict(
             nonlin_out='msigmoid',
             reduce_func=rng.choice(('sum', 'over', 'max')),
