@@ -761,6 +761,8 @@ def vae_kl_div(z_mu, z_log_sigma):
 
 
 def vae_loss_binary(X, mu, z_mu, z_log_sigma):
+    eps = 10e-8
+    mu = theano.tensor.clip(mu, eps, 1 - eps)  # like keras
     binary_ll = (T.nnet.binary_crossentropy(mu, X)).sum(axis=1).mean()
     kl_div = vae_kl_div(z_mu, z_log_sigma).sum(axis=1).mean()
     return binary_ll + kl_div

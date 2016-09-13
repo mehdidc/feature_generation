@@ -237,22 +237,19 @@ def build_capsule_(layers, data, nbl, nbc,
         return L.get_output(layers["y"], X, deterministic=True)
 
     def recons_loss(true, pred, **tags):
-        if autoencoding_loss == "squared_error":
-            return ((true - pred) ** 2).sum(axis=(1, 2, 3)).mean()
+        loss_class =train_params.get('loss_class', 'autoencoder')
 
-        elif autoencoding_loss == "mean_squared_error":
-            return ((true - pred) ** 2).mean()
-        elif autoencoding_loss == "cross_entropy":
-            pred = theano.tensor.clip(pred, 0.001, 0.999)
-            return (T.nnet.binary_crossentropy(pred, true)).sum(axis=(1, 2, 3)).mean()
-
-    def get_recons_loss(model, X):
-        loss_class = train_params.get('loss_class', 'autoencoder')
-        print(loss_class)
-        if loss_class == 'autoencoder':
-            Xrec = reconstruct(model, X)
-            return recons_loss(X, Xrec)
-        elif loss_class == 'variational':
+        if loss_class == "autoencoder":
+            if autoencoding_loss == "squared_error":
+                return ((true - pred) ** 2).sum(axis=(1, 2, 3)).mean()
+            elif autoencoding_loss == "mean_squared_error":
+                return ((true - pred) ** 2).mean()
+            elif autoencoding_loss == "cross_entropy":
+                pred = theano.tensor.clip(pred, 0.001, 0.999)
+                return (T.nnet.binary_crossentropy(pred, true)).sum(axis=(1, 2, 3)).mean()
+        elif loss_class == "variational":
+            X = true
+            x_mu = pred
             z_mu = L.get_output(layers['z_mu'], X)
             z_log_sigma = L.get_output(layers['z_log_sigma'], X)
             if autoencoding_loss == 'squared_error':
@@ -261,10 +258,12 @@ def build_capsule_(layers, data, nbl, nbc,
                     L.get_output(layers['output_log_sigma'], X))
                 loss = vae_loss_real(X.flatten(2), x_mu.flatten(2), x_log_sigma.flatten(2), z_mu, z_log_sigma)
             elif autoencoding_loss == 'cross_entropy':
-                x_mu = L.get_output(layers['output'], X)
                 loss = vae_loss_binary(X.flatten(2), x_mu.flatten(2), z_mu, z_log_sigma)
             return loss
 
+    def get_recons_loss(model, X):
+        rec = reconstruct(model, X)
+        return recons_loss(X, rec)
     functions = {
         "reconstruct": make_function(func=reconstruct, params=["X"]),
         "get_recons_loss": make_function(func=get_recons_loss, params=["X"]),

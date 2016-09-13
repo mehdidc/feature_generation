@@ -5183,13 +5183,11 @@ def model84( w=32, h=32, c=1, seed=42):
     """
     l_in = layers.InputLayer((None, c, w, h), name="input")
     hid = layers.DenseLayer(l_in, 256, nonlinearity=rectify, name="hid")
-    hid = layers.DenseLayer(hid, 256, nonlinearity=rectify, name="hid")
-    z_mu = layers.DenseLayer(hid, 10, nonlinearity=linear, name='z_mu')
-    z_log_sigma = layers.DenseLayer(hid, 10, nonlinearity=linear, name='z_log_sigma')
+    z_mu = layers.DenseLayer(hid, 2, nonlinearity=linear, name='z_mu')
+    z_log_sigma = layers.DenseLayer(hid, 2, nonlinearity=linear, name='z_log_sigma')
     z = GaussianSampleLayer(z_mu, z_log_sigma, rng=RandomStreams(seed), name='z_sample')
     z_sample = z
     hid = layers.DenseLayer(z, 256, nonlinearity=rectify, name="hid")
-    hid = layers.DenseLayer(hid, 256, nonlinearity=rectify, name="hid")
     l_out = layers.DenseLayer(hid, c*w*h, nonlinearity=sigmoid, name='hid')
     l_out = layers.ReshapeLayer(l_out, ([0], c, w, h), name="output")
     return layers_from_list_to_dict([l_in, z_mu, z_log_sigma, z_sample, l_out])
