@@ -1,0 +1,53 @@
+{   
+"autoencoding_loss": "cross_entropy",
+"loss_class": "variational",
+"binarize_thresh": null,
+"budget_hours": 10,
+"contractive": false,
+"contractive_coef": null,
+"dataset": "digits",
+"denoise": null,
+"marginalized": false,
+"model_name": "model83",
+"model_params": { 
+    "normalize_func": "sigmoid", 
+    "nb_recurrent_layers": 3, 
+    "nonlin": "rectify", 
+    "reduce_func": "over", 
+    "nb_fc_units": [
+        300
+    ], 
+    "nb_fc_layers": 1, 
+    "nb_conv_layers": 2,
+    "nb_conv_filters": 32,
+    "size_conv_filters": 5,
+    "nb_recurrent_units": [
+        300, 
+        300, 
+        200
+    ],
+    "n_steps": 39, 
+    "patch_size": 3,
+    "x_sigma": 1,
+    "y_sigma": 1,
+    "x_stride": 1,
+    "y_stride": 1,
+    "color": [1],
+    "x_min": 0,
+    "x_max": "width",
+    "y_min": 0,
+    "y_max": "height",
+    "recurrent_model": "gru",
+    "variational": true,
+    "variational_nb_hidden": 1000
+},
+"noise": null,
+"optimization": {
+    "max_nb_epochs": 9999999999,
+    "patience_nb_epochs": 500
+},
+"mode": "minibatch",
+"walkback": 1,
+"report_rec_error": false,
+"walkback_mode": "bengio_without_sampling"
+}
