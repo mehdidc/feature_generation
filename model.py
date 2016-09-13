@@ -5049,6 +5049,9 @@ def model83(w=32, h=32, c=1,
             y_min=0,
             y_max='height',
             recurrent_model='gru',
+            variational=False,
+            variational_nb_hidden=100,
+            variational_seed=1,
             eps=0):
 
     """
@@ -5088,7 +5091,7 @@ def model83(w=32, h=32, c=1,
         hids.append(l_hid)
 
         if pooling:
-            l_hid = layers.Pool2DLayer(l_hid, (2, 2))
+            l_hid = layers.Pool2DLayer(l_hid, (2, 2), name='pool_hid{}'.format(i + 1))
             hids.append(l_hid)
 
     for i in range(nb_fc_layers):
@@ -5098,6 +5101,18 @@ def model83(w=32, h=32, c=1,
             nonlinearity=nonlin,
             name="hid{}".format(i + 1))
         hids.append(l_hid)
+
+    if variational:
+        z_mu = layers.DenseLayer(l_hid, variational_nb_hidden, nonlinearity=linear, name='z_mu')
+        hids.append(z_mu)
+        z_log_sigma = layers.DenseLayer(l_hid, variational_nb_hidden, nonlinearity=linear, name='z_log_sigma')
+        hids.append(z_log_sigma)
+        z = GaussianSampleLayer(
+            z_mu, z_log_sigma,
+            rng=RandomStreams(variational_seed),
+            name='z_sample')
+        hids.append(z)
+        l_hid = z
     l_hid = Repeat(l_hid, n_steps)
 
     recurrent_model = recurrent_models[recurrent_model]

@@ -253,7 +253,6 @@ def build_capsule_(layers, data, nbl, nbc,
             Xrec = reconstruct(model, X)
             return recons_loss(X, Xrec)
         elif loss_class == 'variational':
-            X = X.flatten(2)
             z_mu = L.get_output(layers['z_mu'], X)
             z_log_sigma = L.get_output(layers['z_log_sigma'], X)
             if autoencoding_loss == 'squared_error':
