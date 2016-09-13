@@ -733,5 +733,44 @@ class DataGen(object):
         self.X = self.X_cache[start:start + self.batch_size]
         self.cnt += 1
 
+
+class GaussianSampleLayer(lasagne.layers.MergeLayer):
+    def __init__(self, mu, logsigma, rng=None, **kwargs):
+        self.rng = rng if rng else RandomStreams(nn.random.get_rng().randint(1, 2147462579))
+        super(GaussianSampleLayer, self).__init__([mu, logsigma], **kwargs)
+
+    def get_output_shape_for(self, input_shapes):
+        return input_shapes[0]
+
+    def get_output_for(self, inputs, deterministic=False, **kwargs):
+        mu, logsigma = inputs
+        shape=(self.input_shapes[0][0] or inputs[0].shape[0],
+               self.input_shapes[0][1] or inputs[0].shape[1])
+        if deterministic:
+            return mu
+        return mu + T.exp(logsigma) * self.rng.normal(shape)
+
+
+def gaussian_log_likelihood(tgt, mu, ls):
+    return (-(np.float32(0.5 * np.log(2 * np.pi)) + ls)
+            - 0.5 * T.sqr(tgt - mu) / T.exp(2 * ls))
+
+
+def vae_kl_div(z_mu, z_log_sigma):
+    return -0.5 * (1 + 2*z_log_sigma - T.sqr(z_mu) - T.exp(2 * z_log_sigma))
+
+
+def vae_loss_binary(X, mu, z_mu, z_log_sigma):
+    binary_ll = (T.nnet.binary_crossentropy(mu, X)).sum(axis=1).mean()
+    kl_div = vae_kl_div(z_mu, z_log_sigma).sum(axis=1).mean()
+    return binary_ll + kl_div
+
+
+def vae_loss_real(X, mu, log_sigma, z_mu, z_log_sigma):
+    gaussian_ll = gaussian_log_likelihood(X, mu, log_sigma).sum(axis=1).mean()
+    kl_div = vae_kl_div(z_mu, z_log_sigma).sum(axis=1).mean()
+    return (gaussian_ll + kl_div)
+
+
 if __name__ == '__main__':
     test_generic_batch_layer()

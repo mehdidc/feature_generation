@@ -31,6 +31,7 @@ from scripts.genstats import genstats
 from lightjob.cli import load_db
 from lightjob.db import SUCCESS, RUNNING, AVAILABLE, ERROR, PENDING
 
+from helpers import vae_loss_binary, vae_loss_real
 
 sys.setrecursionlimit(10000)
 
@@ -235,9 +236,10 @@ def build_capsule_(layers, data, nbl, nbc,
     def predict(model, X):
         return L.get_output(layers["y"], X, deterministic=True)
 
-    def recons_loss(true, pred):
+    def recons_loss(true, pred, **tags):
         if autoencoding_loss == "squared_error":
             return ((true - pred) ** 2).sum(axis=(1, 2, 3)).mean()
+
         elif autoencoding_loss == "mean_squared_error":
             return ((true - pred) ** 2).mean()
         elif autoencoding_loss == "cross_entropy":
@@ -245,8 +247,24 @@ def build_capsule_(layers, data, nbl, nbc,
             return (T.nnet.binary_crossentropy(pred, true)).sum(axis=(1, 2, 3)).mean()
 
     def get_recons_loss(model, X):
-        Xrec = reconstruct(model, X)
-        return recons_loss(X, Xrec)
+        loss_class = train_params.get('loss_class', 'autoencoder')
+        print(loss_class)
+        if loss_class == 'autoencoder':
+            Xrec = reconstruct(model, X)
+            return recons_loss(X, Xrec)
+        elif loss_class == 'variational':
+            X = X.flatten(2)
+            z_mu = L.get_output(layers['z_mu'], X)
+            z_log_sigma = L.get_output(layers['z_log_sigma'], X)
+            if autoencoding_loss == 'squared_error':
+                x_mu, x_log_sigma = (
+                    L.get_output(layers['output_mu'], X),
+                    L.get_output(layers['output_log_sigma'], X))
+                loss = vae_loss_real(X.flatten(2), x_mu.flatten(2), x_log_sigma.flatten(2), z_mu, z_log_sigma)
+            elif autoencoding_loss == 'cross_entropy':
+                x_mu = L.get_output(layers['output'], X)
+                loss = vae_loss_binary(X.flatten(2), x_mu.flatten(2), z_mu, z_log_sigma)
+            return loss
 
     functions = {
         "reconstruct": make_function(func=reconstruct, params=["X"]),

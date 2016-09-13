@@ -147,6 +147,22 @@ def load_data(dataset="digits",
                     included[data.test.y == cl] = True
                 data.test.X = data.test.X[included]
                 data.test.y = data.test.y[included]
+
+    if dataset == "rescaled_digits":
+        from lasagnekit.datasets.mnist import MNIST
+        from lasagnekit.datasets.subsampled import SubSampled
+        from lasagnekit.datasets.helpers import load_once
+        from lasagnekit.datasets.rescaled import Rescaled
+
+        if w is None or h is None:
+            w = 28
+            h = 28
+        c=1
+        data = load_once(MNIST)(which='train')
+        data = SubSampled(data, batch_size)
+        data = Rescaled(data, (w, h))
+        data.load()
+
     if dataset == "cropped_digits":
         from lasagnekit.datasets.subsampled import SubSampled
         from lasagnekit.datasets.mnist import MNIST
