@@ -137,6 +137,9 @@ def train(dataset=None,
         #  periodically save the model
         print("Saving the model...")
         save_(layers, builder, kw_builder, "{}/model.pkl".format(prefix), info=info)
+        if params.get('save_model_snapshots', False):
+            import shutil
+            shutil.copy("{}/model.pkl".format(prefix), "{}/model_{:08d}.pkl".format(prefix, status['epoch']))
 
     logger.info("Compiling the model...")
     capsule = build_capsule_(layers, data, nbl, nbc,

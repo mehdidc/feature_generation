@@ -626,7 +626,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
         elif self.color == 'patches':
             pass
         else:
-            colors_ = theano.shared(np.array(colors))
+            colors_ = theano.shared(np.array(colors).astype(theano.config.floatX))
             colors_ = colors_.dimshuffle('x', 0, 'x', 'x')
             o = o * colors_
         return o
@@ -640,6 +640,12 @@ class GenericBrushLayer(lasagne.layers.Layer):
             (self.nb_col_channels, self.h, self.w))
         init_val = T.zeros(output_shape)
         init_val = T.unbroadcast(init_val, 0, 1, 2, 3)
+        # the above is to avoid this error:
+        # "an input and an output are associated with the same recurrent state
+        # and should have the same type but have type 'CudaNdarrayType(float32,
+        # (False, True, False, False))' and 'CudaNdarrayType(float32, 4D)'
+        # respectively.'))"
+
         output, _ = recurrent_accumulation(
             # 'time' should be the first dimension
             input.dimshuffle(1, 0, 2),
@@ -749,6 +755,39 @@ class GaussianSampleLayer(lasagne.layers.MergeLayer):
         if deterministic:
             return mu
         return mu + T.exp(logsigma) * self.rng.normal(shape)
+
+
+class ExpressionLayerMulti(lasagne.layers.MergeLayer):
+    def __init__(self, incomings, function, output_shape=None, **kwargs):
+        super(ExpressionLayerMulti, self).__init__(incomings, **kwargs)
+
+        if output_shape is None:
+            self._output_shape = None
+        elif output_shape == 'auto':
+            self._output_shape = 'auto'
+        elif hasattr(output_shape, '__call__'):
+            self.get_output_shape_for = output_shape
+        else:
+            self._output_shape = tuple(output_shape)
+
+        self.function = function
+
+    def get_output_shape_for(self, input_shapes):
+        if self._output_shape is None:
+            return input_shapes
+        elif self._output_shape is 'auto':
+            input_shape = input_shapes[0]
+            input_shape = (0 if s is None else s for s in input_shape)
+            X = theano.tensor.alloc(0, *input_shapes)
+            output_shape = self.function(X).shape.eval()
+            output_shape = tuple(s if s else None for s in output_shape)
+            return output_shape
+        else:
+            return self._output_shape
+
+    def get_output_for(self, inputs, **kwargs):
+        return self.function(*inputs)
+
 
 
 def gaussian_log_likelihood(tgt, mu, ls):

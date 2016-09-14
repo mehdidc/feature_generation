@@ -9,7 +9,8 @@ from helpers import correct_over_op, over_op, sum_op, max_op, thresh_op, normali
 from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse, norm_maxmin
 from helpers import Repeat
 from helpers import BrushLayer, GenericBrushLayer
-from helpers import GaussianSampleLayer
+from helpers import GaussianSampleLayer, ExpressionLayerMulti
+from helpers import recurrent_accumulation
 import theano.tensor as T
 import numpy as np
 
@@ -5007,6 +5008,7 @@ reduce_funcs = {
     'over': over_op,
     'normalized_over': normalized_over_op,
     'max': max_op,
+    'new': lambda prev, new: new+prev-prev
 }
 
 proba_funcs = {
@@ -5192,6 +5194,227 @@ def model84( w=32, h=32, c=1, seed=42):
     l_out = layers.ReshapeLayer(l_out, ([0], c, w, h), name="output")
     return layers_from_list_to_dict([l_in, z_mu, z_log_sigma, z_sample, l_out])
 
+
+def model85(w=32, h=32, c=1, n_steps=10, patch_size=5):
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    hid = layers.DenseLayer(l_in, 800, nonlinearity=rectify, name="hid")
+    hid = layers.DenseLayer(hid, 700, nonlinearity=rectify, name="hid")
+    hid = layers.DenseLayer(hid, 800, nonlinearity=rectify, name="hid")
+    hid = layers.DenseLayer(hid, 300, nonlinearity=rectify, name="hid")
+
+
+    hid = Repeat(hid, n_steps)
+    hid = layers.LSTMLayer(hid, 400)
+    l_coord = TensorDenseLayer(hid, 5, name="coord")
+
+    patches = np.ones((1, c, patch_size, patch_size))
+    patches = patches.astype(np.float32)
+
+    l_brush = GenericBrushLayer(
+        l_coord,
+        w, h,
+        n_steps=n_steps,
+        patches=patches,
+        col='rgb' if c == 3 else 'grayscale',
+        return_seq=True,
+        reduce_func=reduce_funcs['sum'],
+        to_proba_func=proba_funcs['softmax'],
+        normalize_func=normalize_funcs['sigmoid'],
+        x_sigma=1,
+        y_sigma=1,
+        x_stride=1,
+        y_stride=1,
+        patch_index=0,
+        color=[1.],
+        x_min=0,
+        x_max='width',
+        y_min=0,
+        y_max='height',
+        name="brush"
+    )
+    def fn(brush, coord):
+        halt =  T.nnet.sigmoid(coord[:, :, 2])
+        halt = T.extra_ops.cumsum(halt, axis=1)
+        halt = halt.dimshuffle(0, 1, 'x', 'x', 'x')
+        return (halt * brush)[:, -1]
+
+    l_raw_out = ExpressionLayerMulti(
+        (l_brush, l_coord),
+        fn,
+        name="raw_output",
+        output_shape=(l_brush.output_shape[0],) + l_brush.output_shape[2:])
+    print(l_raw_out.output_shape)
+    l_scaled_out = layers.ScaleLayer(
+        l_raw_out, scales=init.Constant(2.), name="scaled_output")
+    l_biased_out = layers.BiasLayer(
+        l_scaled_out, b=init.Constant(-1), name="biased_output")
+
+    l_out = layers.NonlinearityLayer(
+        l_biased_out,
+        nonlinearity=get_nonlinearity['sigmoid'],
+        name="output")
+    all_layers = ([l_in] +
+                  [l_coord, l_brush, l_raw_out, l_biased_out, l_scaled_out,  l_out])
+    return layers_from_list_to_dict(all_layers)
+
+
+
+def model86(w=32, h=32, c=1, n_steps=10, patch_size=5):
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    hid = layers.DenseLayer(l_in, 800, nonlinearity=rectify, name="hid")
+    hid = layers.DenseLayer(hid, 700, nonlinearity=rectify, name="hid")
+    hid = layers.DenseLayer(hid, 800, nonlinearity=rectify, name="hid")
+    hid = layers.DenseLayer(hid, 300, nonlinearity=rectify, name="hid")
+
+    hid = Repeat(hid, n_steps)
+    hid = layers.LSTMLayer(hid, 400)
+    l_coord = TensorDenseLayer(hid, 5, name="coord")
+
+    patches = np.ones((1, c, patch_size, patch_size))
+    patches = patches.astype(np.float32)
+
+    l_brush = GenericBrushLayer(
+        l_coord,
+        w, h,
+        n_steps=n_steps,
+        patches=patches,
+        col='rgb' if c == 3 else 'grayscale',
+        return_seq=True,
+        reduce_func=reduce_funcs['new'],
+        to_proba_func=proba_funcs['softmax'],
+        normalize_func=normalize_funcs['sigmoid'],
+        x_sigma=1,
+        y_sigma=1,
+        x_stride=1,
+        y_stride=1,
+        patch_index=0,
+        color=[1.],
+        x_min=0,
+        x_max='width',
+        y_min=0,
+        y_max='height',
+        name="brush"
+    )
+
+    def fn(brush, coord):
+        alpha = T.nnet.sigmoid(coord[:, :, 2])
+        shape = brush.shape
+        output_shape = (shape[0],) + (c, h, w)
+        init_val = T.zeros(output_shape)
+        init_val = T.unbroadcast(init_val, 0, 1, 2, 3)
+
+        def step_function(input_cur, alpha_cur, output_prev):
+            alpha_cur = alpha_cur.dimshuffle(0, 'x', 'x', 'x')
+            return (output_prev * (1 - alpha_cur) + input_cur) # / (2 - alpha_cur)
+
+        X = brush.transpose((1, 0, 2, 3, 4))
+        alpha = alpha.transpose((1, 0))
+        sequences = [X, alpha]
+        outputs_info = [init_val]
+        non_sequences = []
+        result, updates = theano.scan(
+            fn=step_function,
+            sequences=sequences,
+            outputs_info=outputs_info,
+            non_sequences=non_sequences,
+            strict=False,
+            n_steps=n_steps)
+        result = result[-1]
+        return result
+
+    l_raw_out = ExpressionLayerMulti(
+        (l_brush, l_coord),
+        fn,
+        name="raw_output",
+        output_shape=(l_brush.output_shape[0],) + l_brush.output_shape[2:])
+    l_scaled_out = layers.ScaleLayer(
+        l_raw_out, scales=init.Constant(2.), name="scaled_output")
+    l_biased_out = layers.BiasLayer(
+        l_scaled_out, b=init.Constant(-1), name="biased_output")
+
+    l_out = layers.NonlinearityLayer(
+        l_biased_out,
+        nonlinearity=get_nonlinearity['sigmoid'],
+        name="output")
+    all_layers = ([l_in] +
+                  [l_coord, l_brush, l_raw_out, l_biased_out, l_scaled_out,  l_out])
+    return layers_from_list_to_dict(all_layers)
+
+def model87(w=32, h=32, c=1, n_steps=10, patch_size=5):
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    hid = layers.DenseLayer(l_in, 800, nonlinearity=rectify, name="hid")
+    hid = layers.DenseLayer(hid, 700, nonlinearity=rectify, name="hid")
+    hid = layers.DenseLayer(hid, 800, nonlinearity=rectify, name="hid")
+    hid = layers.DenseLayer(hid, 300, nonlinearity=rectify, name="hid")
+
+    hid = Repeat(hid, n_steps)
+    hid = layers.LSTMLayer(hid, 400)
+    l_coord = TensorDenseLayer(hid, 5, name="coord")
+
+    patches = np.ones((1, c, patch_size, patch_size))
+    patches = patches.astype(np.float32)
+
+    l_brush = GenericBrushLayer(
+        l_coord,
+        w, h,
+        n_steps=n_steps,
+        patches=patches,
+        col='rgb' if c == 3 else 'grayscale',
+        return_seq=True,
+        reduce_func=reduce_funcs['new'],
+        to_proba_func=proba_funcs['softmax'],
+        normalize_func=normalize_funcs['sigmoid'],
+        x_sigma=1,
+        y_sigma=1,
+        x_stride=1,
+        y_stride=1,
+        patch_index=0,
+        color=[1.],
+        x_min=0,
+        x_max='width',
+        y_min=0,
+        y_max='height',
+        name="brush"
+    )
+
+    def fn(x):
+        return softmax_(x, axis=1).sum(axis=1)
+
+    l_raw_out = layers.ExpressionLayer(
+        l_brush,
+        fn,
+        name="raw_output",
+        output_shape="auto")
+
+    l_scaled_out = layers.ScaleLayer(
+        l_raw_out, scales=init.Constant(2.), name="scaled_output")
+    l_biased_out = layers.BiasLayer(
+        l_scaled_out, b=init.Constant(-1), name="biased_output")
+
+    l_out = layers.NonlinearityLayer(
+        l_biased_out,
+        nonlinearity=get_nonlinearity['sigmoid'],
+        name="output")
+    all_layers = ([l_in] +
+                  [l_coord, l_brush, l_raw_out, l_biased_out, l_scaled_out,  l_out])
+    return layers_from_list_to_dict(all_layers)
+
+
+def axify(fn):
+
+    def fn_(x, axis=1):
+        x = x.transpose((0, 2, 3 , 4, 1))
+        x = T.cast(x, theano.config.floatX)
+        shape = x.shape
+        x = x.reshape((-1, x.shape[-1]))
+        x = fn(x)
+        x = x.reshape(shape)
+        x = x.transpose((0, 4, 1, 2, 3))
+        return x
+    return fn_
+
+sparsemax_ = axify(sparsemax)
+softmax_ = axify(softmax)
 
 build_convnet_simple = model1
 build_convnet_simple_2 = model2
