@@ -1,0 +1,23 @@
+{
+"autoencoding_loss": "cross_entropy",
+"loss_class": "variational",
+"binarize_thresh": null,
+"budget_hours": 10,
+"contractive": false,
+"contractive_coef": null,
+"dataset": "digits",
+"denoise": null,
+"marginalized": false,
+"model_name": "model84",
+"model_params": {   
+},
+"noise": null,
+"optimization": {
+    "max_nb_epochs": 9999999999,
+    "patience_nb_epochs": 500
+},
+"walkback": 1,
+"mode": "minibatch",
+"report_rec_error": false,
+"walkback_mode": "bengio_without_sampling"
+}
