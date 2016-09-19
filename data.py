@@ -168,25 +168,36 @@ def load_data(dataset="digits",
         from lasagnekit.datasets.mnist import MNIST
         from lasagnekit.datasets.transformed import Transformed
         from lasagnekit.datasets.helpers import load_once
+        from skimage.transform import resize
+        from lasagnekit.datasets.rescaled import Rescaled
+        from lasagnekit.datasets.subsampled import SubSampled
         c = 1
         cr = 6
-        w, h = 28 - cr * 2, 28 - cr * 2
+        if w is None or h is None:
+            w, h = 28 - cr * 2, 28 - cr * 2
         def preprocess(X):
-            return X.reshape((X.shape[0], 28, 28))[:, cr:-cr, cr:-cr].reshape((X.shape[0], w*h))
+            X = X.reshape((X.shape[0], 28, 28))
+            X = X[:, cr:-cr, cr:-cr]
+            X = X.reshape((X.shape[0], w*h))
+            return X
         train_data = load_once(MNIST)(which='train')
         train_data = load_once(Transformed)(train_data, preprocess, per_example=False)
         train_data.load()
+        train_data.img_dim = (28 - cr * 2, 28 - cr * 2)
+        train_data = load_once(Rescaled)(train_data, (h, w))
+        train_data.load()
         train_data.img_dim = (w, h)
+        train_data = SubSampled(train_data, batch_size)
 
         test_data = MNIST(which='test')
         test_data = Transformed(test_data, preprocess, per_example=False)
+        test_data = load_once(Rescaled)(train_data, (h, w))
         test_data.load()
         test_data.img_dim = (w, h)
 
         data = train_data
         data.train = train_data
         data.test = test_data
-        print(data.img_dim)
 
     if dataset == "random_cropped_digits":
         from lasagnekit.datasets.mnist import MNIST
