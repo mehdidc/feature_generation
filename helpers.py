@@ -5,7 +5,7 @@ import os
 from lasagnekit.easy import iterate_minibatches
 import lasagne
 from layers import FeedbackGRULayer, TensorDenseLayer
-from sparsemax_theano import sparsemax
+from utils.sparsemax_theano import sparsemax
 
 def norm(x):
     return (x - x.min()) / (x.max() - x.min() + T.eq(x.max(), x.min()) + 1e-12)
@@ -513,13 +513,13 @@ class GenericBrushLayer(lasagne.layers.Layer):
 
         gx, gy = X[:, 0], X[:, 1]
 
-        gx = self.normalize_func(gx) * self.x_max + self.x_min
-        gy = self.normalize_func(gy) * self.y_max + self.y_min
+        gx = self.normalize_func(gx) * (self.x_max - self.x_min) + self.x_min
+        gy = self.normalize_func(gy) * (self.y_max - self.y_min) + self.y_min
 
         pointer = 2
         if self.x_stride == 'predicted':
             sx = X[:, pointer]
-            sx = self.normalize_func(gx) * self.x_max + self.x_min
+            sx = self.normalize_func(gx)#* (self.x_max - self.x_min) + self.x_min
             self.assign_['x_stride'] = pointer
             pointer += 1
         else:
@@ -527,7 +527,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
 
         if self.y_stride == 'predicted':
             sy = X[:, pointer]
-            sy = self.normalize_func(gy) * self.y_max + self.y_min
+            sy = self.normalize_func(gy)#* (self.y_max - self.y_min) + self.y_min
             self.assign_['y_stride'] = pointer
             pointer += 1
         else:
@@ -664,8 +664,8 @@ def test_generic_batch_layer():
     from lasagne import layers
     from lasagnekit.misc.plot_weights import dispims_color
     from skimage.io import imsave
-    n_steps = 1
-    nb_features = 8
+    n_steps = 10
+    nb_features = 10
     inp = layers.InputLayer((None, n_steps, nb_features))
     p1 = [
         [0, 0, 1, 0, 0],
@@ -681,10 +681,10 @@ def test_generic_batch_layer():
         [1, 1, 1, 1, 1],
         [1, 1, 1, 1, 1],
     ]
-    patches = np.zeros((1, 3, 32, 32))
-    #patches[0, :] = np.array(p1)
-    #patches[1, :] = np.array(p2)
-    patches[:] = 1.
+    patches = np.zeros((2, 3, 5, 5))
+    patches[0, :] = np.array(p1)
+    patches[1, :] = np.array(p2)
+    #patches[:] = 1.
     patches = patches.astype(np.float32)
 
     brush = GenericBrushLayer(
@@ -697,13 +697,13 @@ def test_generic_batch_layer():
         reduce_func=over_op,
         to_proba_func=sparsemax,
         normalize_func=T.nnet.sigmoid,
-        x_sigma=0.5,#'predicted',
-        y_sigma=0.5,#'predicted',
-        x_stride=1,#'predicted',
-        y_stride=1,#,'predicted',
+        x_sigma=1,#'predicted',
+        y_sigma=1,#'predicted',
+        x_stride='predicted',
+        y_stride='predicted',
         patch_index='predicted',
-        #color='predicted',
-        color=(1., 0, 0),
+        color='predicted',
+        #color=(1., 0, 0),
         x_min=0,
         x_max='width',
         y_min=0,
@@ -711,7 +711,7 @@ def test_generic_batch_layer():
         eps=0)
     X = T.tensor3()
     fn = theano.function([X], layers.get_output(brush, X))
-    X_example = np.random.normal(0, 0.5, size=(100, n_steps, nb_features))
+    X_example = np.random.normal(0, 1, size=(100, n_steps, nb_features))
     X_example = X_example.astype(np.float32)
     y = fn(X_example)
     print(y.min(), y.max())

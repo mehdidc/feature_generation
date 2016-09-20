@@ -15,7 +15,7 @@ import theano.tensor as T
 import numpy as np
 
 
-from batch_norm import (
+from utils.batch_norm import (
     NormalizeLayer,
     ScaleAndShiftLayer,
     DecoderNormalizeLayer,
@@ -26,7 +26,7 @@ from lasagne.layers import batch_norm
 import theano
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
-from sparsemax_theano import sparsemax
+from utils.sparsemax_theano import sparsemax
 
 
 get_nonlinearity = dict(

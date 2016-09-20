@@ -730,7 +730,7 @@ def check(filename="out.pkl",
           force_model_params=None):
     import json
     import traceback
-    import analyze
+    from tools.computation import analyze
 
     logger.info("Loading data...")
 
