@@ -75,5 +75,5 @@ for j in tqdm(J):
         plt.axvline(x=b, color='gray', linestyle='dashed')
     plt.xlabel('normalized distance')
     plt.ylabel('two point correlation')
-    plt.savefig('figs/twopointcorr/{}'.format(id_))
+    plt.savefig('exported_figs/twopointcorr/{}'.format(id_))
     plt.close(fig)

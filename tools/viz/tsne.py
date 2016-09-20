@@ -86,6 +86,6 @@ if __name__ == '__main__':
         plt.subplot(2, 1, 2)
         plt.imshow(img_content, cmap='gray', interpolation='none')
         plt.title(id_+'/'+jref_s)
-        plt.savefig('figs/tsne/{}.png'.format(id_))
+        plt.savefig('exported_data/figs/tsne/{}.png'.format(id_))
         plt.show()
         plt.close(fig)

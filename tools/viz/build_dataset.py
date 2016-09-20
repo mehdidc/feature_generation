@@ -55,7 +55,7 @@ def build_hash_vector(X):
 if __name__ == '__main__':
     import random
     random.seed(42)
-    f = h5py.File('figs/dataset.hdf5', 'w')
+    f = h5py.File('exported_data/figs/dataset.hdf5', 'w')
     db = load_db()
     jobs = list(db.jobs_with(state=SUCCESS, type='generation'))
     random.shuffle(jobs)

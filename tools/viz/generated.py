@@ -56,10 +56,10 @@ if __name__ == '__main__':
         plt.axis('off')
         plt.title(jref_s, fontsize=8)
         if per_jobset is False:
-            plt.savefig('figs/generated/{}.png'.format(id_))
+            plt.savefig('exported_data/figs/generated/{}.png'.format(id_))
         else:
             where = jref['where']
-            mkdir_path('figs/generated/{}'.format(where))
-            plt.savefig('figs/generated/{}/{}.png'.format(where, id_))
+            mkdir_path('exported_data/figs/generated/{}'.format(where))
+            plt.savefig('exported_data/figs/generated/{}/{}.png'.format(where, id_))
         fig.tight_layout()
         plt.close(fig)

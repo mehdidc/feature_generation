@@ -32,4 +32,4 @@ for j in tqdm(J):
     X = X[:, :, :, np.newaxis]
     X = X * np.ones((1, 1, 1, 3))
     img = dispims_color(X)
-    imsave('figs/mini/{}.png'.format(id_), img)
+    imsave('exported_data/figs/mini/{}.png'.format(id_), img)
