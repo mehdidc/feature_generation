@@ -204,7 +204,6 @@ def gen(neuralnets, nb_iter=10, w=32, h=32, init='random'):
                 #print(img.shape)
                 img = upscale_simple(img, scale=scale)
                 #print(img.shape)
-
                 #img = normalize(img)
                 img = img > thresh_
                 img = img.astype(np.float32)
