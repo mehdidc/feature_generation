@@ -26,7 +26,7 @@ from data import load_data
 from model import *  # for dill
 from skimage.io import imsave
 import logging
-from scripts.genstats import genstats
+from tools.gen.genstats import genstats
 
 from lightjob.cli import load_db
 from lightjob.db import SUCCESS, RUNNING, AVAILABLE, ERROR, PENDING
@@ -730,7 +730,7 @@ def check(filename="out.pkl",
           force_model_params=None):
     import json
     import traceback
-    from tools.computation import analyze
+    from tools import analyze
 
     logger.info("Loading data...")
 

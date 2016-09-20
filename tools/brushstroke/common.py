@@ -3,7 +3,7 @@ import os
 sys.path.append(os.getcwd())
 from tasks import load_
 from tasks import check as load_filename
-from scripts.imgtovideo import imgs_to_video
+from tools.system.imgtovideo import imgs_to_video
 from data import load_data
 import numpy as np
 import theano

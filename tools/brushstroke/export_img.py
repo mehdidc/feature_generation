@@ -79,9 +79,11 @@ def main():
     img = disp_grid(imgs[:, -1], border=1, bordercolor=(0.3, 0, 0))
     imsave(O + 'ir.png', img)
     seq_to_video(imgs, O+'ir.mp4', border=0, bordercolor=(0, 0, 0))
-    pd.Series(score).to_csv(scores, O+'scores.csv')
-    pd.Series(diversity).to_csv(diversity, O+'diversity.csv')
+    pd.Series(score).to_csv(O+'scores.csv')
+    pd.Series(diversity).to_csv(O+'diversity.csv')
+
     # OMNIGLOT TEST
+    """
     dt_test = load_data('omniglot', w=w, h=h)
     nb = 100
     dt = dt_test.X[0:nb]
@@ -100,6 +102,6 @@ def main():
     im_mix[:, 0:im1.shape[1]] = im1
     im_mix[:, im1.shape[1]:] = im2
     imsave(O+'im_mix_new_dataset.png', im_mix)
-
+    """
 if __name__ == '__main__':
     main()

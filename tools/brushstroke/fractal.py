@@ -1,106 +1,10 @@
-import sys, os
-os.environ['OMP_NUM_THREADS'] = '1'
-os.environ['THEANO_FLAGS'] = 'device=cpu,compiledir_format="ipynb_compiledir_%(platform)s-%(processor)s-%(python_version)s-%(python_bitwidth)s"'
-sys.path.append("/home/mcherti/work/code/feature_generation")
-from tasks import check as load_filename
-from scripts.imgtovideo import imgs_to_video
-from data import load_data
-from helpers import salt_and_pepper
-import matplotlib.pyplot as plt
+from tqdm import tqdm
 import numpy as np
-import theano
-import theano.tensor as T
-from lasagne import layers as L
-from lasagnekit.misc.plot_weights import dispims_color, tile_raster_images
 import pandas as pd
-from tqdm import tqdm
-import base64
-import json
-from skimage.io import imread, imsave
-from skimage.transform import resize
+from skimage.io import imsave
 from skimage.util import pad
-from tqdm import tqdm
+from common import load_model
 
-def load_model(filename, **kw):
-
-    model = load_filename(
-        what="notebook", 
-        filename=filename, 
-        **kw
-    )
-    return model
-
-def build_brush_func(layers):
-    if 'biased_output' in layers:
-        bias = layers['biased_output'].b.get_value()
-    elif 'bias' in layers:
-        bias = layers['bias'].b.get_value()
-    else:
-        bias = np.array(0.1)
-
-    bias = bias[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis]
-
-    if 'scaled_output' in layers:
-        scale = layers['scaled_output'].scales.get_value()
-    elif 'scale' in layers:
-        scale = layers['scale'].scales.get_value()
-    else:
-        scale = np.array((1.,))
-    scale = scale[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis]
-
-    
-    X = T.tensor4()
-
-    B = L.get_output(layers['brush'], X)
-    if len(layers['brush'].output_shape) == 4: # (ex, t, w, h)
-        B = B.dimshuffle(0, 1, 'x', 2, 3)
-    
-    fn = theano.function(
-        [X], 
-        T.nnet.sigmoid(B * scale + bias)
-    )
-    return fn
-
-def build_encode_func(layers):
-    w = layers['output'].output_shape[2]
-    X = T.tensor4()
-    fn = theano.function(
-        [X], 
-        T.nnet.sigmoid(L.get_output(layers['coord'], X)[:, :, 0:2]) * w
-    )
-    return fn
-
-def to_grid_of_images(seq_imgs, **kw):
-    y = seq_imgs
-    imgs = []
-    for t in range(y.shape[1]):
-        yy = y[:, t]
-        if yy.shape[1] == 1:
-            yy = yy[:, 0, :, :, np.newaxis] * np.ones((1, 1, 1, 3))
-        else:
-            yy = yy.transpose((0, 2, 3, 1))
-        img = dispims_color(yy, **kw)
-        imgs.append(img)
-    return imgs
-
-def seq_to_video(seq, filename='out.mp4', verbose=1, framerate=8, rate=8, **kw):
-    # shape of seq should be : (examples, time, c, w, h)
-    seq = to_grid_of_images(seq, **kw)
-    seq = [np.zeros_like(seq[0])] + seq
-    if os.path.exists(filename):
-        os.remove(filename)
-    imgs_to_video(seq, out=filename, verbose=verbose, framerate=framerate, rate=rate)
-
-def embed_video(filename):
-    video = open(filename, 'r+b').read()
-    encoded = base64.b64encode(video)
-    return HTML(data='''<video alt="test" controls>
-                <source src="data:video/mp4;base64,{0}" type="video/mp4" />
-                </video>'''.format(encoded.decode('ascii')))
-def disp_grid(imgs, **kw):
-    # shape of imgs should be : (examples, color, w, h)
-    out = dispims_color(imgs.transpose((0, 2, 3, 1)) * np.ones((1, 1, 1, 3)), **kw)
-    return out
 def normalize(img):
     img = img.copy()
     img -= img.min()
@@ -213,13 +117,8 @@ def gen(neuralnets, nb_iter=10, w=32, h=32, init='random'):
     return out_img, snapshots
 
 if __name__ == '__main__':
-    model_a, data, layers, w, h, c = load_model("training/fractal/a/model.pkl", 
-                                                dataset="rescaled_digits", 
-                                                force_w=16, force_h=16)
-
-    model_b, data, layers, w, h, c = load_model("training/fractal/b/model.pkl", 
-                                                dataset="random_cropped_digits", 
-                                                force_w=8, force_h=8)
+    model_a, data, layers = load_model("training/fractal/a/model.pkl")
+    model_b, data, layers = load_model("training/fractal/b/model.pkl")
     neuralnets = [
         {'model': model_b, 'on': 'crops', 'padlen': 3,   'nb_iter':  5,   'thresh': 0.5, 'when': 'always', 'whitepx_ratio': 0.5},
         #{'model': model_a, 'on': 'crops',  'padlen': 3,  'nb_iter': 5,   'thresh': 'moving', 'when': 'always', 'whitepx_ratio': 0.185},
