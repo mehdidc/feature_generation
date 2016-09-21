@@ -1,0 +1,34 @@
+{
+    "binarize_thresh": null, 
+    "noise": null, 
+    "budget_hours": 10, 
+    "contractive_coef": null, 
+    "denoise": null, 
+    "optimization": {
+        "max_nb_epochs": 9999999999
+    }, 
+    "dataset": "omniglot", 
+    "model_params": {
+        "normalize": "sigmoid", 
+        "nb_fc_layers": 2, 
+        "nonlin": "rectify", 
+        "stride": false, 
+        "nb_recurrent_units": 200, 
+        "out_reduce": "over", 
+        "sigma": 1, 
+        "nb_fc_units": [
+            1000, 
+            100
+        ], 
+        "n_steps": 45, 
+        "patch_size": 2, 
+        "inp_reduce": "over"
+    }, 
+    "walkback": 1, 
+    "marginalized": false, 
+    "mode": "random", 
+    "walkback_mode": "bengio_without_sampling", 
+    "contractive": false, 
+    "model_name": "model82", 
+    "autoencoding_loss": "squared_error"
+}

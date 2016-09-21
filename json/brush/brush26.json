@@ -1,0 +1,38 @@
+{
+    "comment": "retrain 76f2a5320d2d700ee5943dceb2c3e004 and show iterative generation through epochs",
+    "binarize_thresh": null, 
+    "noise": null, 
+    "budget_hours": 10, 
+    "contractive_coef": null, 
+    "denoise": null, 
+    "optimization": {
+        "max_nb_epochs": 9999999999
+    }, 
+    "dataset": "digits", 
+    "model_params": {
+        "normalize": "sigmoid", 
+        "nb_fc_layers": 4, 
+        "nonlin": "rectify", 
+        "stride": false, 
+        "nb_recurrent_units": 400, 
+        "out_reduce": "max", 
+        "sigma": 1, 
+        "nb_fc_units": [
+            800, 
+            700, 
+            800, 
+            300
+        ], 
+        "n_steps": 59, 
+        "patch_size": 5, 
+        "inp_reduce": "prev"
+    }, 
+    "walkback": 1, 
+    "marginalized": false, 
+    "mode": "random", 
+    "walkback_mode": "bengio_without_sampling", 
+    "contractive": false, 
+    "model_name": "model82", 
+    "autoencoding_loss": "squared_error",
+    "save_model_snapshots": true
+}

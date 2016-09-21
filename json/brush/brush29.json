@@ -1,0 +1,25 @@
+{   
+"comment": "try to use sparse-max or softmax pixel wise to have a sharper result",
+"autoencoding_loss": "squared_error",
+"binarize_thresh": null,
+"budget_hours": 10,
+"contractive": false,
+"contractive_coef": null,
+"dataset": "digits",
+"denoise": null,
+"marginalized": false,
+"model_name": "model87",
+"model_params": { 
+    "n_steps": 59,
+    "patch_size": 5
+},
+"noise": null,
+"optimization": {
+    "max_nb_epochs": 9999999999,
+    "patience_nb_epochs": 500
+},
+"mode": "random",
+"walkback": 1,
+"report_rec_error": false,
+"walkback_mode": "bengio_without_sampling"
+}

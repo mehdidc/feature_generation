@@ -1,0 +1,29 @@
+{   
+"autoencoding_loss": "squared_error",
+"binarize_thresh": null,
+"budget_hours": 10,
+"contractive": false,
+"contractive_coef": null,
+"dataset": "digits",
+"denoise": null,
+"marginalized": false,
+"mode": "random",
+"model_name": "model81",
+"model_params": {   
+    "n_steps": 51,
+    "nb_fc_layers": 4,
+    "nb_fc_units": [1800, 500, 300, 600],
+    "nb_recurrent_layers": 2,
+    "nb_recurrent_units": [300, 100],
+    "nonlin": "rectify",
+    "patch_size": 2,
+    "sigma": null,
+    "stride": false,
+    "normalize": "sigmoid",
+    "reduce": "over"
+},
+"noise": null,
+"optimization": {"max_nb_epochs": 9999999999},
+"walkback": 1,
+"walkback_mode": "bengio_without_sampling"
+}
