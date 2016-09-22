@@ -601,6 +601,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
         # shape of Fy : (nb_examples, ph, h)
         Fy = Fy / (Fy.sum(axis=2, keepdims=True) + self.eps)
         patches = theano.shared(self.patches)
+        self.patches_ = patches
         # patches : (nbp, c, ph, pw)
         # Fy : (nb_examples, ph, h)
         # Fx : (nb_examples, pw, w)
@@ -811,6 +812,19 @@ def vae_loss_real(X, mu, log_sigma, z_mu, z_log_sigma):
     gaussian_ll = gaussian_log_likelihood(X, mu, log_sigma).sum(axis=1).mean()
     kl_div = vae_kl_div(z_mu, z_log_sigma).sum(axis=1).mean()
     return (gaussian_ll + kl_div)
+
+def axify(fn):
+
+    def fn_(x, axis=1):
+        x = x.transpose((0, 2, 3 , 4, 1))
+        x = T.cast(x, theano.config.floatX)
+        shape = x.shape
+        x = x.reshape((-1, x.shape[-1]))
+        x = fn(x)
+        x = x.reshape(shape)
+        x = x.transpose((0, 4, 1, 2, 3))
+        return x
+    return fn_
 
 
 if __name__ == '__main__':

@@ -9,7 +9,7 @@ from helpers import correct_over_op, over_op, sum_op, max_op, thresh_op, normali
 from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse, norm_maxmin
 from helpers import Repeat
 from helpers import BrushLayer, GenericBrushLayer
-from helpers import GaussianSampleLayer, ExpressionLayerMulti
+from helpers import GaussianSampleLayer, ExpressionLayerMulti, axify
 from helpers import recurrent_accumulation
 import theano.tensor as T
 import numpy as np
@@ -33,6 +33,7 @@ get_nonlinearity = dict(
     linear=linear,
     sigmoid=sigmoid,
     rectify=rectify,
+    relu=rectify,
     very_leaky_rectify=very_leaky_rectify,
     softmax=softmax,
     tanh=tanh,
@@ -5054,6 +5055,8 @@ def model83(w=32, h=32, c=1,
             variational=False,
             variational_nb_hidden=100,
             variational_seed=1,
+            patches=None,
+            col=None,
             eps=0):
 
     """
@@ -5132,16 +5135,17 @@ def model83(w=32, h=32, c=1,
     l_coord = TensorDenseLayer(l_hid, nb, nonlinearity=linear, name="coord")
 
     # DECODING PART
-
-    patches = np.ones((1, c, patch_size * (h_out/h), patch_size * (w_out/w)))
-    patches = patches.astype(np.float32)
+    
+    if patches is None:
+        patches = np.ones((1, c, patch_size * (h_out/h), patch_size * (w_out/w)))
+        patches = patches.astype(np.float32)
 
     l_brush = GenericBrushLayer(
         l_coord,
         w_out, h_out,
         n_steps=n_steps,
         patches=patches,
-        col='rgb' if c == 3 else 'grayscale',
+        col=col if col else ('rgb' if c == 3 else 'grayscale'),
         return_seq=True,
         reduce_func=reduce_funcs[reduce_func],
         to_proba_func=proba_funcs[proba_func],
@@ -5399,19 +5403,221 @@ def model87(w=32, h=32, c=1, n_steps=10, patch_size=5):
                   [l_coord, l_brush, l_raw_out, l_biased_out, l_scaled_out,  l_out])
     return layers_from_list_to_dict(all_layers)
 
+def model88(w=32, h=32, c=1,
+            nb_fc_layers=3,
+            nb_recurrent_layers=1,
+            nb_recurrent_units=100,
+            nb_fc_units=1000,
+            nb_conv_layers=0,
+            nb_conv_filters=64,
+            size_conv_filters=3,
+            nonlin='relu',
+            nonlin_out='sigmoid',
+            pooling=True,
+            n_steps=10,
+            patch_size=3,
+            w_out=-1,
+            h_out=-1,
+            reduce_func='sum',
+            proba_func='sparsemax',
+            normalize_func='sigmoid',
+            x_sigma=0.5,
+            y_sigma=0.5,
+            x_stride=1,
+            y_stride=1,
+            patch_index=0,
+            color='predicted',
+            x_min=0,
+            x_max='width',
+            y_min=0,
+            y_max='height',
+            recurrent_model='gru',
+            variational=False,
+            variational_nb_hidden=100,
+            variational_seed=1,
+            patches=None,
+            col=None,
+            parallel=1,
+            parallel_share=True,
+            parallel_reduce_func='sum',
+            eps=0):
 
-def axify(fn):
+    """
+    the clean GenericBrushLayer
+    """
 
-    def fn_(x, axis=1):
-        x = x.transpose((0, 2, 3 , 4, 1))
-        x = T.cast(x, theano.config.floatX)
-        shape = x.shape
-        x = x.reshape((-1, x.shape[-1]))
-        x = fn(x)
-        x = x.reshape(shape)
-        x = x.transpose((0, 4, 1, 2, 3))
-        return x
-    return fn_
+    # INIT
+    def init_method(): return init.GlorotUniform(gain='relu')
+    if type(nb_fc_units) != list: nb_fc_units = [nb_fc_units] * nb_fc_layers
+    if type(nb_conv_filters) != list: nb_conv_filters = [nb_conv_filters] * nb_conv_layers
+    if type(size_conv_filters) != list: size_conv_filters = [size_conv_filters] * nb_conv_layers
+    if type(nb_recurrent_units) != list: nb_recurrent_units = [nb_recurrent_units] * nb_recurrent_layers
+    if w_out == -1: w_out = w
+    if h_out == -1: h_out = h
+    output_shape = (None, c, h_out, w_out)
+    nonlin = get_nonlinearity[nonlin]
+    recurrent_model = recurrent_models[recurrent_model]
+    if patches is None:patches = np.ones((1, c, patch_size * (h_out/h), patch_size * (w_out/w)));patches = patches.astype(np.float32)
+    extra_layers = []
+
+    ##  ENCODING part
+    in_ = layers.InputLayer((None, c, w, h), name="input")
+    hid = in_
+        
+    nets = []
+    for i in range(parallel):
+        hids = conv_fc(
+          hid, 
+          num_filters=nb_conv_filters, 
+          size_conv_filters=size_conv_filters, 
+          init_method=init_method,
+          pooling=pooling,
+          nb_fc_units=nb_fc_units,
+          nonlin=nonlin,
+          names_prefix='net{}'.format(i))
+        nets.append(hids)
+   
+    if variational:
+        all_z_mu = []
+        all_z_log_sigma = []
+        for n, net in enumerate(nets):
+            z_mu = layers.DenseLayer(net[-1], variational_nb_hidden, nonlinearity=linear, name='z_mu_{}'.format(n))
+            z_log_sigma = layers.DenseLayer(net[-1], variational_nb_hidden, nonlinearity=linear, name='z_log_sigma_{}'.format(n))
+            all_z_mu.append(z_mu)
+            all_z_log_sigma.append(z_log_sigma)
+            net.append(z_mu)
+            net.append(z_log_sigma)
+
+        z_mu = layers.ConcatLayer(all_z_mu, axis=1, name='z_mu')
+        z_log_sigma = layers.ConcatLayer(all_z_log_sigma, axis=1, name='z_log_sigma')
+        z = GaussianSampleLayer(
+            z_mu, z_log_sigma,
+            rng=RandomStreams(variational_seed),
+            name='z_sample')
+
+        extra_layers.append(z_mu)
+        extra_layers.append(z_log_sigma)
+        extra_layers.append(z)
+        i = 0
+        for n, net in enumerate(nets):
+            z_net = layers.SliceLayer(z, indices=slice(i, i + variational_nb_hidden), axis=1, name='z_sample_{}'.format(n))
+            i += variational_nb_hidden
+            net.append(z_net)
+
+    for n, net in enumerate(nets):
+        hid = Repeat(net[-1], n_steps)
+        for l in range(nb_recurrent_layers):
+            hid = recurrent_model(hid, nb_recurrent_units[l], name="recurrent{}_{}".format(l, n))
+        net.append(hid)
+    
+    nb = ( 2 +
+          (1 if x_sigma == 'predicted' else 0) +
+          (1 if y_sigma == 'predicted' else 0) +
+          (1 if x_stride == 'predicted' else 0) +
+          (1 if y_stride == 'predicted' else 0) +
+          (c if color == 'predicted' else 0) +
+          (1 if patch_index == 'predicted' else 0))
+    
+    for i, net in enumerate(nets):
+        hid = net[-1]
+        coord = TensorDenseLayer(hid, nb, nonlinearity=linear, name="coord_{}".format(i))
+        net.append(coord)
+
+    # DECODING PART
+    
+    for i, net in enumerate(nets):
+        coord = net[-1]
+        brush = GenericBrushLayer(
+            coord,
+            w_out, h_out,
+            n_steps=n_steps,
+            patches=patches,
+            col=col if col else ('rgb' if c == 3 else 'grayscale'),
+            return_seq=True,
+            reduce_func=reduce_funcs[reduce_func],
+            to_proba_func=proba_funcs[proba_func],
+            normalize_func=normalize_funcs[normalize_func],
+            x_sigma=x_sigma,
+            y_sigma=y_sigma,
+            x_stride=x_stride,
+            y_stride=y_stride,
+            patch_index=patch_index,
+            color=color,
+            x_min=x_min,
+            x_max=x_max,
+            y_min=y_min,
+            y_max=y_max,
+            eps=eps,
+            name="brush_{}".format(i)
+        )
+        net.append(brush)
+
+    for i, net in enumerate(nets):
+        brush = net[-1]
+        raw_out = layers.ExpressionLayer(
+            brush,
+            lambda x: x[:, -1, :, :],
+            name="raw_output_{}".format(i),
+            output_shape='auto')
+        net.append(brush)
+    
+    def nets_reduce(*nets):
+        nets = map(lambda k:k[:, -1], nets) # get last time step output from each net
+        func = reduce_funcs[parallel_reduce_func]
+        return reduce(func, nets)
+
+    raw_out = ExpressionLayerMulti(
+        map(lambda net:net[-1], nets),
+        nets_reduce,
+        name="raw_output",
+        output_shape=output_shape)
+    
+    scaled_out = layers.ScaleLayer(
+        raw_out, scales=init.Constant(2.), name="scaled_output")
+    biased_out = layers.BiasLayer(
+        scaled_out, b=init.Constant(-1), name="biased_output")
+
+    out = layers.NonlinearityLayer(
+        biased_out,
+        nonlinearity=get_nonlinearity[nonlin_out],
+        name="output")
+    all_layers = ([in_] +
+                  [lay for net in nets for lay in net] +
+                  extra_layers + 
+                  [raw_out, scaled_out, biased_out, out])
+    return layers_from_list_to_dict(all_layers)
+
+def conv_fc(x, 
+            num_filters=[32, 32], 
+            size_conv_filters=[5, 5], 
+            init_method=init.GlorotUniform,
+            pooling=False,
+            nb_fc_units=[100],
+            nonlin=get_nonlinearity['rectify'],
+            names_prefix=''):
+    l_hid = x
+    hids = []
+    for i in range(len(num_filters)):
+        l_hid = layers.Conv2DLayer(
+            l_hid,
+            num_filters=nb_conv_filters[i],
+            filter_size=(size_conv_filters[i], size_conv_filters[i]),
+            nonlinearity=nonlin,
+            W=init_method(),
+            name='conv{}_{}'.format(i + 1, names_prefix))
+        hids.append(l_hid)
+        if pooling:
+            l_hid = layers.Pool2DLayer(l_hid, (2, 2), name='pool{}_{}'.format(i + 1, names_prefix))
+            hids.append(l_hid)
+
+    for i in range(len(nb_fc_units)):
+        l_hid = layers.DenseLayer(
+            l_hid, nb_fc_units[i],
+            W=init_method(),
+            nonlinearity=nonlin,
+            name="fc{}_{}".format(i + 1, names_prefix))
+        hids.append(l_hid)
+    return hids
 
 sparsemax_ = axify(sparsemax)
 softmax_ = axify(softmax)
@@ -5432,3 +5638,24 @@ build_convnet_simple_13 = model13
 build_convnet_simple_14 = model14
 build_convnet_simple_15 = model15
 build_convnet_simple_16 = model16
+
+if __name__ == '__main__':
+    from docopt import docopt
+    import theano
+    import theano.tensor as T
+    import lasagne
+
+    doc = """
+    Usage: model.py MODEL
+    """
+    args = docopt(doc)
+    model = args['MODEL']
+    model = globals()[model]
+    w, h, c = 32, 32, 3
+    all_layers = model(w=w, h=h, c=c, parallel=2)
+    for layer in all_layers.items():
+        print(layer)
+    x = T.tensor4()
+    fn = theano.function([x], lasagne.layers.get_output(all_layers['output'], x))
+    x_examples = np.random.uniform(size=(128, c, h, w)).astype(np.float32)
+    print(fn(x_examples).shape)

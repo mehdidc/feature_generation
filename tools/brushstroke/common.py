@@ -17,6 +17,8 @@ import json
 from skimage.io import imread, imsave
 from skimage.transform import resize
 
+from IPython.display import HTML
+
 def minibatcher(fn, batchsize=1000):
   """
   fn : a function that takes an input and returns an output
@@ -59,20 +61,29 @@ def load_model(filename, **kw):
             dataset=dataset, 
             force_w=force_w, 
             force_h=force_h, 
-            kw_load_data={'include_test': True},
             **kw)
     return model, data, layers
 
-def build_brush_func(layers):
+
+def resize_set(x, w, h, **kw):
+    x_out = np.empty((x.shape[0], 1, w, h))
+    for i in range(len(x)):
+        x_out[i, 0] = resize(x[i, 0], (w, h), **kw)
+    return x_out.astype(np.float32)
+
+def get_bias(layers):
     if 'biased_output' in layers:
         bias = layers['biased_output'].b.get_value()
     elif 'bias' in layers:
         bias = layers['bias'].b.get_value()
     else:
-        bias = np.array(0.1)
-
+        bias = np.array(0)
+        
     bias = bias[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis]
 
+    return bias
+
+def get_scale(layers):
     if 'scaled_output' in layers:
         scale = layers['scaled_output'].scales.get_value()
     elif 'scale' in layers:
@@ -80,28 +91,64 @@ def build_brush_func(layers):
     else:
         scale = np.array((1.,))
     scale = scale[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis]
-
+    return scale
     
+def build_brush_func(layers, lay='brush', scale=1, bias=0, nonlin=T.nnet.sigmoid):
     X = T.tensor4()
-
-    B = L.get_output(layers['brush'], X)
-    if len(layers['brush'].output_shape) == 4: # (ex, t, w, h)
-        B = B.dimshuffle(0, 1, 'x', 2, 3)
+    Bs = []
+    for l in lay:
+        B = L.get_output(layers[l], X)
+        if len(layers[l].output_shape) == 4: # (ex, t, w, h)
+            B = B.dimshuffle(0, 1, 'x', 2, 3)
+        Bs.append(B)
     
     fn = theano.function(
         [X], 
-        T.nnet.sigmoid(B * scale + bias)
+        [nonlin(B * scale + bias) for B in Bs]
     )
     return fn
 
-def build_encode_func(layers):
+def build_encode_func(layers, lay='coord'):
     w = layers['output'].output_shape[2]
     X = T.tensor4()
     fn = theano.function(
         [X], 
-        T.nnet.sigmoid(L.get_output(layers['coord'], X)[:, :, 0:2]) * w
+        T.nnet.sigmoid(L.get_output(layers[lay], X)[:, :, 0:2]) * w
     )
     return fn
+
+def build_image_to_code_func(layers, lay='coord'):
+    if type(lay) != tuple:
+        lay = (lay,)
+    X = T.tensor4()
+
+    outputs = [L.get_output(layers[l], X) for l in lay]
+
+    fn = theano.function(
+        [X], 
+        outputs
+    )
+    return fn
+
+def build_code_to_image(layers, X=T.tensor3(), lay='coord'):
+    
+    if type(lay) != tuple:
+        lay = (lay,)
+    if type(X) != tuple:
+        X = (X,)
+    
+    inputs = {}
+    
+    for x, l in zip(X, lay):
+        inputs[layers[l]] = x
+    
+    fn = theano.function(
+        X, 
+        L.get_output(layers['output'], inputs)
+    )
+    return fn
+
+
 
 def to_grid_of_images(seq_imgs, **kw):
     y = seq_imgs
@@ -130,12 +177,10 @@ def embed_video(filename):
     return HTML(data='''<video alt="test" controls>
                 <source src="data:video/mp4;base64,{0}" type="video/mp4" />
                 </video>'''.format(encoded.decode('ascii')))
-
 def disp_grid(imgs, **kw):
     # shape of imgs should be : (examples, color, w, h)
     out = dispims_color(imgs.transpose((0, 2, 3, 1)) * np.ones((1, 1, 1, 3)), **kw)
     return out
-
 
 def prop_uniques(x):
     x = x.reshape((x.shape[0], -1))
@@ -147,3 +192,17 @@ def hash_array(x):
 
 def normalize(x, axis=1):
     return (x - x.min(axis=axis, keepdims=True)) / (x.max(axis=axis, keepdims=True) - x.min(axis=axis, keepdims=True))
+
+def sigmoid(x):
+    return 1./(1. + np.exp(-x))
+
+def build_pointer_images(coord, color, w, h, p=2):
+    color = np.array(color)
+    nb_examples, T, _ = coord.shape
+    imgs = np.zeros((nb_examples, T, 3, w, h))
+    for e in range(nb_examples):
+        for t in range(T):
+            x, y = coord[e, t, :]
+            x, y = int(x), int(y)
+            imgs[e, t, :, y-p:y+p, x-p:x+p] = color[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis]
+    return imgs

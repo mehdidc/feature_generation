@@ -82,6 +82,8 @@ def gen(neuralnets, nb_iter=10, w=32, h=32, init='random'):
                         thresh_ = thresh
                     if thresh: patch = patch > thresh_
                     patch = patch.astype(np.float32)
+                #if np.random.uniform() <= 0.2:
+                #    patch = 1 - patch
                 img[py:py + patch_h, px:px + patch_w] = patch[0, 0]
                 out_img[:, :] = img[padlen:-padlen, padlen:-padlen]
             elif on == 'full':
@@ -117,11 +119,11 @@ def gen(neuralnets, nb_iter=10, w=32, h=32, init='random'):
     return out_img, snapshots
 
 if __name__ == '__main__':
-    model_a, data, layers = load_model("training/fractal/a/model.pkl")
-    model_b, data, layers = load_model("training/fractal/b/model.pkl")
+    model_a, data, layers = load_model("training/initial_models/model_E.pkl")
+    model_b, data, layers = load_model("training/fractal/b2/model.pkl")
     neuralnets = [
-        {'model': model_b, 'on': 'crops', 'padlen': 3,   'nb_iter':  5,   'thresh': 0.5, 'when': 'always', 'whitepx_ratio': 0.5},
-        #{'model': model_a, 'on': 'crops',  'padlen': 3,  'nb_iter': 5,   'thresh': 'moving', 'when': 'always', 'whitepx_ratio': 0.185},
+        #{'model': model_b, 'on': 'crops', 'padlen': 3,   'nb_iter':  5,   'thresh': 'moving', 'when': 'always', 'whitepx_ratio': 0.5},
+        {'model': model_a, 'on': 'crops',  'padlen': 3,  'nb_iter': 5,   'thresh': 'moving', 'when': 'always', 'whitepx_ratio': 0.1},
     ]
     imgs = []
     for i in range(1):

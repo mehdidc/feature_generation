@@ -7,6 +7,8 @@ from common import load_model, build_brush_func, disp_grid, prop_uniques, seq_to
 import pandas as pd
 from skimage.io import imsave
 
+from helpers import mkdir_path
+
 def main():
     doc = """
     Usage:
@@ -28,6 +30,7 @@ def main():
     c, h, w = layers['output'].output_shape[1:]
 
     O = args['OUTPUT'] + '/'
+    mkdir_path(O)
     brush = build_brush_func(layers) # transforms an image to sequence of images
     X = data.X[0:11*11]
     imgs = brush(model.preprocess(X)) # (examples, time, w, h)
@@ -44,23 +47,27 @@ def main():
     nb_examples = 100
     thresh = 'moving'
     use_noise = False
+    if c == 3:
+        use_noise = True
     # PREP
-    if use_noise: noise = np.random.normal(0, 0.5, size=imgs[:, 0].shape).astype(np.float32) #(for colored images)
-    else: noise = 0
-
-    if thresh == 'moving':
+    if c == 1 and thresh == 'moving':
         whitepx_ratio = (data.X>0.5).sum() / np.ones_like(data.X).sum()
 
     imgs = np.empty((nb_examples, nb_iter + 1, c, w, h)) # 1 = color channel
     imgs = imgs.astype(np.float32)
     imgs[:, 0] = np.random.uniform(size=(nb_examples, c, w, h))
+
+
+    if use_noise: noise = np.random.normal(0, 0.5, size=imgs[:, 0].shape).astype(np.float32) #(for colored images)
+    else: noise = 0
+
     scores = []
     diversities = []
     # ITERATION
+    #print(imgs[:, 0].shape, noise.shape)
     for i in tqdm(range(1, nb_iter + 1)):
-        if use_noise:noise = np.random.normal(0, 1, size=imgs[:, 0].shape).astype(np.float32) #(for colored images)
-        else:noise = 0
-            
+        #if use_noise:noise = np.random.normal(0, 1, size=imgs[:, 0].shape).astype(np.float32) #(for colored images)
+        #else:noise = 0
         imgs[:, i] = brush(imgs[:, i - 1] + noise)[:,-1]
         if c == 1:
             if thresh == 'moving':

@@ -314,28 +314,22 @@ def build_capsule_(layers, data, nbl, nbc,
                     W = W.T
                 if W.shape[1] == c * w * h:
                     W = W.reshape((W.shape[0], c, w , h))
-            if 3 in W.shape[0:2]:
+            if 3 in W.shape[0:2] and len(W.shape) == 4:
                 if W.shape[0] == 3:
                     W = W.transpose((1, 2, 3, 0))  # F w h col
                 elif W.shape[1] == 3:
                     W = W.transpose((0, 2, 3, 1))  # F w h col
-                #if W.shape[0] > 1024:
-                #    W = W[0:1024]
                 img = dispims_color(W, border=1)
                 imsave(filename, img)
-                #plt.axis('off')
-                #plt.imshow(img, interpolation='none')
-            elif 1 in W.shape[0:2]:
+            elif 1 in W.shape[0:2] and len(W.shape) == 4:
                 W = W.reshape((W.shape[0] * W.shape[1],
                                W.shape[2], W.shape[3]))
-                #if W.shape[0] > 1024:
-                #    W = W[0:1024]
                 sz = int(np.sqrt(W.shape[0]))
-                print(w, h, W.shape)
-                img = tile_raster_images(W, (W.shape[1], W.shape[2]), (sz, sz),
-                                         scale_rows_to_unit_interval=True,
-                                         output_pixel_vals=True,
-                                         tile_spacing=(1, 1))
+                img = tile_raster_images(
+                    W, (W.shape[1], W.shape[2]), (sz, sz),
+                    scale_rows_to_unit_interval=True,
+                    output_pixel_vals=True,
+                    tile_spacing=(1, 1))
                 imsave(filename, img)
             else:
                 continue
@@ -466,7 +460,6 @@ def build_capsule_(layers, data, nbl, nbc,
     )
     optim_params = optim_params_default.copy()
     optim_params.update(train_params.get("optimization", {}))
-    print(optim_params)
     lr_decay_method = optim_params["lr_decay_method"]
     initial_lr = optim_params["initial_lr"]
     lr_decay = optim_params["lr_decay"]
