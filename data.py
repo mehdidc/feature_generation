@@ -390,11 +390,10 @@ def load_data(dataset="digits",
             return x
         data = load_once(Chairs)(
             size=(w, h),
-            nb=86366,
-            #nb=batch_size * nb_chunks,
+            nb=kw.get('nb_examples', 86366),
             crop=True,
             crop_to=200,
-            mode='all',
+            mode=kw.get('image_collection_mode', 'all'),
             postprocess_example=post,
             preprocess_example=pre)
         data.load()

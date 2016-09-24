@@ -206,3 +206,13 @@ def build_pointer_images(coord, color, w, h, p=2):
             x, y = int(x), int(y)
             imgs[e, t, :, y-p:y+p, x-p:x+p] = color[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis]
     return imgs
+
+def build_encoders(layers, nb_parallel=None):
+    lays = (['coord_{}'.format(i) for i in range(nb_parallel)] 
+            if nb_parallel else ['coord'])
+    lays = tuple(lays)
+    encoders = []
+    for lay in lays:
+        encoder = build_encode_func(layers, lay=lay)
+        encoders.append(encoder)
+    return encoders
