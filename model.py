@@ -5619,6 +5619,120 @@ def conv_fc(x,
         hids.append(l_hid)
     return hids
 
+def merge_scale(nets):
+    # take 4 nets of shape (example, c, h, w) and returns their
+    # concatenation in a grid of size (example, c, h * 2, h * 2)
+    n1 = layers.ConcatLayer((nets[0], nets[1]), axis=3)
+    n2 = layers.ConcatLayer((nets[2], nets[3]), axis=3)
+    n = layers.ConcatLayer((n1, n2), axis=2)
+    return n
+
+def iterate_scales(x=0, y=0,w=32, h=32):
+    S = 2
+    if w <= 2 or h <= 2:
+        return
+    ts = [
+        (y, x, h/S, w/S),
+        (y, x+w/S, h/S, w/S),
+        (y+h/S, x, h/S, w/S),
+        (y+h/S, x+w/S, h/S, w/S)
+    ]
+
+    t = ts[0]
+    for t_cur in iterate_scales(y=t[0], x=t[1], h=t[2], w=t[3]):
+        yield t_cur
+    t = ts[1]
+    for t_cur in iterate_scales(y=t[0], x=t[1], h=t[2], w=t[3]):
+        yield t_cur
+    t = ts[2]
+    for t_cur in iterate_scales(y=t[0], x=t[1], h=t[2], w=t[3]):
+        yield t_cur
+    t = ts[3]
+    for t_cur in iterate_scales(y=t[0], x=t[1], h=t[2], w=t[3]):
+        yield t_cur
+    for t in ts:
+        yield t
+
+def model89(w=32, h=32, c=1, scale_min=8, n_steps_min=4, patch_size_min=1):
+    w_in = w
+    h_in = h
+    w_out = h
+    w_out = w
+    h_out = h
+    nb_conv_filters = []
+    size_conv_filters = []
+    init_method = init.GlorotUniform
+    pooling = False
+    nb_fc_units = [500]
+    nonlin = 'relu'
+
+    in_ = layers.InputLayer((None, c, w_in, h_in), name="input")
+    nets = []
+    recurrent_model = layers.GRULayer
+    brushes = {}
+    for y, x, h, w in iterate_scales(w=w_out, h=h_out):
+        if w < scale_min: continue
+        scale = w_out / scale_min
+        n_steps = n_steps_min * scale
+        patch_h = patch_size_min * scale
+        patch_w = patch_size_min * scale
+        patches = np.ones((1, c, patch_h, patch_w), dtype='float32')
+
+        hid = in_
+        hid = layers.SliceLayer(hid, slice(y, y+h), axis=2)
+        hid = layers.SliceLayer(hid, slice(x, x+w), axis=3)
+        hid = layers.DenseLayer(hid, 100, nonlinearity=rectify)
+        hid = Repeat(hid, n_steps) 
+        hid = recurrent_model(hid, 50)
+        coord = recurrent_model(hid, 5)
+        brush = GenericBrushLayer(
+            coord,
+            w, h,
+            n_steps=n_steps,
+            patches=patches,
+            col=('rgb' if c == 3 else 'grayscale'),
+            return_seq=False,
+            reduce_func=sum_op,
+            to_proba_func=softmax_,
+            normalize_func=T.nnet.sigmoid,
+            x_sigma=1,
+            y_sigma=1,
+            x_stride=1,
+            y_stride=1,
+            patch_index=0,
+            color='predicted',
+            x_min=0,
+            x_max='width',
+            y_min=0,
+            y_max='height',
+            eps=0
+        )
+        brushes[(y, x, h, w)] = brush
+
+    def get_val(v=None, x=0, y=0, w=32, h=32):
+        if w<=scale_min:
+            return v
+        else:
+            t = [
+                get_val(brushes[(y, x, h/2, w/2)], x=x, y=y, h=h/2, w=w/2),
+                get_val(brushes[(y, x + w/2, h/2, w/2)], x=x+w/2, y=y, h=h/2, w=w/2),
+                get_val(brushes[(y+h/2, x, h/2, w/2)], x=x,y=y+h/2, h=h/2, w=w/2),
+                get_val(brushes[(y+h/2, x+w/2, h/2, w/2)], x=x+w/2,y=y+h/2, h=h/2,w=w/2)]
+            return (layers.ElemwiseSumLayer((v, merge_scale(t)))) if v else merge_scale(t)
+    raw_out = get_val(x=0, y=0, w=w_out, h=h_out)
+    raw_out.name = "raw_output"
+    scaled_out = layers.ScaleLayer(
+        raw_out, scales=init.Constant(2.), name="scaled_output")
+    biased_out = layers.BiasLayer(
+        scaled_out, b=init.Constant(-1), name="biased_output")
+    out = layers.NonlinearityLayer(
+        biased_out,
+        nonlinearity=T.nnet.sigmoid,
+        name="output")
+    all_layers = ([in_] +
+                  [raw_out, scaled_out, biased_out, out])
+    return layers_from_list_to_dict(all_layers)
+
 sparsemax_ = axify(sparsemax)
 softmax_ = axify(softmax)
 
@@ -5651,8 +5765,8 @@ if __name__ == '__main__':
     args = docopt(doc)
     model = args['MODEL']
     model = globals()[model]
-    w, h, c = 32, 32, 3
-    all_layers = model(w=w, h=h, c=c, parallel=2)
+    w, h, c = 28, 28, 1
+    all_layers = model(w=w, h=h, c=c, scale_min=7)
     for layer in all_layers.items():
         print(layer)
     x = T.tensor4()
