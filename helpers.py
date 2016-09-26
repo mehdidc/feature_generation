@@ -775,7 +775,7 @@ class ExpressionLayerMulti(lasagne.layers.MergeLayer):
 
     def get_output_shape_for(self, input_shapes):
         if self._output_shape is None:
-            return input_shapes
+            return input_shapes[0]
         elif self._output_shape is 'auto':
             input_shape = input_shapes[0]
             input_shape = (0 if s is None else s for s in input_shape)

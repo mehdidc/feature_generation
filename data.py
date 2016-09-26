@@ -478,13 +478,28 @@ def load_data(dataset="digits",
 
         from lasagnekit.datasets.imagecollection import ImageCollection
         from lasagnekit.datasets.transformed import Transformed
+        from lasagnekit.datasets.subsampled import SubSampled
+        from lasagnekit.datasets.helpers import load_once
         if w is None and h is None:
             w, h = 32, 32
         c = 3
         folder = "{}/aloi".format(os.getenv("DATA_PATH"))
-        data = ImageCollection(size=(w, h), nb=batch_size, folder=folder, recur=True)
+        
+        mode = kw.get('image_collection_mode', 'random')
+
+        if mode == 'random':
+            data = ImageCollection(size=(w, h), nb=batch_size, folder=folder, recur=True)
+        else:
+            data = load_once(ImageCollection)(
+                    size=(w, h), 
+                    mode='all',
+                    nb=72000,
+                    folder=folder,
+                    recur=True)
+            data.load()
+            data = SubSampled(data, batch_size)
         data.load()
-        print(data.X.shape)
+        
         def preprocess(X):
             X = X.transpose((0, 3, 1, 2))
             X = X.reshape((X.shape[0], -1))

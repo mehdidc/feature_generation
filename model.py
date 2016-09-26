@@ -5654,6 +5654,7 @@ def iterate_scales(x=0, y=0,w=32, h=32):
         yield t
 
 def model89(w=32, h=32, c=1, scale_min=8, n_steps_min=4, patch_size_min=1):
+    from itertools import chain
     w_in = w
     h_in = h
     w_out = h
@@ -5670,8 +5671,9 @@ def model89(w=32, h=32, c=1, scale_min=8, n_steps_min=4, patch_size_min=1):
     nets = []
     recurrent_model = layers.GRULayer
     brushes = {}
-    for y, x, h, w in iterate_scales(w=w_out, h=h_out):
+    for y, x, h, w in chain(iterate_scales(w=w_out, h=h_out), [(0, 0, h_out, w_out)]):
         if w < scale_min: continue
+        print(y, x, h, w)
         scale = w_out / scale_min
         n_steps = n_steps_min * scale
         patch_h = patch_size_min * scale
@@ -5681,13 +5683,102 @@ def model89(w=32, h=32, c=1, scale_min=8, n_steps_min=4, patch_size_min=1):
         hid = in_
         hid = layers.SliceLayer(hid, slice(y, y+h), axis=2)
         hid = layers.SliceLayer(hid, slice(x, x+w), axis=3)
-        hid = layers.DenseLayer(hid, 100, nonlinearity=rectify)
+        hid = layers.DenseLayer(hid, 100*scale, nonlinearity=rectify)
         hid = Repeat(hid, n_steps) 
-        hid = recurrent_model(hid, 50)
-        coord = recurrent_model(hid, 5)
+        hid = recurrent_model(hid, 100)
+        coord = TensorDenseLayer(hid, 5, nonlinearity=linear)
         brush = GenericBrushLayer(
             coord,
             w, h,
+            n_steps=n_steps,
+            patches=patches,
+            col=('rgb' if c == 3 else 'grayscale'),
+            return_seq=False,
+            reduce_func=over_op,
+            to_proba_func=softmax_,
+            normalize_func=T.nnet.sigmoid,
+            x_sigma=1,
+            y_sigma=1,
+            x_stride=1,
+            y_stride=1,
+            patch_index=0,
+            color='predicted',
+            x_min=0,
+            x_max='width',
+            y_min=0,
+            y_max='height',
+            eps=0
+        )
+        brushes[(y, x, h, w)] = brush
+    op = max_op
+    def get_val(v=None, x=0, y=0, w=32, h=32):
+        if w<=scale_min:
+            return v
+        else:
+            t = [
+                get_val(brushes[(y, x, h/2, w/2)], x=x, y=y, h=h/2, w=w/2),
+                get_val(brushes[(y, x + w/2, h/2, w/2)], x=x+w/2, y=y, h=h/2, w=w/2),
+                get_val(brushes[(y+h/2, x, h/2, w/2)], x=x,y=y+h/2, h=h/2, w=w/2),
+                get_val(brushes[(y+h/2, x+w/2, h/2, w/2)], x=x+w/2,y=y+h/2, h=h/2,w=w/2)]
+            if v:
+                v = ExpressionLayerMulti([v, merge_scale(t)], op)
+                return v
+            else:
+                return merge_scale(t)
+
+    raw_out = get_val(v=brushes[(0, 0, h, w)], x=0, y=0, w=w_out, h=h_out)
+    raw_out.name = "raw_output"
+    scaled_out = layers.ScaleLayer(
+        raw_out, scales=init.Constant(2.), name="scaled_output")
+    biased_out = layers.BiasLayer(
+        scaled_out, b=init.Constant(-1), name="biased_output")
+    out = layers.NonlinearityLayer(
+        biased_out,
+        nonlinearity=T.nnet.sigmoid,
+        name="output")
+    all_layers = ([in_] +
+                  [raw_out, scaled_out, biased_out, out])
+    return layers_from_list_to_dict(all_layers)
+
+
+def model89(w=32, h=32, c=1, scale_min=8, n_steps_min=4, patch_size_min=1):
+    nb_conv_filters = []
+    size_conv_filters = []
+    init_method = init.GlorotUniform
+    pooling = False
+    nb_fc_units = [500]
+    nonlin = 'relu'
+    nb_scales = int(np.log2(w / scale_min))
+    recurrent_model = layers.RecurrentLayer
+    
+    in_ = layers.InputLayer((None, c, w, h), name="input")
+    in_flat = layers.ReshapeLayer(in_, ([0], c*w*h))
+    
+    brushes = []
+    coords = []
+    scales_out = []
+    w_cur, h_cur = scale_min, scale_min
+    for i in range(nb_scales + 1):
+        n_steps = n_steps_min
+        if i > 0:
+            x = layers.ConcatLayer((in_flat, brush_flat), axis=1)
+        else:
+            x = in_flat
+        hid = layers.DenseLayer(x, 1000, nonlinearity=very_leaky_rectify)
+        hid = layers.DenseLayer(hid, 1000, nonlinearity=very_leaky_rectify)
+        
+        hid = Repeat(hid, n_steps) 
+        hid = recurrent_model(hid, 256)
+        coord = TensorDenseLayer(hid, 7, nonlinearity=linear)
+        coords.append(coord)
+
+        patch_h = patch_size_min
+        patch_w = patch_size_min
+        patches = np.ones((1, c, patch_h, patch_w), dtype='float32')
+
+        brush = GenericBrushLayer(
+            coord,
+            w_cur, h_cur,
             n_steps=n_steps,
             patches=patches,
             col=('rgb' if c == 3 else 'grayscale'),
@@ -5707,19 +5798,22 @@ def model89(w=32, h=32, c=1, scale_min=8, n_steps_min=4, patch_size_min=1):
             y_max='height',
             eps=0
         )
-        brushes[(y, x, h, w)] = brush
-
-    def get_val(v=None, x=0, y=0, w=32, h=32):
-        if w<=scale_min:
-            return v
+        brushes.append(brush)
+        brush_flat = layers.ReshapeLayer(brush, ([0], c * w_cur * h_cur))
+        if w == w_cur:
+            scale_out = brush
         else:
-            t = [
-                get_val(brushes[(y, x, h/2, w/2)], x=x, y=y, h=h/2, w=w/2),
-                get_val(brushes[(y, x + w/2, h/2, w/2)], x=x+w/2, y=y, h=h/2, w=w/2),
-                get_val(brushes[(y+h/2, x, h/2, w/2)], x=x,y=y+h/2, h=h/2, w=w/2),
-                get_val(brushes[(y+h/2, x+w/2, h/2, w/2)], x=x+w/2,y=y+h/2, h=h/2,w=w/2)]
-            return (layers.ElemwiseSumLayer((v, merge_scale(t)))) if v else merge_scale(t)
-    raw_out = get_val(x=0, y=0, w=w_out, h=h_out)
+            scale_out = layers.Upscale2DLayer(brush, w / w_cur)
+        print(scale_out.output_shape)
+        scales_out.append(scale_out)
+        w_cur *= 2
+        h_cur *= 2
+    
+    raw_out = scales_out[0]
+    op = sum_op
+    for o in scales_out[1:]:
+        raw_out = ExpressionLayerMulti((raw_out, o), op)
+
     raw_out.name = "raw_output"
     scaled_out = layers.ScaleLayer(
         raw_out, scales=init.Constant(2.), name="scaled_output")
@@ -5730,6 +5824,8 @@ def model89(w=32, h=32, c=1, scale_min=8, n_steps_min=4, patch_size_min=1):
         nonlinearity=T.nnet.sigmoid,
         name="output")
     all_layers = ([in_] +
+                  #coords + 
+                  #brushes + 
                   [raw_out, scaled_out, biased_out, out])
     return layers_from_list_to_dict(all_layers)
 
