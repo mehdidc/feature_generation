@@ -2504,6 +2504,55 @@ def jobset54():
     nb = job_write(params, cmd, where=jobset_name)
     return nb
 
+def jobset55():
+    # vertebrate convnet hyperopt search
+    rng = random
+    nb_layers = rng.randint(1, 7)
+    nb_filters = [2 ** rng.randint(5, 9) for _ in range(nb_layers)]
+    model_params = OrderedDict(
+        nb_layers=nb_layers,
+        nb_filters=nb_filters,
+        filter_size=rng.choice((3, 5)),
+        use_channel=rng.choice((True, False)),
+        use_spatial=True,
+        spatial_k=rng.randint(1, 4),
+        channel_stride=rng.choice((1, 2, 4)),
+        weight_sharing=rng.choice((True, False)),
+        merge_op=rng.choice(('sum', 'mul'))
+    )
+    params = OrderedDict(
+        model_params=model_params,
+        denoise=None,
+        noise=None,
+        walkback=1,
+        walkback_mode='bengio_without_sampling',
+        autoencoding_loss='squared_error',
+        mode='random',
+        contractive=False,
+        contractive_coef=None,
+        marginalized=False,
+        binarize_thresh=None,
+        force_w=32,
+        force_h=32
+    )
+    budget_hours = 10 
+    model_name = 'model73'
+    dataset = 'olivetti'
+    jobset_name = "jobset55"
+
+    params['model_name'] = model_name
+    params['dataset'] = dataset
+    params['budget_hours'] = budget_hours
+
+    cmd = build_cmd(model_name=model_name,
+                    dataset=dataset,
+                    params=params,
+                    budget_hours=budget_hours)
+    nb = job_write(params, cmd, where=jobset_name)
+    return nb
+
+
+
 @click.command()
 @click.option('--where', default='', help='jobset name', required=False)
 @click.option('--nb', default=1, help='nb of repetitions', required=False)

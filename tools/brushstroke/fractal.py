@@ -119,15 +119,17 @@ def gen(neuralnets, nb_iter=10, w=32, h=32, init='random'):
     return out_img, snapshots
 
 if __name__ == '__main__':
-    model_a, data, layers = load_model("training/initial_models/model_E.pkl")
-    model_b, data, layers = load_model("training/fractal/b/model.pkl")
+    model_a, data, layers = load_model("training/fractal/b/model.pkl")
+    model_b, data, layers = load_model("training/fractal/b2/model.pkl")
+    model_c, data, layers = load_model("training/initial_models/model_E.pkl")
     neuralnets = [
-        {'model': model_b, 'on': 'crops', 'padlen': 3,   'nb_iter':  5,   'thresh': 'moving', 'when': 'always', 'whitepx_ratio': 0.5},
-        {'model': model_a, 'on': 'crops',  'padlen': 3,  'nb_iter': 5,  'thresh': 0.5, 'when': 'always'},
+       {'model': model_a, 'on': 'crops', 'padlen': 3,   'nb_iter':  5,   'thresh': 'moving', 'when': 'always', 'whitepx_ratio': 0.1},
+       {'model': model_b, 'on': 'crops', 'padlen': 3,   'nb_iter':  5,   'thresh': 'moving', 'when': 'always', 'whitepx_ratio': 0.2},
+        {'model': model_c, 'on': 'crops', 'padlen': 3,   'nb_iter':  5,   'thresh': 'moving', 'when': 'always', 'whitepx_ratio': 0.1},
     ]
     imgs = []
-    for i in range(100):
-        img, snap = gen(neuralnets, nb_iter=500, w=2**5, h=2**5, init='random')
+    for i in range(1):
+        img, snap = gen(neuralnets, nb_iter=5000, w=2**10, h=2**10, init='random')
         imgs.append(img)
     imgs = np.array(imgs)
     imgs = imgs[:, np.newaxis, :, :]

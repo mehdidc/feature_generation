@@ -3544,7 +3544,7 @@ def model66(nb_filters=64, w=32, h=32, c=1, sparsity=True):
 
 def model67(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     """
-    like model66 but with sum instead of multiplication
+    like model66 vertebrate but with sum instead of multiplication
     """
     if type(nb_filters) != list:
         nb_filters = [nb_filters] * 3
@@ -3643,7 +3643,7 @@ def model67(nb_filters=64, w=32, h=32, c=1, sparsity=True):
 
 def model68(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     """
-    like model67 but with weight sharing in the last layers
+    like model67 verteberate but with weight sharing in the last layers
     """
     if type(nb_filters) != list:
         nb_filters = [nb_filters] * 3
@@ -3741,7 +3741,7 @@ def model68(nb_filters=64, w=32, h=32, c=1, sparsity=True):
 
 def model69(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     """
-    like model68 but only two layers
+    like model68 vertebrate but only two layers
     """
     if type(nb_filters) != list:
         nb_filters = [nb_filters] * 3
@@ -3812,7 +3812,7 @@ def model69(nb_filters=64, w=32, h=32, c=1, sparsity=True):
 
 def model70(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     """
-    model68 with stride (used for large images)
+    model68 vertebarte with stride (used for large images)
     """
     if type(nb_filters) != list:
         nb_filters = [nb_filters] * 3
@@ -3921,7 +3921,7 @@ def model70(nb_filters=64, w=32, h=32, c=1, sparsity=True):
 
 def model71(nb_filters=64, w=32, h=32, c=1, sparsity=True):
     """
-    model70 with sharing
+    model70 vertebrate with sharing
     """
     if type(nb_filters) != list:
         nb_filters = [nb_filters] * 3
@@ -4121,7 +4121,7 @@ def model73(nb_filters=64, w=32, h=32, c=1,
             weight_sharing=False,
             merge_op='sum'):
     """
-    parametrized version of model67
+    parametrized version of vertebrate model67
     """
     merge_op = {'sum': T.add, 'mul': T.mul, 'over': over_op}[merge_op]
     if type(filter_size) != list:

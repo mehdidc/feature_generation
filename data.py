@@ -237,6 +237,7 @@ def load_data(dataset="digits",
         print('loaded')
 
     if dataset == "olivetti":
+        from lasagnekit.datasets.helpers import load_once
         from sklearn.datasets import fetch_olivetti_faces
         from lasagnekit.datasets.manual import Manual
         from lasagnekit.datasets.rescaled import Rescaled
@@ -247,10 +248,10 @@ def load_data(dataset="digits",
         data = fetch_olivetti_faces()
         X = data['images']
         X = X.astype(np.float32)
-        X = 1 - X
+        #X = 1 - X
         data = Manual(X.reshape((X.shape[0], -1)), y=data['target'])
-        data.img_dim = (w, h)
-        data = Rescaled(data, (w, h))
+        data.img_dim = (64, 64)
+        data = load_once(Rescaled)(data, (w, h))
         data = SubSampled(data, batch_size)
 
     if dataset == "notdigits":
