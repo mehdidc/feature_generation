@@ -5902,7 +5902,7 @@ def model90(w=32,h=32,c=1):
             nonlinearity=linear,
             W=init.GlorotUniform(),
             pad='full',
-            name='unconv')
+            name='out1')
     out2  = layers.Conv2DLayer(
             conv9,
             num_filters=c,
@@ -5910,7 +5910,7 @@ def model90(w=32,h=32,c=1):
             nonlinearity=linear,
             W=out1.W,
             pad='full',
-            name='unconv')
+            name='out2')
     raw_out = layers.ElemwiseMergeLayer([out1, out2], T.add)
     scaled_out = layers.ScaleLayer(raw_out,  scales=init.Constant(2.), name="scaled_output")
     biased_out = layers.BiasLayer(scaled_out, b=init.Constant(-1),   name="biased_output")
