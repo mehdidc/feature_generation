@@ -1,0 +1,19 @@
+{
+"comment": "testing the new fractal brush",
+"budget_hours": 10,
+"dataset": "aloi",
+"data_params": {
+    "image_collection_mode": "all"
+},
+"model_name": "model89",
+"model_params": {   
+    "scale_min": 8,
+    "n_steps_min": 40,
+    "patch_size_min": 4 
+},
+"optimization": {
+    "max_nb_epochs": 9999999999,
+    "patience_nb_epochs": 500
+},
+"report_rec_error": false
+}

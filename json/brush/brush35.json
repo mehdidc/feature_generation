@@ -1,0 +1,16 @@
+{
+"comment": "testing the new fractal brush",
+"budget_hours": 10,
+"dataset": "digits",
+"model_name": "model89",
+"model_params": {   
+    "scale_min": 14,
+    "n_steps_min": 20,
+    "patch_size_min": 1 
+},
+"optimization": {
+    "max_nb_epochs": 9999999999,
+    "patience_nb_epochs": 500
+},
+"report_rec_error": false
+}
