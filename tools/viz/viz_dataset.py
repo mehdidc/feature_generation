@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 import sys, os
 import numpy as np
-sys.path.append(os.getcwd()+"/..")
-
+sys.path.append(".")
 import matplotlib as mpl
 mpl.use('Agg') # NOQA
 import sys

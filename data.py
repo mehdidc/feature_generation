@@ -476,32 +476,29 @@ def load_data(dataset="digits",
         data = Transformed(data, preprocess, per_example=False)
     
     elif dataset == 'shoes':
-        from lasagnekit.datasets.imagecollection import ImageCollection
+        from lasagnekit.datasets.rescaled import Rescaled
+        from lasagnekit.datasets.skimagecollection import ImageCollection
         from lasagnekit.datasets.transformed import Transformed
         from lasagnekit.datasets.subsampled import SubSampled
         from lasagnekit.datasets.helpers import load_once
+        from skimage.io import imread_collection
         if w is None and h is None:
             w, h = 32, 32
         c = 3
         folder = "{}/shoes/ut-zap50k-images/Shoes/**/**/*.jpg".format(os.getenv("DATA_PATH"))
-        mode = kw.get('image_collection_mode', 'random')
-
-        if mode == 'random':
-            data = ImageCollection(size=(w, h), nb=batch_size, folder=folder, recur=True)
-        else:
-            data = load_once(ImageCollection)(
-                    size=(w, h), 
-                    mode='all',
-                    nb=30169,
-                    folder=folder,
-                    recur=True)
-            data.load()
-            data = SubSampled(data, batch_size)
+        collection = imread_collection(folder)
+        collection = list(collection)
+        indices = np.arange(len(collection))
+        np.random.shuffle(indices)
+        data = load_once(ImageCollection)(collection, indices=indices, batch_size=batch_size)
+        data = load_once(Rescaled)(data, (w, h))
+        data = SubSampled(data, batch_size)
         data.load()
         def preprocess(X):
+            X = X.reshape((X.shape[0], w, h, c))
             X = X.transpose((0, 3, 1, 2))
             X = X.reshape((X.shape[0], -1))
-            return X
+            return X / 255.
         data = Transformed(data, preprocess, per_example=False)
 
     elif dataset == 'aloi':

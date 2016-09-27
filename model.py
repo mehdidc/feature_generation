@@ -5918,7 +5918,8 @@ def model90(w=32,h=32,c=1):
     convs = [
         conv1, conv2, conv3, conv4, conv5, conv6, conv7, conv8, conv9
     ]
-    return layers_from_list_to_dict([in_] + convs + [out1, out2, scaled_out, biased_out, out])
+    wtas = [wta1, wta2, wta3, wta4]
+    return layers_from_list_to_dict([in_] + convs + wtas + [out1, out2, scaled_out, biased_out, out])
 
 
 
