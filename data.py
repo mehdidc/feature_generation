@@ -474,6 +474,35 @@ def load_data(dataset="digits",
             X = X.reshape((X.shape[0], -1))
             return X
         data = Transformed(data, preprocess, per_example=False)
+    
+    elif dataset == 'shoes':
+        from lasagnekit.datasets.imagecollection import ImageCollection
+        from lasagnekit.datasets.transformed import Transformed
+        from lasagnekit.datasets.subsampled import SubSampled
+        from lasagnekit.datasets.helpers import load_once
+        if w is None and h is None:
+            w, h = 32, 32
+        c = 3
+        folder = "{}/shoes/ut-zap50k-images/Shoes/**/**/*.jpg".format(os.getenv("DATA_PATH"))
+        mode = kw.get('image_collection_mode', 'random')
+
+        if mode == 'random':
+            data = ImageCollection(size=(w, h), nb=batch_size, folder=folder, recur=True)
+        else:
+            data = load_once(ImageCollection)(
+                    size=(w, h), 
+                    mode='all',
+                    nb=30169,
+                    folder=folder,
+                    recur=True)
+            data.load()
+            data = SubSampled(data, batch_size)
+        data.load()
+        def preprocess(X):
+            X = X.transpose((0, 3, 1, 2))
+            X = X.reshape((X.shape[0], -1))
+            return X
+        data = Transformed(data, preprocess, per_example=False)
 
     elif dataset == 'aloi':
 

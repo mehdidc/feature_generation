@@ -40,6 +40,32 @@ get_nonlinearity = dict(
     msigmoid=lambda x:1 - sigmoid(x)
 )
 
+normalize_funcs = {
+    'maxmin': norm_maxmin,
+    'sigmoid': T.nnet.sigmoid,
+    'none': lambda x: x}
+
+reduce_funcs = {
+    'sum': sum_op,
+    'over': over_op,
+    'normalized_over': normalized_over_op,
+    'max': max_op,
+    'new': lambda prev, new: new+prev-prev
+}
+
+proba_funcs = {
+    'softmax': T.nnet.softmax,
+    'sparsemax': sparsemax
+}
+
+recurrent_models = {
+    'lstm': layers.LSTMLayer,
+    'gru': layers.GRULayer,
+    'rnn': layers.RecurrentLayer
+}
+
+sparsemax_ = axify(sparsemax)
+softmax_ = axify(softmax)
 
 def model1(nb_filters=64, w=32, h=32, c=1):
     l_in = layers.InputLayer((None, c, w, h), name="input")
@@ -4110,7 +4136,6 @@ def model72(nb_filters=64, w=32, h=32, c=1, sparsity=True):
         [l_unconv, l_wta_spatial, l_wta_channel, l_out])
     return layers_from_list_to_dict(all_layers)
 
-
 def model73(nb_filters=64, w=32, h=32, c=1,
             nb_layers=3,
             filter_size=5,
@@ -4133,13 +4158,10 @@ def model73(nb_filters=64, w=32, h=32, c=1,
     if type(spatial_k) != list:
         spatial_k = [spatial_k] * nb_layers
 
-    print(weight_sharing)
     if type(weight_sharing) != list:
         weight_sharing = [weight_sharing] * nb_layers
     sparse_layers = []
 
-    print('nb_filters : {}'.format(nb_filters))
-    print('nb_layers : {}'.format(nb_layers))
 
     def sparse(l):
         name = l.name
@@ -4176,11 +4198,12 @@ def model73(nb_filters=64, w=32, h=32, c=1,
 
     conv_backs = []
     back = {}
+    back_layers = {}
     for i in range(nb_layers): #[0, 1, 2]
         l_conv_back = convs_sparse[i]
         for j in range(i): # for 0 : [], for 1 : [0], for 2 : [0, 1]
             if weight_sharing[i - j - 1] and i > 0 and j > 0:
-                W = back[(i - 1, j - 1)]
+                W = back_layers[(i - 1, j - 1)].W
             else:
                 W = init.GlorotUniform()
             l_conv_back = layers.Conv2DLayer(
@@ -4189,19 +4212,20 @@ def model73(nb_filters=64, w=32, h=32, c=1,
                 filter_size=(filter_size[i - j - 1], filter_size[i - j - 1]),
                 nonlinearity=rectify,
                 W=W,
-                pad='full'
+                pad='full',
+                name='conv_back_{}_{}'.format(i + 1, j + 1)
             )
-            back[(i, j)] = l_conv_back.W
-        l_conv_back.name = 'conv_back{}'.format(i + 1)
+            back_layers[(i, j)] = l_conv_back
+            #back[(i, j)] = l_conv_back.W
+        #l_conv_back.name = 'conv_back{}'.format(i + 1)
         conv_backs.append(l_conv_back)
-    print(conv_backs)
+    #print(conv_backs)
     outs = []
     for i, conv_back in enumerate(conv_backs):
         if i == 0 or not weight_sharing[0]:
             W = init.GlorotUniform()
         else:
             W = outs[0].W
-            print(W)
         l_out = layers.Conv2DLayer(
             conv_back,
             num_filters=c,
@@ -4213,7 +4237,7 @@ def model73(nb_filters=64, w=32, h=32, c=1,
         outs.append(l_out)
     l_out = layers.ElemwiseMergeLayer(outs, merge_op)
     l_out = layers.NonlinearityLayer(l_out, sigmoid, name='output')
-    all_layers = [l_in] + convs + sparse_layers + conv_backs + outs + [l_out]
+    all_layers = [l_in] + convs + sparse_layers + back_layers.values() + outs + [l_out]
     return layers_from_list_to_dict(all_layers)
 
 def model74(nb_filters=64, w=32, h=32, c=1,
@@ -4998,31 +5022,6 @@ def model82(w=32, h=32, c=1,
     all_layers = [l_in] + hids + [l_canvas, l_raw_out, l_scaled_out, l_biased_out, l_out]
     return layers_from_list_to_dict(all_layers)
 
-
-normalize_funcs = {
-    'maxmin': norm_maxmin,
-    'sigmoid': T.nnet.sigmoid,
-    'none': lambda x: x}
-
-reduce_funcs = {
-    'sum': sum_op,
-    'over': over_op,
-    'normalized_over': normalized_over_op,
-    'max': max_op,
-    'new': lambda prev, new: new+prev-prev
-}
-
-proba_funcs = {
-    'softmax': T.nnet.softmax,
-    'sparsemax': sparsemax
-}
-
-recurrent_models = {
-    'lstm': layers.LSTMLayer,
-    'gru': layers.GRULayer,
-    'rnn': layers.RecurrentLayer
-}
-
 def model83(w=32, h=32, c=1,
             nb_fc_layers=3,
             nb_recurrent_layers=1,
@@ -5185,7 +5184,7 @@ def model83(w=32, h=32, c=1,
 
 def model84( w=32, h=32, c=1, seed=42):
     """
-    simple vae model
+    simple vae model with a fully connected neural net
     """
     l_in = layers.InputLayer((None, c, w, h), name="input")
     hid = layers.DenseLayer(l_in, 256, nonlinearity=rectify, name="hid")
@@ -5200,6 +5199,9 @@ def model84( w=32, h=32, c=1, seed=42):
 
 
 def model85(w=32, h=32, c=1, n_steps=10, patch_size=5):
+    """
+    brush stroke where  I am experimenting with the halting unit
+    """
     l_in = layers.InputLayer((None, c, w, h), name="input")
     hid = layers.DenseLayer(l_in, 800, nonlinearity=rectify, name="hid")
     hid = layers.DenseLayer(hid, 700, nonlinearity=rectify, name="hid")
@@ -5264,6 +5266,9 @@ def model85(w=32, h=32, c=1, n_steps=10, patch_size=5):
 
 
 def model86(w=32, h=32, c=1, n_steps=10, patch_size=5):
+    """
+    brushstroke where i am experimenting with alpha blending prediction"
+    """
     l_in = layers.InputLayer((None, c, w, h), name="input")
     hid = layers.DenseLayer(l_in, 800, nonlinearity=rectify, name="hid")
     hid = layers.DenseLayer(hid, 700, nonlinearity=rectify, name="hid")
@@ -5345,6 +5350,9 @@ def model86(w=32, h=32, c=1, n_steps=10, patch_size=5):
     return layers_from_list_to_dict(all_layers)
 
 def model87(w=32, h=32, c=1, n_steps=10, patch_size=5):
+    """
+    brushstrike where I try to use sparse-max or softmax pixel wise to have a sharper result"
+    """
     l_in = layers.InputLayer((None, c, w, h), name="input")
     hid = layers.DenseLayer(l_in, 800, nonlinearity=rectify, name="hid")
     hid = layers.DenseLayer(hid, 700, nonlinearity=rectify, name="hid")
@@ -5443,7 +5451,7 @@ def model88(w=32, h=32, c=1,
             eps=0):
 
     """
-    the clean GenericBrushLayer
+    a clean version of GenericBrushLayer
     """
 
     # INIT
@@ -5619,41 +5627,12 @@ def conv_fc(x,
         hids.append(l_hid)
     return hids
 
-def merge_scale(nets):
-    # take 4 nets of shape (example, c, h, w) and returns their
-    # concatenation in a grid of size (example, c, h * 2, h * 2)
-    n1 = layers.ConcatLayer((nets[0], nets[1]), axis=3)
-    n2 = layers.ConcatLayer((nets[2], nets[3]), axis=3)
-    n = layers.ConcatLayer((n1, n2), axis=2)
-    return n
-
-def iterate_scales(x=0, y=0,w=32, h=32):
-    S = 2
-    if w <= 2 or h <= 2:
-        return
-    ts = [
-        (y, x, h/S, w/S),
-        (y, x+w/S, h/S, w/S),
-        (y+h/S, x, h/S, w/S),
-        (y+h/S, x+w/S, h/S, w/S)
-    ]
-
-    t = ts[0]
-    for t_cur in iterate_scales(y=t[0], x=t[1], h=t[2], w=t[3]):
-        yield t_cur
-    t = ts[1]
-    for t_cur in iterate_scales(y=t[0], x=t[1], h=t[2], w=t[3]):
-        yield t_cur
-    t = ts[2]
-    for t_cur in iterate_scales(y=t[0], x=t[1], h=t[2], w=t[3]):
-        yield t_cur
-    t = ts[3]
-    for t_cur in iterate_scales(y=t[0], x=t[1], h=t[2], w=t[3]):
-        yield t_cur
-    for t in ts:
-        yield t
-
 def model89(w=32, h=32, c=1, scale_min=8, n_steps_min=4, patch_size_min=1):
+    """
+    big brush stroke model where we divide the image into a grid of 4
+    then divide each subgrid into a grid 4 and have a brush stroke model
+    in each cell
+    """
     from itertools import chain
     w_in = w
     h_in = h
@@ -5742,6 +5721,9 @@ def model89(w=32, h=32, c=1, scale_min=8, n_steps_min=4, patch_size_min=1):
 
 
 def model89(w=32, h=32, c=1, scale_min=8, n_steps_min=4, patch_size_min=1):
+    """
+    brush stroke with iterative rescaling
+    """
     nb_conv_filters = []
     size_conv_filters = []
     init_method = init.GlorotUniform
@@ -5829,8 +5811,151 @@ def model89(w=32, h=32, c=1, scale_min=8, n_steps_min=4, patch_size_min=1):
                   [raw_out, scaled_out, biased_out, out])
     return layers_from_list_to_dict(all_layers)
 
-sparsemax_ = axify(sparsemax)
-softmax_ = axify(softmax)
+def model90(w=32,h=32,c=1):
+    """
+    vertebrate model to force the neural net to learn compositionality
+    because the number of low level filters are small.
+    """
+    in_ = layers.InputLayer((None, c, w, h), name="input")
+    conv1 = layers.Conv2DLayer(
+        in_,
+        num_filters=64,
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv1")
+    conv2 = layers.Conv2DLayer(
+        conv1,
+        num_filters=32,
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv2")
+    conv3 = layers.Conv2DLayer(
+        conv2,
+        num_filters=8,
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv3")
+
+    wta1 = layers.NonlinearityLayer(conv3, wta_spatial, name="wta1")
+    wta2 = layers.NonlinearityLayer(wta1, linear, name="wta2")
+
+    conv4 = layers.Conv2DLayer(
+        conv3,
+        num_filters=8,
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv4")
+
+    conv5 = layers.Conv2DLayer(
+        conv4,
+        num_filters=32,
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv5")
+
+    conv6 = layers.Conv2DLayer(
+        conv5,
+        num_filters=64,
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv6")
+
+    wta3 = layers.NonlinearityLayer(conv6, wta_spatial, name="wta3")
+    wta4 = layers.NonlinearityLayer(wta3, linear, name="wta4")
+
+    conv7 = layers.Conv2DLayer(
+        wta4,
+        num_filters=64,
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        pad='full',
+        name="conv7")
+
+    conv8 = layers.Conv2DLayer(
+        conv7,
+        num_filters=32,
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        pad='full',
+        name="conv8")
+
+    conv9 = layers.Conv2DLayer(
+        conv8,
+        num_filters=8,
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        pad='full',
+        name="conv9")
+    out1  = layers.Conv2DLayer(
+            wta2,
+            num_filters=c,
+            filter_size=(13, 13),
+            nonlinearity=linear,
+            W=init.GlorotUniform(),
+            pad='full',
+            name='unconv')
+    out2  = layers.Conv2DLayer(
+            conv9,
+            num_filters=c,
+            filter_size=(13, 13),
+            nonlinearity=linear,
+            W=out1.W,
+            pad='full',
+            name='unconv')
+    raw_out = layers.ElemwiseMergeLayer([out1, out2], T.add)
+    scaled_out = layers.ScaleLayer(raw_out,  scales=init.Constant(2.), name="scaled_output")
+    biased_out = layers.BiasLayer(scaled_out, b=init.Constant(-1),   name="biased_output")
+    out = layers.NonlinearityLayer(biased_out, nonlinearity=sigmoid, name='output')
+    convs = [
+        conv1, conv2, conv3, conv4, conv5, conv6, conv7, conv8, conv9
+    ]
+    return layers_from_list_to_dict([in_] + convs + [out1, out2, scaled_out, biased_out, out])
+
+
+
+def merge_scale(nets):
+    # take 4 nets of shape (example, c, h, w) and returns their
+    # concatenation in a grid of size (example, c, h * 2, h * 2)
+    n1 = layers.ConcatLayer((nets[0], nets[1]), axis=3)
+    n2 = layers.ConcatLayer((nets[2], nets[3]), axis=3)
+    n = layers.ConcatLayer((n1, n2), axis=2)
+    return n
+
+def iterate_scales(x=0, y=0,w=32, h=32):
+    S = 2
+    if w <= 2 or h <= 2:
+        return
+    ts = [
+        (y, x, h/S, w/S),
+        (y, x+w/S, h/S, w/S),
+        (y+h/S, x, h/S, w/S),
+        (y+h/S, x+w/S, h/S, w/S)
+    ]
+
+    t = ts[0]
+    for t_cur in iterate_scales(y=t[0], x=t[1], h=t[2], w=t[3]):
+        yield t_cur
+    t = ts[1]
+    for t_cur in iterate_scales(y=t[0], x=t[1], h=t[2], w=t[3]):
+        yield t_cur
+    t = ts[2]
+    for t_cur in iterate_scales(y=t[0], x=t[1], h=t[2], w=t[3]):
+        yield t_cur
+    t = ts[3]
+    for t_cur in iterate_scales(y=t[0], x=t[1], h=t[2], w=t[3]):
+        yield t_cur
+    for t in ts:
+        yield t
+
 
 build_convnet_simple = model1
 build_convnet_simple_2 = model2
@@ -5862,7 +5987,7 @@ if __name__ == '__main__':
     model = args['MODEL']
     model = globals()[model]
     w, h, c = 28, 28, 1
-    all_layers = model(w=w, h=h, c=c, scale_min=7)
+    all_layers = model(w=w, h=h, c=c)
     for layer in all_layers.items():
         print(layer)
     x = T.tensor4()
