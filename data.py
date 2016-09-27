@@ -477,8 +477,8 @@ def load_data(dataset="digits",
     
     elif dataset == 'shoes':
         from lasagnekit.datasets.rescaled import Rescaled
-        from lasagnekit.datasets.skimagecollection import ImageCollection
         from lasagnekit.datasets.transformed import Transformed
+        from lasagnekit.datasets.manual import Manual
         from lasagnekit.datasets.subsampled import SubSampled
         from lasagnekit.datasets.helpers import load_once
         from skimage.io import imread_collection
@@ -488,18 +488,17 @@ def load_data(dataset="digits",
         folder = "{}/shoes/ut-zap50k-images/Shoes/**/**/*.jpg".format(os.getenv("DATA_PATH"))
         collection = imread_collection(folder)
         collection = list(collection)
-        indices = np.arange(len(collection))
-        np.random.shuffle(indices)
-        data = load_once(ImageCollection)(collection, indices=indices, batch_size=batch_size)
+        X = np.array(collection)
+        data = Manual(X=X)
+        data.img_dim = (102, 136, 3)
         data = load_once(Rescaled)(data, (w, h))
-        data = SubSampled(data, batch_size)
-        data.load()
         def preprocess(X):
             X = X.reshape((X.shape[0], w, h, c))
             X = X.transpose((0, 3, 1, 2))
             X = X.reshape((X.shape[0], -1))
             return X / 255.
-        data = Transformed(data, preprocess, per_example=False)
+        data = load_once(Transformed)(data, preprocess, per_example=False)
+        data = SubSampled(data, batch_size)
 
     elif dataset == 'aloi':
 

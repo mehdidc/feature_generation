@@ -825,8 +825,7 @@ def save_(layers, builder, kw_builder, filename, info=None):
         values = L.get_all_param_values(layers["output"])
         data = {"values": values, "builder": builder, "kw_builder": kw_builder, "info": info}
         dill.dump(data, fd)
-
-
+    
 def load_(filename, **kwargs):
     with open(filename, "r") as fd:
         data = dill.load(fd)
