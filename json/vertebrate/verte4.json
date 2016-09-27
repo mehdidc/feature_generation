@@ -4,7 +4,6 @@
     },
     "dataset": "shoes",
     "data_params": {
-        "image_collection_mode": "all"
     },
     "force_w": 32,
     "force_h": 32,
@@ -15,5 +14,5 @@
         "initial_lr": 0.1
     },
     "report_rec_error": false,
-    "save_model_snapshots": true
+    "save_model_snapshots": false
 }
