@@ -1,6 +1,7 @@
 {
     "model_name": "model90",
     "model_params": {
+        "nb_filters": [128, 128, 64]
     },
     "dataset": "shoes",
     "data_params": {

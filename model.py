@@ -5811,29 +5811,31 @@ def model89(w=32, h=32, c=1, scale_min=8, n_steps_min=4, patch_size_min=1):
                   [raw_out, scaled_out, biased_out, out])
     return layers_from_list_to_dict(all_layers)
 
-def model90(w=32,h=32,c=1):
+def model90(w=32,h=32,c=1, nb_filters=None, sparsity_second=True):
     """
     vertebrate model to force the neural net to learn compositionality
     because the number of low level filters are small.
     """
+    if nb_filters is None: nb_filters=[64, 32, 8]
+    nbf = nb_filters
     in_ = layers.InputLayer((None, c, w, h), name="input")
     conv1 = layers.Conv2DLayer(
         in_,
-        num_filters=64,
+        num_filters=nbf[0],
         filter_size=(5, 5),
         nonlinearity=rectify,
         W=init.GlorotUniform(),
         name="conv1")
     conv2 = layers.Conv2DLayer(
         conv1,
-        num_filters=32,
+        num_filters=nbf[1],
         filter_size=(5, 5),
         nonlinearity=rectify,
         W=init.GlorotUniform(),
         name="conv2")
     conv3 = layers.Conv2DLayer(
         conv2,
-        num_filters=8,
+        num_filters=nbf[2],
         filter_size=(5, 5),
         nonlinearity=rectify,
         W=init.GlorotUniform(),
@@ -5844,7 +5846,7 @@ def model90(w=32,h=32,c=1):
 
     conv4 = layers.Conv2DLayer(
         conv3,
-        num_filters=8,
+        num_filters=nbf[2],
         filter_size=(5, 5),
         nonlinearity=rectify,
         W=init.GlorotUniform(),
@@ -5852,7 +5854,7 @@ def model90(w=32,h=32,c=1):
 
     conv5 = layers.Conv2DLayer(
         conv4,
-        num_filters=32,
+        num_filters=nbf[1],
         filter_size=(5, 5),
         nonlinearity=rectify,
         W=init.GlorotUniform(),
@@ -5860,18 +5862,20 @@ def model90(w=32,h=32,c=1):
 
     conv6 = layers.Conv2DLayer(
         conv5,
-        num_filters=64,
+        num_filters=nbf[0],
         filter_size=(5, 5),
         nonlinearity=rectify,
         W=init.GlorotUniform(),
         name="conv6")
 
-    wta3 = layers.NonlinearityLayer(conv6, wta_spatial, name="wta3")
+    if sparsity_second: wta3 = layers.NonlinearityLayer(conv6, wta_spatial, name="wta3")
+    else: wta3 = layers.NonlinearityLayer(conv6, linear, name="wta3")
+    
     wta4 = layers.NonlinearityLayer(wta3, linear, name="wta4")
 
     conv7 = layers.Conv2DLayer(
         wta4,
-        num_filters=64,
+        num_filters=nbf[0],
         filter_size=(5, 5),
         nonlinearity=rectify,
         W=init.GlorotUniform(),
@@ -5880,7 +5884,7 @@ def model90(w=32,h=32,c=1):
 
     conv8 = layers.Conv2DLayer(
         conv7,
-        num_filters=32,
+        num_filters=nbf[1],
         filter_size=(5, 5),
         nonlinearity=rectify,
         W=init.GlorotUniform(),
@@ -5889,7 +5893,7 @@ def model90(w=32,h=32,c=1):
 
     conv9 = layers.Conv2DLayer(
         conv8,
-        num_filters=8,
+        num_filters=nbf[2],
         filter_size=(5, 5),
         nonlinearity=rectify,
         W=init.GlorotUniform(),
@@ -5920,8 +5924,6 @@ def model90(w=32,h=32,c=1):
     ]
     wtas = [wta1, wta2, wta3, wta4]
     return layers_from_list_to_dict([in_] + convs + wtas + [out1, out2, scaled_out, biased_out, out])
-
-
 
 def merge_scale(nets):
     # take 4 nets of shape (example, c, h, w) and returns their
