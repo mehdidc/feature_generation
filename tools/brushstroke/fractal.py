@@ -64,6 +64,7 @@ def gen(neuralnets, nb_iter=10, w=32, h=32, init='random', out='out.png'):
             if on == 'crops':
                 padlen = nnet.get('padlen', 5) 
                 img = pad(out_img, padlen, 'constant', constant_values=(0, 0))
+                inner_padlen = nnet.get('inner_padlen', 0)
                 py = np.random.randint(0, img.shape[0] - patch_h)
                 px = np.random.randint(0, img.shape[1] - patch_w)
                 patch = img[py:py + patch_h, px:px + patch_w]
@@ -84,12 +85,12 @@ def gen(neuralnets, nb_iter=10, w=32, h=32, init='random', out='out.png'):
                     patch = patch.astype(np.float32)
                 #if np.random.uniform() <= 0.2:
                 #    patch = 1 - patch
-                inner_padlen = nnet.get('inner_padlen', 0)
                 if inner_padlen:
-                    p = patch[inner_padlen:-inner_padlen, inner_padlen:-inner_padlen]
+                    p = patch[:, :, inner_padlen:-inner_padlen, inner_padlen:-inner_padlen]
+                    #print(p.shape, patch_h - inner_padlen * 2)
                 else:
                     p = patch
-                img[py:py + patch_h - inner_padlen, px:px + patch_w - inner_padlen] = p 
+                img[py:py + patch_h - inner_padlen*2, px:px + patch_w - inner_padlen*2] = p 
                 out_img[:, :] = img[padlen:-padlen, padlen:-padlen]
             elif on == 'full':
                 nb_full += 1

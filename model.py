@@ -28,6 +28,13 @@ from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
 from utils.sparsemax_theano import sparsemax
 
+def sparsemax_seq(x):
+    x = T.cast(x, theano.config.floatX)
+    orig_shape = x.shape
+    x = x.reshape((x.shape[0]*x.shape[1], x.shape[2]))
+    x =  sparsemax(x)
+    x = x.reshape(orig_shape)
+    return x
 
 get_nonlinearity = dict(
     linear=linear,
@@ -6206,6 +6213,180 @@ def model92(w=32,h=32,c=1, nb_filters=None):
     wtas = [wta1, wta2, wta3]
     return layers_from_list_to_dict([in_] + convs + wtas + [out1, out2, out3, scaled_out, biased_out, out])
 
+def model93(w=32, h=32,c=1, nb_filters=None):
+    """
+    vertebrate but one scale = one conv and a wta in the output layer
+    for each scale
+    """
+    if nb_filters is None: nb_filters = [8, 32]
+    nbf = nb_filters
+    in_ = layers.InputLayer((None, c, w, h), name="input")
+
+    conv1 = layers.Conv2DLayer(
+        in_,
+        num_filters=nbf[0],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv1")
+
+    wta1 = layers.NonlinearityLayer(conv1, wta_spatial, name="wta1")
+
+    conv2 = layers.Conv2DLayer(
+        conv1,
+        num_filters=nbf[1],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv2")
+
+    wta2 = layers.NonlinearityLayer(conv2, wta_spatial, name="wta2")
+
+    conv3 = layers.Conv2DLayer(
+        wta2,
+        num_filters=nbf[0],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        pad='full',
+        name="conv3")
+
+    wta3 = layers.NonlinearityLayer(conv3, wta_k_spatial(4), name="wta3")
+    print(wta1.output_shape, wta2.output_shape)
+    out1  = layers.Conv2DLayer(
+            wta1,
+            num_filters=c,
+            filter_size=(5, 5),
+            nonlinearity=linear,
+            W=init.GlorotUniform(),
+            pad='full',
+            name='out1')
+
+    out2  = layers.Conv2DLayer(
+            wta3,
+            num_filters=c,
+            filter_size=(5, 5),
+            nonlinearity=linear,
+            W=out1.W,
+            pad='full',
+            name='out2')
+
+    raw_out = layers.ElemwiseMergeLayer([out1, out2], T.add)
+    scaled_out = layers.ScaleLayer(raw_out,  scales=init.Constant(2.), name="scaled_output")
+    biased_out = layers.BiasLayer(scaled_out, b=init.Constant(-1),   name="biased_output")
+    out = layers.NonlinearityLayer(biased_out, nonlinearity=sigmoid, name='output')
+    convs = [
+        conv1, conv2, conv3
+    ]
+    wtas = [wta1, wta2, wta3]
+    return layers_from_list_to_dict([in_] + convs + wtas + [out1, out2, scaled_out, biased_out, out])
+
+
+def model94(w=32, h=32,c=1, nb_filters=None):
+    """
+    model93 with one more scale
+    """
+    if nb_filters is None: nb_filters = [8, 32, 64]
+    nbf = nb_filters
+    in_ = layers.InputLayer((None, c, w, h), name="input")
+
+    conv1 = layers.Conv2DLayer(
+        in_,
+        num_filters=nbf[0],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv1")
+
+    wta1 = layers.NonlinearityLayer(conv1, wta_spatial, name="wta1")
+
+    conv2 = layers.Conv2DLayer(
+        conv1,
+        num_filters=nbf[1],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv2")
+
+    wta2 = layers.NonlinearityLayer(conv2, wta_spatial, name="wta2")
+
+    conv3 = layers.Conv2DLayer(
+        wta2,
+        num_filters=nbf[0],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        pad='full',
+        name="conv3")
+
+    wta3 = layers.NonlinearityLayer(conv3, wta_k_spatial(4), name="wta3")
+
+    conv4 = layers.Conv2DLayer(
+        conv2,
+        num_filters=nbf[2],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv4")
+
+    wta4 = layers.NonlinearityLayer(conv3, wta_spatial, name="wta4")
+
+    conv5 = layers.Conv2DLayer(
+        conv4,
+        num_filters=nbf[1],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        pad='full',
+        name="conv4")
+
+    conv6 = layers.Conv2DLayer(
+        conv5,
+        num_filters=nbf[0],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        pad='full',
+        name="conv6")
+
+    wta5 = layers.NonlinearityLayer(conv6, wta_k_spatial(8), name="wta5")
+
+    out1  = layers.Conv2DLayer(
+            wta1,
+            num_filters=c,
+            filter_size=(5, 5),
+            nonlinearity=linear,
+            W=init.GlorotUniform(),
+            pad='full',
+            name='out1')
+
+    out2  = layers.Conv2DLayer(
+            wta3,
+            num_filters=c,
+            filter_size=(5, 5),
+            nonlinearity=linear,
+            W=out1.W,
+            pad='full',
+            name='out2')
+
+    out3  = layers.Conv2DLayer(
+            wta5,
+            num_filters=c,
+            filter_size=(5, 5),
+            nonlinearity=linear,
+            W=out1.W,
+            pad='full',
+            name='out3')
+
+    raw_out = layers.ElemwiseMergeLayer([out1, out2, out3], T.add)
+    scaled_out = layers.ScaleLayer(raw_out,  scales=init.Constant(2.), name="scaled_output")
+    biased_out = layers.BiasLayer(scaled_out, b=init.Constant(-1),   name="biased_output")
+    out = layers.NonlinearityLayer(biased_out, nonlinearity=sigmoid, name='output')
+    convs = [
+        conv1, conv2, conv3, conv4, conv5, conv6
+    ]
+    wtas = [wta1, wta2, wta3, wta4, wta5]
+    return layers_from_list_to_dict([in_] + convs + wtas + [out1, out2, scaled_out, biased_out, out])
+
+
 def merge_scale(nets):
     # take 4 nets of shape (example, c, h, w) and returns their
     # concatenation in a grid of size (example, c, h * 2, h * 2)
@@ -6240,6 +6421,109 @@ def iterate_scales(x=0, y=0,w=32, h=32):
     for t in ts:
         yield t
 
+
+def model95(w=32, h=32,c=1):
+    """
+    """
+    lays = []
+    in_ = layers.InputLayer((None, c, w, h), name="input")
+
+    conv = layers.Conv2DLayer(
+        in_,
+        num_filters=128,
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name='conv1')
+    lays.append(conv)
+
+    conv = layers.Conv2DLayer(
+        conv,
+        num_filters=128,
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name='conv2')
+    lays.append(conv)
+    conv = layers.Conv2DLayer(
+        conv,
+        num_filters=128,
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name='conv3')
+    lays.append(conv)
+
+    nb_comp = [6, 3]
+    dim_comp = [10, 10]
+     
+    Drepr = layers.DenseLayer(conv, nb_comp[0] * dim_comp[0], nonlinearity=linear, name='drepr')
+    lays.append(Drepr)
+    Drepr = layers.ReshapeLayer(Drepr, ([0], nb_comp[0], dim_comp[0]))
+    Drepr = layers.ExpressionLayer(Drepr, lambda x:sparsemax_seq(x), output_shape='auto', name='drepr_normalized')
+    lays.append(Drepr)
+
+    Dcoord = layers.DenseLayer(conv, nb_comp[0] * 2, nonlinearity=linear, name='dcoord')
+    lays.append(Dcoord)
+    
+    Dcoord = layers.ReshapeLayer(Dcoord, ([0], nb_comp[0], 2))
+    Dcoord = layers.NonlinearityLayer(Dcoord, T.nnet.sigmoid, name='dcoord_normalized')
+    lays.append(Dcoord)
+
+    L = []
+    W = init.GlorotUniform()
+    b = init.Constant(0.)
+    brushes = []
+
+    for i in range(nb_comp[0]):
+        dcoordi = layers.SliceLayer(Dcoord, i, axis=1)
+        drepri = layers.SliceLayer(Drepr, i, axis=1)
+        di = layers.ConcatLayer((dcoordi, drepri), axis=1)
+
+        dcoordj = layers.DenseLayer(di, nb_comp[1] * 2, W=W, b=b, nonlinearity=linear, name='dcoordj_{}'.format(i))
+        lays.append(dcoordj)
+        W = dcoordj.W
+        b = dcoordj.b
+        
+        dcoordj = layers.NonlinearityLayer(dcoordj, T.nnet.sigmoid)
+        dcoordj = layers.ReshapeLayer(dcoordj, ([0], nb_comp[1], 2))
+
+        dcoordj = ExpressionLayerMulti((dcoordi, dcoordj), lambda a, b:a[:, None, :] * b, output_shape=dcoordj.output_shape, name='dcoordj_normalized_{}'.format(i))
+        lays.append(dcoordj)
+
+        brush_i = GenericBrushLayer(
+                dcoordj, w, h,
+                patches=np.ones((1, 1, 3, 3)).astype(np.float32),
+                col='grayscale',
+                n_steps=nb_comp[1],
+                return_seq=False,
+                reduce_func=sum_op,
+                to_proba_func=T.nnet.softmax,
+                normalize_func=linear,
+                x_sigma=1,
+                y_sigma=1,
+                x_stride=1,
+                y_stride=1,
+                patch_index=0,
+                color=[1.],
+                x_min=0,
+                x_max='width',
+                y_min=0,
+                y_max='height',
+                name='brush{}'.format(i),
+                eps=0)
+        lays.append(brush_i)
+        brushes.append(brush_i)
+    raw_out = layers.ElemwiseSumLayer(brushes, name="raw_out")
+    scaled_out = layers.ScaleLayer(
+       raw_out, scales=init.Constant(2.), name="scaled_output")
+    biased_out = layers.BiasLayer(
+      scaled_out, b=init.Constant(-1), name="biased_output")
+    out = layers.NonlinearityLayer(
+       biased_out,
+       nonlinearity=T.nnet.sigmoid,
+       name="output")
+    return layers_from_list_to_dict([in_] + lays + [raw_out, scaled_out, biased_out, out])
 
 build_convnet_simple = model1
 build_convnet_simple_2 = model2
