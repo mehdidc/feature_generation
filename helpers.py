@@ -429,6 +429,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
                  y_min=0,
                  y_max='height',
                  eps=0,
+                 learn_patches=False,
                  **kwargs):
         """
         w : width of resulting image
@@ -491,6 +492,16 @@ class GenericBrushLayer(lasagne.layers.Layer):
         self.y_max = h if y_max == 'height' else y_max
         self.patch_index = patch_index
         self.color = color
+        self.learn_patches = learn_patches
+        if learn_patches:
+            if isinstance(self.patches, np.ndarray):
+                shape = self.patches.shape
+            else:
+                shape = self.patches.get_value().shape
+            self.ph, self.pw = shape[2:]
+            self.patches_ = self.add_param(self.patches, shape, name="patches")
+        else:
+            self.patches_ = theano.shared(self.patches)
         self.eps = 0
 
         self._nb_input_features = incoming.output_shape[2]
@@ -507,8 +518,8 @@ class GenericBrushLayer(lasagne.layers.Layer):
         w = self.w
         h = self.h
         nb_patches = self.patches.shape[0]
-        ph = self.patches.shape[2]
-        pw = self.patches.shape[3]
+        ph = self.ph
+        pw = self.pw
         nb_features = self._nb_input_features
 
         gx, gy = X[:, 0], X[:, 1]
@@ -600,8 +611,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
         Fy = T.exp(-(b_ - uy_) ** 2 / (2 * y_sigma_ ** 2))
         # shape of Fy : (nb_examples, ph, h)
         Fy = Fy / (Fy.sum(axis=2, keepdims=True) + self.eps)
-        patches = theano.shared(self.patches)
-        self.patches_ = patches
+        patches = self.patches_
         # patches : (nbp, c, ph, pw)
         # Fy : (nb_examples, ph, h)
         # Fx : (nb_examples, pw, w)

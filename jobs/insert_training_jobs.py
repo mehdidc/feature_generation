@@ -2551,7 +2551,43 @@ def jobset55():
     nb = job_write(params, cmd, where=jobset_name)
     return nb
 
+def jobset56():
+    rng = random
+    nb = rng.randint(1, 5)
+    dim_comp = [rng.randint(1,10)*10 for _ in range(nb)]
+    nb_comp = [rng.randint(2, 10) for _ in range(nb)]
+    model_params = OrderedDict(
+        dim_comp=dim_comp,
+        nb_comp=nb_comp
+    )
+    params = OrderedDict(
+        model_params=model_params,
+        denoise=None,
+        noise=None,
+        walkback=1,
+        walkback_mode='bengio_without_sampling',
+        autoencoding_loss='squared_error',
+        mode='random',
+        contractive=False,
+        contractive_coef=None,
+        marginalized=False,
+        binarize_thresh=None
+    )
+    budget_hours = 10
+    model_name = 'model96'
+    dataset = 'digits'
+    jobset_name = "jobset56"
 
+    params['model_name'] = model_name
+    params['dataset'] = dataset
+    params['budget_hours'] = budget_hours
+
+    cmd = build_cmd(model_name=model_name,
+                    dataset=dataset,
+                    params=params,
+                    budget_hours=budget_hours)
+    nb = job_write(params, cmd, where=jobset_name)
+    return nb
 
 @click.command()
 @click.option('--where', default='', help='jobset name', required=False)

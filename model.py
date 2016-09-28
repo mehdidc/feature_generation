@@ -6475,6 +6475,7 @@ def model95(w=32, h=32,c=1):
     b = init.Constant(0.)
     brushes = []
 
+    patches = np.ones((1, 1, 3, 3)).astype(np.float32)
     for i in range(nb_comp[0]):
         dcoordi = layers.SliceLayer(Dcoord, i, axis=1)
         drepri = layers.SliceLayer(Drepr, i, axis=1)
@@ -6493,15 +6494,16 @@ def model95(w=32, h=32,c=1):
 
         brush_i = GenericBrushLayer(
                 dcoordj, w, h,
-                patches=np.ones((1, 1, 3, 3)).astype(np.float32),
+                patches=patches,
+                learn_patches=True,
                 col='grayscale',
                 n_steps=nb_comp[1],
                 return_seq=False,
                 reduce_func=sum_op,
                 to_proba_func=T.nnet.softmax,
                 normalize_func=linear,
-                x_sigma=1,
-                y_sigma=1,
+                x_sigma=0.5,
+                y_sigma=0.5,
                 x_stride=1,
                 y_stride=1,
                 patch_index=0,
@@ -6512,8 +6514,155 @@ def model95(w=32, h=32,c=1):
                 y_max='height',
                 name='brush{}'.format(i),
                 eps=0)
+        patches = brush_i.patches_
         lays.append(brush_i)
         brushes.append(brush_i)
+    raw_out = layers.ElemwiseSumLayer(brushes, name="raw_out")
+    scaled_out = layers.ScaleLayer(
+       raw_out, scales=init.Constant(2.), name="scaled_output")
+    biased_out = layers.BiasLayer(
+      scaled_out, b=init.Constant(-1), name="biased_output")
+    out = layers.NonlinearityLayer(
+       biased_out,
+       nonlinearity=T.nnet.sigmoid,
+       name="output")
+    return layers_from_list_to_dict([in_] + lays + [raw_out, scaled_out, biased_out, out])
+
+def model96(w=32, h=32,c=1, nb_comp=[8, 6, 4], dim_comp=[10, 10, 10]):
+    """
+    """
+    nb_patches = 1
+    patch_size = 5
+    nb_comp = [8, 6, 4]
+    dim_comp = [10, 10, 10]
+
+    lays = []
+    in_ = layers.InputLayer((None, c, w, h), name="input")
+    conv = layers.Conv2DLayer(
+        in_,
+        num_filters=128,
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name='conv1')
+    lays.append(conv)
+    conv = layers.Conv2DLayer(
+        conv,
+        num_filters=128,
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name='conv2')
+    lays.append(conv)
+    conv = layers.Conv2DLayer(
+        conv,
+        num_filters=128,
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name='conv3')
+    lays.append(conv)
+
+    brushes = []
+    patches_all_brushes = np.ones((nb_patches, 1, patch_size, patch_size)).astype(np.float32)
+
+    def add_program_layer(lrepr=None, lcoord=None, depth=0):
+        nb_comp_cur = nb_comp[depth]
+        nb_dim_cur = dim_comp[depth]
+
+        if depth == 0:
+            lrepr = layers.DenseLayer(conv, nb_comp[0] * dim_comp[0], nonlinearity=linear, name='lrepr_0')
+            lays.append(lrepr)
+            lrepr = layers.ReshapeLayer(lrepr, ([0], nb_comp[0], dim_comp[0]))
+            lrepr = layers.ExpressionLayer(lrepr, lambda x:sparsemax_seq(x), output_shape='auto', name='lrepr_0_normalized')
+            lays.append(lrepr)
+
+            lcoord = layers.DenseLayer(conv, nb_comp[0] * 2, nonlinearity=linear, name='lcoord_0')
+            lays.append(lcoord)
+            
+            lcoord = layers.ReshapeLayer(lcoord, ([0], nb_comp[0], 2))
+            lcoord = layers.NonlinearityLayer(lcoord, T.nnet.sigmoid, name='lcoord_0_normalized')
+            lays.append(lcoord)
+
+        if depth == len(nb_comp) - 1:
+            if len(brushes):
+                patches = brushes[0].patches_
+            else:
+                patches = patches_all_brushes
+            brush = GenericBrushLayer(
+                    lcoord, w, h,
+                    patches=patches,
+                    learn_patches=True,
+                    col='grayscale',
+                    n_steps=nb_comp_cur,
+                    return_seq=False,
+                    reduce_func=sum_op,
+                    to_proba_func=T.nnet.softmax,
+                    normalize_func=linear,
+                    x_sigma=0.5,
+                    y_sigma=0.5,
+                    x_stride=1,
+                    y_stride=1,
+                    patch_index=0,
+                    color=[1.],
+                    x_min=0,
+                    x_max='width',
+                    y_min=0,
+                    y_max='height',
+                    name='brush{}'.format(depth),
+                    eps=0)
+            brushes.append(brush)
+            lays.append(brush)
+            return
+        
+        nb_comp_next = nb_comp[depth + 1]
+        nb_dim_next = dim_comp[depth + 1]
+
+        Wcoord = init.GlorotUniform()
+        bcoord = init.Constant(0.)
+        Wrepr = init.GlorotUniform()
+        brepr = init.Constant(0.)
+        for i in range(nb_comp_cur):
+            lcoord_cur = layers.SliceLayer(lcoord, i, axis=1)
+            lrepr_cur = layers.SliceLayer(lrepr, i, axis=1)
+            lfeats = layers.ConcatLayer((lcoord_cur, lrepr_cur), axis=1)
+                   
+            # coord next
+            lcoord_next = layers.DenseLayer(
+                    lfeats, nb_comp_next * 2, 
+                    W=Wcoord, b=bcoord, 
+                    nonlinearity=linear, 
+                    name='coord_{}_{}'.format(i, depth))
+            Wcoord = lcoord_next.W
+            bcoord = lcoord_next.b
+            lays.append(lcoord_next)
+
+            lcoord_next = layers.NonlinearityLayer(lcoord_next, T.nnet.sigmoid)
+            lcoord_next = layers.ReshapeLayer(lcoord_next, ([0], nb_comp_next, 2))
+            lcoord_next = ExpressionLayerMulti(
+                    (lcoord_cur, lcoord_next), lambda a, b:a[:, None, :] * b, 
+                    output_shape=lcoord_next.output_shape, 
+                    name='coord_{}_{}_normalized'.format(i, depth))
+            lays.append(lcoord_next)
+
+            # repr next
+            lrepr_next = layers.DenseLayer(
+                lfeats, 
+                nb_comp_next * nb_dim_next, 
+                W=Wrepr, b=brepr, 
+                nonlinearity=linear, 
+                name='repr_{}_{}'.format(i, depth))
+            lays.append(lrepr_next)
+            Wrepr = lrepr_next.W
+            brepr = lrepr_next.b
+
+            lrepr_next = layers.ReshapeLayer(lrepr_next, ([0], nb_comp_next, nb_dim_next))
+            lrepr_next = layers.ExpressionLayer(lrepr_next, lambda x:sparsemax_seq(x), output_shape='auto', name='repr_{}_{}_normalized'.format(i, depth))
+            lays.append(lrepr_next)
+
+            add_program_layer(lcoord_next, lrepr_next, depth=depth + 1)
+
+    add_program_layer(depth=0)
     raw_out = layers.ElemwiseSumLayer(brushes, name="raw_out")
     scaled_out = layers.ScaleLayer(
        raw_out, scales=init.Constant(2.), name="scaled_output")
