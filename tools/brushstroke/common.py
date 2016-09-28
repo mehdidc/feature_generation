@@ -17,7 +17,6 @@ import json
 from skimage.io import imread, imsave
 from skimage.transform import resize
 
-from IPython.display import HTML
 
 def minibatcher(fn, batchsize=1000):
   """
@@ -172,6 +171,7 @@ def seq_to_video(seq, filename='out.mp4', verbose=1, framerate=8, rate=8, **kw):
     imgs_to_video(seq, out=filename, verbose=verbose, framerate=framerate, rate=rate)
 
 def embed_video(filename):
+    from IPython.display import HTML
     video = open(filename, 'r+b').read()
     encoded = base64.b64encode(video)
     return HTML(data='''<video alt="test" controls>

@@ -33,7 +33,7 @@ def upscale_simple(x, scale=2):
     y[::scale, ::scale] = x
     return y
 
-def gen(neuralnets, nb_iter=10, w=32, h=32, init='random'):
+def gen(neuralnets, nb_iter=10, w=32, h=32, init='random', out='out.png'):
     out_img = np.random.uniform(size=(h, w)) if init == 'random' else init
     snapshots = []
     nb_full = 0
@@ -84,7 +84,12 @@ def gen(neuralnets, nb_iter=10, w=32, h=32, init='random'):
                     patch = patch.astype(np.float32)
                 #if np.random.uniform() <= 0.2:
                 #    patch = 1 - patch
-                img[py:py + patch_h, px:px + patch_w] = patch[0, 0]
+                inner_padlen = nnet.get('inner_padlen', 0)
+                if inner_padlen:
+                    p = patch[inner_padlen:-inner_padlen, inner_padlen:-inner_padlen]
+                else:
+                    p = patch
+                img[py:py + patch_h - inner_padlen, px:px + patch_w - inner_padlen] = p 
                 out_img[:, :] = img[padlen:-padlen, padlen:-padlen]
             elif on == 'full':
                 nb_full += 1
@@ -114,8 +119,8 @@ def gen(neuralnets, nb_iter=10, w=32, h=32, init='random'):
                 img = img > thresh_
                 img = img.astype(np.float32)
                 out_img = img
-            #if i % 100 == 0:
-            #    imsave('out.png', img)
+            if i % 100 == 0:
+                imsave(out, img)
     return out_img, snapshots
 
 def serialrun():
@@ -165,8 +170,8 @@ def serialrun():
             {'model': model_b, 'on': 'crops', 'padlen': 3,   'nb_iter':  nb_iter_b,   'thresh': 'moving', 'when': whenb, 'whitepx_ratio': wb},
             {'model': model_c, 'on': 'crops', 'padlen': 3,   'nb_iter':  nb_iter_c,   'thresh': 'moving', 'when': whenc, 'whitepx_ratio': wc},
         ]
-        img, snap = gen(neuralnets, nb_iter=5000, w=2**10, h=2**10, init='random')
-        imsave('exported_data/fractal/trial{}.png'.format(i), img)
+        img, snap = gen(neuralnets, nb_iter=2000, w=2**7, h=2**7, init='random')
+        imsave('exported_data/fractal/trial{:05d}.png'.format(i), img)
      
 if __name__ == '__main__':
     from docopt import docopt
@@ -175,7 +180,6 @@ if __name__ == '__main__':
 
     Arguments:
     MODE serial/manual
-
     """
     args = docopt(doc)
     mode = args['MODE']
@@ -192,10 +196,12 @@ if __name__ == '__main__':
         ]
         imgs = []
         for i in range(1):
-            img, snap = gen(neuralnets, nb_iter=5000, w=2**9, h=2**9, init='random')
+            img, snap = gen(neuralnets, nb_iter=2000, w=2**7, h=2**7, init='random', out='manual.png')
             imgs.append(img)
         imgs = np.array(imgs)
         imgs = imgs[:, np.newaxis, :, :]
         print(imgs.shape)
         img = disp_grid(imgs, border=1, bordercolor=(0.3, 0, 0))
         imsave('grid.png', img)
+    else:
+        raise Exception('Unknown mode : {}'.format(mode))
