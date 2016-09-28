@@ -114,25 +114,88 @@ def gen(neuralnets, nb_iter=10, w=32, h=32, init='random'):
                 img = img > thresh_
                 img = img.astype(np.float32)
                 out_img = img
-            if i % 100 == 0:
-                imsave('out.png', img)
+            #if i % 100 == 0:
+            #    imsave('out.png', img)
     return out_img, snapshots
 
-if __name__ == '__main__':
-    model_a, data, layers = load_model("training/fractal/b/model.pkl")
-    model_b, data, layers = load_model("training/fractal/b2/model.pkl")
-    model_c, data, layers = load_model("training/initial_models/model_E.pkl")
-    neuralnets = [
-       {'model': model_a, 'on': 'crops', 'padlen': 3,   'nb_iter':  5,   'thresh': 'moving', 'when': 'always', 'whitepx_ratio': 0.1},
-       {'model': model_b, 'on': 'crops', 'padlen': 3,   'nb_iter':  5,   'thresh': 'moving', 'when': 'always', 'whitepx_ratio': 0.2},
-        {'model': model_c, 'on': 'crops', 'padlen': 3,   'nb_iter':  5,   'thresh': 'moving', 'when': 'always', 'whitepx_ratio': 0.1},
-    ]
-    imgs = []
-    for i in range(1):
+def serialrun():
+    from collections import defaultdict
+    import json
+
+    scale_32_32 = ['a6']
+    scale_16_16 = ['b3', 'b2', 'a5', 'a4', 'a3', 'a2', 'a']
+    scale_8_8 = ['b']
+    
+    models = defaultdict(list)
+
+    for s in scale_32_32:
+        model, data, layers = load_model('training/fractal/{}/model.pkl'.format(s))
+        models[32].append((s, model))
+
+    for s in scale_16_16:
+        model, data, layers = load_model('training/fractal/{}/model.pkl'.format(s))
+        models[16].append((s, model))
+
+    for s in scale_8_8:
+        model, data, layers = load_model('training/fractal/{}/model.pkl'.format(s))
+        models[8].append((s, model))
+    nb_trials = 100000
+    import random
+    trials = []
+    rng = random
+    for i in range(nb_trials):
+        sa, model_a  = rng.choice(models[8])
+        sb, model_b  = rng.choice(models[16])
+        sc, model_c = rng.choice(models[32])
+        nb_iter_a = rng.randint(1, 20)
+        nb_iter_b = rng.randint(1, 20)
+        nb_iter_c = rng.randint(1, 20)
+        whena = rng.choice(('always', [0], [0, 0.5]))
+        whenb = rng.choice(('always', [0], [0, 0.5]))
+        whenc = rng.choice(('always', [0], [0, 0.5]))
+        wa = rng.uniform(0.1, 0.5)
+        wb = rng.uniform(0.1, 0.5)
+        wc = rng.uniform(0.1, 0.5)
+        trial_conf = [sa, sb, sc, nb_iter_a, nb_iter_b, nb_iter_c, whena, whenb, whenc]
+        trials.append(trial_conf)
+        with open('exported_data/fractal/trials.json', 'w') as fd:
+            fd.write(json.dumps(trials))
+        neuralnets = [
+            {'model': model_a, 'on': 'crops', 'padlen': 3,   'nb_iter':  nb_iter_a,   'thresh': 'moving', 'when': whena, 'whitepx_ratio': wa},
+            {'model': model_b, 'on': 'crops', 'padlen': 3,   'nb_iter':  nb_iter_b,   'thresh': 'moving', 'when': whenb, 'whitepx_ratio': wb},
+            {'model': model_c, 'on': 'crops', 'padlen': 3,   'nb_iter':  nb_iter_c,   'thresh': 'moving', 'when': whenc, 'whitepx_ratio': wc},
+        ]
         img, snap = gen(neuralnets, nb_iter=5000, w=2**10, h=2**10, init='random')
-        imgs.append(img)
-    imgs = np.array(imgs)
-    imgs = imgs[:, np.newaxis, :, :]
-    print(imgs.shape)
-    img = disp_grid(imgs, border=1, bordercolor=(0.3, 0, 0))
-    imsave('grid.png', img)
+        imsave('exported_data/fractal/trial{}.png'.format(i), img)
+     
+if __name__ == '__main__':
+    from docopt import docopt
+    doc = """
+    Usage: fractal.py MODE
+
+    Arguments:
+    MODE serial/manual
+
+    """
+    args = docopt(doc)
+    mode = args['MODE']
+    if mode == 'serial':
+        serialrun()
+    elif mode == 'manual':
+        model_a, data, layers = load_model("training/fractal/b/model.pkl")
+        model_b, data, layers = load_model("training/fractal/b2/model.pkl")
+        model_c, data, layers = load_model("training/initial_models/model_E.pkl")
+        neuralnets = [
+            {'model': model_a, 'on': 'crops', 'padlen': 3,   'nb_iter':  5,   'thresh': 'moving', 'when': 'always', 'whitepx_ratio': 0.1},
+            {'model': model_b, 'on': 'crops', 'padlen': 3,   'nb_iter':  5,   'thresh': 'moving', 'when': 'always', 'whitepx_ratio': 0.2},
+            {'model': model_c, 'on': 'crops', 'padlen': 3,   'nb_iter':  5,   'thresh': 'moving', 'when': 'always', 'whitepx_ratio': 0.1},
+        ]
+        imgs = []
+        for i in range(1):
+            img, snap = gen(neuralnets, nb_iter=5000, w=2**9, h=2**9, init='random')
+            imgs.append(img)
+        imgs = np.array(imgs)
+        imgs = imgs[:, np.newaxis, :, :]
+        print(imgs.shape)
+        img = disp_grid(imgs, border=1, bordercolor=(0.3, 0, 0))
+        imsave('grid.png', img)

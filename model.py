@@ -5925,6 +5925,287 @@ def model90(w=32,h=32,c=1, nb_filters=None, sparsity_second=True):
     wtas = [wta1, wta2, wta3, wta4]
     return layers_from_list_to_dict([in_] + convs + wtas + [out1, out2, scaled_out, biased_out, out])
 
+
+def model91(w=32,h=32,c=1, nb_filters=None):
+    """
+    model90 but allow weight sharing
+    """
+    if nb_filters is None: nb_filters=[16, 8, 16, 32]
+    nbf = nb_filters
+    in_ = layers.InputLayer((None, c, w, h), name="input")
+
+    # DETECT IN FIRST SCALE
+    conv1 = layers.Conv2DLayer(
+        in_,
+        num_filters=nbf[0],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv1")
+    conv2 = layers.Conv2DLayer(
+        conv1,
+        num_filters=nbf[1],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv2")
+
+    # SPARSE IN FIRST SCALE
+    wta1 = layers.NonlinearityLayer(conv2, wta_spatial, name="wta1")
+    wta2 = layers.NonlinearityLayer(wta1, linear, name="wta2")
+        
+    # DETECT IN SECOND SCALE
+    conv3 = layers.Conv2DLayer(
+        conv2,
+        num_filters=nbf[2],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv3")
+
+    conv4 = layers.Conv2DLayer(
+        conv3,
+        num_filters=nbf[3],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv4")
+
+    # SPARSE IN SECOND SCALE
+    wta3 = layers.NonlinearityLayer(conv4, wta_spatial, name="wta3")
+    wta4 = layers.NonlinearityLayer(wta3, linear, name="wta4")
+    
+    # CONVERT SECOND TO FIRST  SCALE
+    conv5 = layers.Conv2DLayer(
+        wta4,
+        num_filters=nbf[2],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        pad='full',
+        name="conv5")
+
+    conv6 = layers.Conv2DLayer(
+        conv5,
+        num_filters=nbf[1],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        pad='full',
+        name="conv6")
+
+    conv7 = layers.Conv2DLayer(
+        conv6,
+        num_filters=nbf[0],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        pad='full',
+        name="conv7")
+
+    conv8 = layers.Conv2DLayer(
+        conv7,
+        num_filters=nbf[1],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=conv2.W,
+        name="conv8")
+
+    out1  = layers.Conv2DLayer(
+            wta2,
+            num_filters=c,
+            filter_size=(9, 9),
+            nonlinearity=linear,
+            W=init.GlorotUniform(),
+            pad='full',
+            name='out1')
+
+    out2  = layers.Conv2DLayer(
+            conv8,
+            num_filters=c,
+            filter_size=(9, 9),
+            nonlinearity=linear,
+            W=out1.W,
+            pad='full',
+            name='out2')
+
+    raw_out = layers.ElemwiseMergeLayer([out1, out2], T.add)
+    scaled_out = layers.ScaleLayer(raw_out,  scales=init.Constant(2.), name="scaled_output")
+    biased_out = layers.BiasLayer(scaled_out, b=init.Constant(-1),   name="biased_output")
+    out = layers.NonlinearityLayer(biased_out, nonlinearity=sigmoid, name='output')
+    convs = [
+        conv1, conv2, conv3, conv4, conv5, conv6, conv7, conv8
+    ]
+    wtas = [wta1, wta2, wta3, wta4]
+    return layers_from_list_to_dict([in_] + convs + wtas + [out1, out2, scaled_out, biased_out, out])
+
+def model92(w=32,h=32,c=1, nb_filters=None):
+    """
+    model91 but with more scales
+    """
+    if nb_filters is None: nb_filters=[16, 8, 32, 16, 64, 32]
+    nbf = nb_filters
+    in_ = layers.InputLayer((None, c, w, h), name="input")
+
+    # DETECT IN FIRST SCALE
+    conv1 = layers.Conv2DLayer(
+        in_,
+        num_filters=nbf[0],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv1")
+
+    conv2 = layers.Conv2DLayer(
+        conv1,
+        num_filters=nbf[1],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv2")
+
+    # SPARSE IN FIRST SCALE
+    
+    wta1 = layers.NonlinearityLayer(conv2, wta_spatial, name="wta1")
+
+    # DETECT IN SECOND SCALE
+    conv3 = layers.Conv2DLayer(
+        conv2,
+        num_filters=nbf[2],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv3")
+
+    conv4 = layers.Conv2DLayer(
+        conv3,
+        num_filters=nbf[3],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv4")
+
+    # SPARSE IN SECOND SCALE
+    wta2 = layers.NonlinearityLayer(conv4, wta_spatial, name="wta2")
+
+    # GO BACK TO FIRST SCALE
+
+    conv5 = layers.Conv2DLayer(
+        wta2,
+        num_filters=nbf[2],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        pad='full',
+        name="conv5")
+
+    conv6 = layers.Conv2DLayer(
+        conv5,
+        num_filters=nbf[1],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        pad='full',
+        name="conv6")
+    
+    # DETECT IN THIRD SCALE
+
+    conv7 = layers.Conv2DLayer(
+        conv4,
+        num_filters=nbf[4],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv7")
+
+    conv8 = layers.Conv2DLayer(
+        conv7,
+        num_filters=nbf[5],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        name="conv8")
+
+    # SPARSE IN THIRD SCALE
+    wta3 = layers.NonlinearityLayer(conv8, wta_spatial, name="wta3")
+
+    # GO BACK TO SECOND SCALE
+
+    conv9 = layers.Conv2DLayer(
+        wta3,
+        num_filters=nbf[4],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        pad='full',
+        name="conv9")
+
+    conv10 = layers.Conv2DLayer(
+        conv9,
+        num_filters=nbf[3],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=init.GlorotUniform(),
+        pad='full',
+        name="conv10")
+ 
+    # GO BACK TO FIRST SCALE
+
+    conv11 = layers.Conv2DLayer(
+        conv10,
+        num_filters=nbf[2],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=conv5.W,
+        pad='full',
+        name="conv11")
+
+    conv12 = layers.Conv2DLayer(
+        conv11,
+        num_filters=nbf[1],
+        filter_size=(5, 5),
+        nonlinearity=rectify,
+        W=conv6.W,
+        pad='full',
+        name="conv12")
+    print(wta1.output_shape, conv6.output_shape, conv12.output_shape)
+    out1  = layers.Conv2DLayer(
+            wta1,
+            num_filters=c,
+            filter_size=(9, 9),
+            nonlinearity=linear,
+            W=init.GlorotUniform(),
+            pad='full',
+            name='out1')
+
+    out2  = layers.Conv2DLayer(
+            conv6,
+            num_filters=c,
+            filter_size=(9, 9),
+            nonlinearity=linear,
+            W=out1.W,
+            pad='full',
+            name='out2')
+
+    out3  = layers.Conv2DLayer(
+            conv12,
+            num_filters=c,
+            filter_size=(9, 9),
+            nonlinearity=linear,
+            W=out1.W,
+            pad='full',
+            name='out3')
+ 
+    raw_out = layers.ElemwiseMergeLayer([out1, out2, out3], T.add)
+    scaled_out = layers.ScaleLayer(raw_out,  scales=init.Constant(2.), name="scaled_output")
+    biased_out = layers.BiasLayer(scaled_out, b=init.Constant(-1),   name="biased_output")
+    out = layers.NonlinearityLayer(biased_out, nonlinearity=sigmoid, name='output')
+    convs = [
+        conv1, conv2, conv3, conv4, conv5, conv6, conv7, conv8, conv9, conv10, conv11, conv12,
+    ]
+    wtas = [wta1, wta2, wta3]
+    return layers_from_list_to_dict([in_] + convs + wtas + [out1, out2, out3, scaled_out, biased_out, out])
+
 def merge_scale(nets):
     # take 4 nets of shape (example, c, h, w) and returns their
     # concatenation in a grid of size (example, c, h * 2, h * 2)
