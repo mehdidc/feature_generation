@@ -1,8 +1,8 @@
 {
     "model_name": "model96",
     "model_params": {
-        "dim_comp": [10, 10],
-        "nb_comp": [6, 3]
+        "dim_comp": [10, 10, 10, 10],
+        "nb_comp": [3, 3, 6, 6]
     },
     "dataset": "digits",
     "data_params": {
@@ -10,8 +10,8 @@
     "mode": "random",
     "budget_hours": 24,
     "optimization": {
-        "algo": "adadelta",
-        "initial_lr": 0.1
+        "algo": "adam",
+        "initial_lr": 0.01
     },
     "report_rec_error": false,
     "save_model_snapshots": true

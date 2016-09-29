@@ -501,6 +501,11 @@ class GenericBrushLayer(lasagne.layers.Layer):
             self.ph, self.pw = shape[2:]
             self.patches_ = self.add_param(self.patches, shape, name="patches")
         else:
+            if isinstance(self.patches, np.ndarray):
+                shape = self.patches.shape
+            else:
+                shape = self.patches.get_value().shape
+            self.ph, self.pw = shape[2:]
             self.patches_ = theano.shared(self.patches)
         self.eps = 0
 

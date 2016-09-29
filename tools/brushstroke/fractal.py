@@ -38,7 +38,6 @@ def gen(neuralnets, nb_iter=10, w=32, h=32, init='random', out='out.png'):
     snapshots = []
     nb_full = 0
     for i in tqdm(range(nb_iter)):
-        #snapshots.append(out_img.copy())
         for nnet in neuralnets:
             when = nnet.get('when', 'always')
             if type(when) == list:
@@ -55,6 +54,10 @@ def gen(neuralnets, nb_iter=10, w=32, h=32, init='random', out='out.png'):
                             allow = True    
                 if not allow:
                     continue
+            elif type(when) == float:
+                when = when * nb_iter
+                allow = (i % when) == 0
+
             model = nnet['model']
             on = nnet['on']
             patch_h, patch_w = model.layers['output'].output_shape[2:]
@@ -159,9 +162,9 @@ def serialrun():
         whena = rng.choice(('always', [0], [0, 0.5]))
         whenb = rng.choice(('always', [0], [0, 0.5]))
         whenc = rng.choice(('always', [0], [0, 0.5]))
-        wa = rng.uniform(0.1, 0.5)
-        wb = rng.uniform(0.1, 0.5)
-        wc = rng.uniform(0.1, 0.5)
+        wa = rng.choice(  ('always',  rng.uniform(0, 0.5)   )   )
+        wb = rng.choice(  ('always',  rng.uniform(0, 0.5)   )   )
+        wc = rng.choice(  ('always',  rng.uniform(0, 0.5)   )   )
         trial_conf = [sa, sb, sc, nb_iter_a, nb_iter_b, nb_iter_c, whena, whenb, whenc]
         trials.append(trial_conf)
         with open('exported_data/fractal/trials.json', 'w') as fd:
@@ -171,7 +174,7 @@ def serialrun():
             {'model': model_b, 'on': 'crops', 'padlen': 3,   'nb_iter':  nb_iter_b,   'thresh': 'moving', 'when': whenb, 'whitepx_ratio': wb},
             {'model': model_c, 'on': 'crops', 'padlen': 3,   'nb_iter':  nb_iter_c,   'thresh': 'moving', 'when': whenc, 'whitepx_ratio': wc},
         ]
-        img, snap = gen(neuralnets, nb_iter=2000, w=2**7, h=2**7, init='random')
+        img, snap = gen(neuralnets, nb_iter=2000, w=2**5, h=2**5, init='random')
         imsave('exported_data/fractal/trial{:05d}.png'.format(i), img)
      
 if __name__ == '__main__':

@@ -6528,7 +6528,7 @@ def model95(w=32, h=32,c=1):
        name="output")
     return layers_from_list_to_dict([in_] + lays + [raw_out, scaled_out, biased_out, out])
 
-def model96(w=32, h=32,c=1, nb_comp=[6, 3], dim_comp=[10, 10], nb_patches=1, patch_size=3):
+def model96(w=32, h=32,c=1, nb_comp=[3, 3, 3, 3], dim_comp=[10, 10, 10, 10], nb_patches=1, patch_size=3):
     """
     """
 
@@ -6569,14 +6569,14 @@ def model96(w=32, h=32,c=1, nb_comp=[6, 3], dim_comp=[10, 10], nb_patches=1, pat
         if depth == 0:
             lrepr = layers.DenseLayer(conv, nb_comp[0] * dim_comp[0], nonlinearity=linear, name='lrepr_0')
             lays.append(lrepr)
-            #lrepr = batch_norm(lrepr)
+            lrepr = batch_norm(lrepr)
 
             lrepr = layers.ReshapeLayer(lrepr, ([0], nb_comp[0], dim_comp[0]))
             lrepr = layers.ExpressionLayer(lrepr, lambda x:sparsemax_seq(x), output_shape='auto', name='lrepr_0_normalized')
             lays.append(lrepr)
 
             lcoord = layers.DenseLayer(conv, nb_comp[0] * 2, nonlinearity=linear, name='lcoord_0')
-            #lcoord = batch_norm(lcoord)
+            lcoord = batch_norm(lcoord)
             lays.append(lcoord)
             
             lcoord = layers.ReshapeLayer(lcoord, ([0], nb_comp[0], 2))
@@ -6637,7 +6637,7 @@ def model96(w=32, h=32,c=1, nb_comp=[6, 3], dim_comp=[10, 10], nb_patches=1, pat
             lays.append(lcoord_next)
         
             
-            #lcoord_next = batch_norm(lcoord_next)
+            lcoord_next = batch_norm(lcoord_next)
 
             lcoord_next = layers.NonlinearityLayer(lcoord_next, T.nnet.sigmoid)
             lcoord_next = layers.ReshapeLayer(lcoord_next, ([0], nb_comp_next, 2))
@@ -6658,7 +6658,7 @@ def model96(w=32, h=32,c=1, nb_comp=[6, 3], dim_comp=[10, 10], nb_patches=1, pat
             Wrepr = lrepr_next.W
             brepr = lrepr_next.b
             
-            #lrepr_next = batch_norm(lrepr_next)
+            lrepr_next = batch_norm(lrepr_next)
             lrepr_next = layers.ReshapeLayer(lrepr_next, ([0], nb_comp_next, nb_dim_next))
             lrepr_next = layers.ExpressionLayer(lrepr_next, lambda x:sparsemax_seq(x), output_shape='auto', name='repr_{}_{}_normalized'.format(i, depth))
             lays.append(lrepr_next)
