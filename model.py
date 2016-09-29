@@ -44,6 +44,9 @@ def softmax_seq(x):
     x = x.reshape(orig_shape)
     return x
 
+def is_max_seq(x):
+    m = x.max(axis=2, keepdims=True)
+    return x*T.eq(x, m)# / m
 
 get_nonlinearity = dict(
     linear=linear,
@@ -6543,45 +6546,27 @@ def model96(w=32, h=32,c=1, nb_comp=[3, 3, 3, 3], dim_comp=[10, 10, 10, 10], sca
 
     lays = []
     in_ = layers.InputLayer((None, c, w, h), name="input")
-    conv = layers.Conv2DLayer(
-        in_,
-        num_filters=128,
-        filter_size=(5, 5),
-        nonlinearity=rectify,
-        W=init.GlorotUniform(),
-        name='conv1')
-    lays.append(conv)
-    conv = layers.Conv2DLayer(
-        conv,
-        num_filters=128,
-        filter_size=(5, 5),
-        nonlinearity=rectify,
-        W=init.GlorotUniform(),
-        name='conv2')
-    lays.append(conv)
-    conv = layers.Conv2DLayer(
-        conv,
-        num_filters=128,
-        filter_size=(5, 5),
-        nonlinearity=rectify,
-        W=init.GlorotUniform(),
-        name='conv3')
-    lays.append(conv)
+
+    hid = layers.DenseLayer(in_, 500, nonlinearity=rectify)
+    conv = hid
 
     brushes = []
     patches_all_brushes = np.ones((nb_patches, 1, patch_size, patch_size)).astype(np.float32)
     params_per_depth = {}
+
+    #selector = sparsemax_seq
+    #selector = is_max_seq
+    selector = softmax_seq
     def add_program_layer(lrepr=None, lcoord=None, depth=0):
         nb_comp_cur = nb_comp[depth]
         nb_dim_cur = dim_comp[depth]
-
         if depth == 0:
             lrepr = layers.DenseLayer(conv, nb_comp[0] * dim_comp[0], nonlinearity=linear, name='repr_0')
             lays.append(lrepr)
             #lrepr = batch_norm(lrepr)
 
             lrepr = layers.ReshapeLayer(lrepr, ([0], nb_comp[0], dim_comp[0]))
-            lrepr = layers.ExpressionLayer(lrepr, lambda x:softmax_seq(x), output_shape='auto', name='repr_0_normalized')
+            lrepr = layers.ExpressionLayer(lrepr, lambda x:selector(x), output_shape='auto', name='repr_0_normalized')
             lays.append(lrepr)
 
             lcoord = layers.DenseLayer(conv, nb_comp[0] * 2, nonlinearity=linear, name='coord_0')
@@ -6589,7 +6574,7 @@ def model96(w=32, h=32,c=1, nb_comp=[3, 3, 3, 3], dim_comp=[10, 10, 10, 10], sca
             lays.append(lcoord)
             
             lcoord = layers.ReshapeLayer(lcoord, ([0], nb_comp[0], 2))
-            lcoord = layers.NonlinearityLayer(lcoord, T.nnet.sigmoid, name='lcoord_0_normalized')
+            lcoord = layers.NonlinearityLayer(lcoord, T.nnet.sigmoid, name='coord_0_normalized')
             lays.append(lcoord)
 
         if depth == len(nb_comp) - 1:
@@ -6601,7 +6586,7 @@ def model96(w=32, h=32,c=1, nb_comp=[3, 3, 3, 3], dim_comp=[10, 10, 10, 10], sca
             brush = GenericBrushLayer(
                     lcoord, w, h,
                     patches=patches,
-                    learn_patches=False,
+                    learn_patches=True,
                     col='grayscale',
                     n_steps=nb_comp_cur,
                     return_seq=False,
@@ -6635,8 +6620,8 @@ def model96(w=32, h=32,c=1, nb_comp=[3, 3, 3, 3], dim_comp=[10, 10, 10, 10], sca
             lcoord_cur = layers.SliceLayer(lcoord, i, axis=1, name='coord_cur_{}_{}'.format(i, depth))
             lrepr_cur = layers.SliceLayer(lrepr, i, axis=1, name='repr_cur_{}_{}'.format(i, depth))
             lfeats = layers.ConcatLayer((lcoord_cur, lrepr_cur), axis=1)
-                   
-           # coord next
+            #lfeats = layers.DenseLayer(lfeats, 256, nonlinearity=rectify)
+            # coord next
             lcoord_next = layers.DenseLayer(
                     lfeats, nb_comp_next * 2, 
                     W=Wcoord, b=bcoord, 
@@ -6649,12 +6634,13 @@ def model96(w=32, h=32,c=1, nb_comp=[3, 3, 3, 3], dim_comp=[10, 10, 10, 10], sca
         
             #lcoord_next = batch_norm(lcoord_next)
 
-            lcoord_next = layers.NonlinearityLayer(lcoord_next, T.nnet.sigmoid)
+            lcoord_next = layers.NonlinearityLayer(lcoord_next, T.tanh)
             lcoord_next = layers.ReshapeLayer(lcoord_next, ([0], nb_comp_next, 2))
 
             def fn(abs, rel):
                 abs = abs[:, None, :]
-                r = abs + abs * rel
+                r = abs + (abs + abs + scales[depth]) * rel
+                #r = abs + abs * rel
                 return r
             lcoord_next = ExpressionLayerMulti(
                     (lcoord_cur, lcoord_next), 
@@ -6665,7 +6651,7 @@ def model96(w=32, h=32,c=1, nb_comp=[3, 3, 3, 3], dim_comp=[10, 10, 10, 10], sca
 
             # repr next
             lrepr_next = layers.DenseLayer(
-                lfeats, 
+                lrepr_cur, 
                 nb_comp_next * nb_dim_next, 
                 W=Wrepr, b=brepr, 
                 nonlinearity=linear, 
@@ -6677,7 +6663,7 @@ def model96(w=32, h=32,c=1, nb_comp=[3, 3, 3, 3], dim_comp=[10, 10, 10, 10], sca
             
             #lrepr_next = batch_norm(lrepr_next)
             lrepr_next = layers.ReshapeLayer(lrepr_next, ([0], nb_comp_next, nb_dim_next))
-            lrepr_next = layers.ExpressionLayer(lrepr_next, lambda x:softmax_seq(x), output_shape='auto', name='repr_{}_{}_normalized'.format(i, depth))
+            lrepr_next = layers.ExpressionLayer(lrepr_next, lambda x:selector(x), output_shape='auto', name='repr_{}_{}_normalized'.format(i, depth))
             lays.append(lrepr_next)
 
             add_program_layer(lrepr_next, lcoord_next, depth=depth + 1)
