@@ -6561,7 +6561,7 @@ def model96(w=32, h=32,c=1, nb_comp=[3, 3, 3, 3], dim_comp=[10, 10, 10, 10], nb_
 
     brushes = []
     patches_all_brushes = np.ones((nb_patches, 1, patch_size, patch_size)).astype(np.float32)
-
+    params_per_depth = {}
     def add_program_layer(lrepr=None, lcoord=None, depth=0):
         nb_comp_cur = nb_comp[depth]
         nb_dim_cur = dim_comp[depth]
@@ -6569,14 +6569,14 @@ def model96(w=32, h=32,c=1, nb_comp=[3, 3, 3, 3], dim_comp=[10, 10, 10, 10], nb_
         if depth == 0:
             lrepr = layers.DenseLayer(conv, nb_comp[0] * dim_comp[0], nonlinearity=linear, name='lrepr_0')
             lays.append(lrepr)
-            lrepr = batch_norm(lrepr)
+            #lrepr = batch_norm(lrepr)
 
             lrepr = layers.ReshapeLayer(lrepr, ([0], nb_comp[0], dim_comp[0]))
             lrepr = layers.ExpressionLayer(lrepr, lambda x:sparsemax_seq(x), output_shape='auto', name='lrepr_0_normalized')
             lays.append(lrepr)
 
             lcoord = layers.DenseLayer(conv, nb_comp[0] * 2, nonlinearity=linear, name='lcoord_0')
-            lcoord = batch_norm(lcoord)
+            #lcoord = batch_norm(lcoord)
             lays.append(lcoord)
             
             lcoord = layers.ReshapeLayer(lcoord, ([0], nb_comp[0], 2))
@@ -6616,11 +6616,10 @@ def model96(w=32, h=32,c=1, nb_comp=[3, 3, 3, 3], dim_comp=[10, 10, 10, 10], nb_
         
         nb_comp_next = nb_comp[depth + 1]
         nb_dim_next = dim_comp[depth + 1]
+            
+        default_params = (init.GlorotUniform(), init.Constant(0.), init.GlorotUniform(), init.Constant(0.))
+        Wcoord, bcoord, Wrepr, brepr = params_per_depth.get(depth, default_params)
 
-        Wcoord = init.GlorotUniform()
-        bcoord = init.Constant(0.)
-        Wrepr = init.GlorotUniform()
-        brepr = init.Constant(0.)
         for i in range(nb_comp_cur):
             lcoord_cur = layers.SliceLayer(lcoord, i, axis=1, name='coord_cur_{}_{}'.format(i, depth))
             lrepr_cur = layers.SliceLayer(lrepr, i, axis=1, name='repr_cur_{}_{}'.format(i, depth))
@@ -6634,15 +6633,15 @@ def model96(w=32, h=32,c=1, nb_comp=[3, 3, 3, 3], dim_comp=[10, 10, 10, 10], nb_
                     name='coord_{}_{}'.format(i, depth))
             Wcoord = lcoord_next.W
             bcoord = lcoord_next.b
+
             lays.append(lcoord_next)
         
-            
-            lcoord_next = batch_norm(lcoord_next)
+            #lcoord_next = batch_norm(lcoord_next)
 
             lcoord_next = layers.NonlinearityLayer(lcoord_next, T.nnet.sigmoid)
             lcoord_next = layers.ReshapeLayer(lcoord_next, ([0], nb_comp_next, 2))
             lcoord_next = ExpressionLayerMulti(
-                    (lcoord_cur, lcoord_next), lambda a, b:a[:, None, :] * b, 
+                    (lcoord_cur, lcoord_next), lambda a, b:a[:, None, :] + b, 
                     output_shape=lcoord_next.output_shape, 
                     name='coord_{}_{}_normalized'.format(i, depth))
             lays.append(lcoord_next)
@@ -6657,8 +6656,9 @@ def model96(w=32, h=32,c=1, nb_comp=[3, 3, 3, 3], dim_comp=[10, 10, 10, 10], nb_
             lays.append(lrepr_next)
             Wrepr = lrepr_next.W
             brepr = lrepr_next.b
+            params_per_depth[depth] = Wcoord, bcoord, Wrepr, brepr
             
-            lrepr_next = batch_norm(lrepr_next)
+            #lrepr_next = batch_norm(lrepr_next)
             lrepr_next = layers.ReshapeLayer(lrepr_next, ([0], nb_comp_next, nb_dim_next))
             lrepr_next = layers.ExpressionLayer(lrepr_next, lambda x:sparsemax_seq(x), output_shape='auto', name='repr_{}_{}_normalized'.format(i, depth))
             lays.append(lrepr_next)

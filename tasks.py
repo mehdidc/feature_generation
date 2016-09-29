@@ -1,10 +1,10 @@
-import matplotlib as mpl
 import os
-import pandas as pd
+import matplotlib as mpl
 if os.getenv("DISPLAY") is None:  # NOQA
     mpl.use('Agg')  # NOQA
-import matplotlib.pyplot as plt
 import dill
+import os
+import pandas as pd
 import sys
 from invoke import task
 from collections import OrderedDict
@@ -56,7 +56,6 @@ def train(dataset=None,
           force_w=None, force_h=None,
           params=None):
     import json
-
     if type(params) == dict:
         pass
     else:
@@ -196,6 +195,9 @@ def build_capsule_(layers, data, nbl, nbc,
                    budget_hours=np.inf,
                    compile_="all",
                    **train_params):
+    import matplotlib.pyplot as plt
+
+
     batch_size = train_params.get("batch_size", 128)
     denoise = train_params.get("denoise", None)
     walkback = train_params.get("walkback", 1)
