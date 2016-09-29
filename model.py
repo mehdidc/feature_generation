@@ -6528,13 +6528,9 @@ def model95(w=32, h=32,c=1):
        name="output")
     return layers_from_list_to_dict([in_] + lays + [raw_out, scaled_out, biased_out, out])
 
-def model96(w=32, h=32,c=1, nb_comp=[8, 6, 4], dim_comp=[10, 10, 10]):
+def model96(w=32, h=32,c=1, nb_comp=[6, 3], dim_comp=[10, 10], nb_patches=1, patch_size=3):
     """
     """
-    nb_patches = 1
-    patch_size = 5
-    nb_comp = [8, 6, 4]
-    dim_comp = [10, 10, 10]
 
     lays = []
     in_ = layers.InputLayer((None, c, w, h), name="input")
@@ -6573,11 +6569,14 @@ def model96(w=32, h=32,c=1, nb_comp=[8, 6, 4], dim_comp=[10, 10, 10]):
         if depth == 0:
             lrepr = layers.DenseLayer(conv, nb_comp[0] * dim_comp[0], nonlinearity=linear, name='lrepr_0')
             lays.append(lrepr)
+            #lrepr = batch_norm(lrepr)
+
             lrepr = layers.ReshapeLayer(lrepr, ([0], nb_comp[0], dim_comp[0]))
             lrepr = layers.ExpressionLayer(lrepr, lambda x:sparsemax_seq(x), output_shape='auto', name='lrepr_0_normalized')
             lays.append(lrepr)
 
             lcoord = layers.DenseLayer(conv, nb_comp[0] * 2, nonlinearity=linear, name='lcoord_0')
+            #lcoord = batch_norm(lcoord)
             lays.append(lcoord)
             
             lcoord = layers.ReshapeLayer(lcoord, ([0], nb_comp[0], 2))
@@ -6623,8 +6622,8 @@ def model96(w=32, h=32,c=1, nb_comp=[8, 6, 4], dim_comp=[10, 10, 10]):
         Wrepr = init.GlorotUniform()
         brepr = init.Constant(0.)
         for i in range(nb_comp_cur):
-            lcoord_cur = layers.SliceLayer(lcoord, i, axis=1)
-            lrepr_cur = layers.SliceLayer(lrepr, i, axis=1)
+            lcoord_cur = layers.SliceLayer(lcoord, i, axis=1, name='coord_cur_{}_{}'.format(i, depth))
+            lrepr_cur = layers.SliceLayer(lrepr, i, axis=1, name='repr_cur_{}_{}'.format(i, depth))
             lfeats = layers.ConcatLayer((lcoord_cur, lrepr_cur), axis=1)
                    
             # coord next
@@ -6636,6 +6635,9 @@ def model96(w=32, h=32,c=1, nb_comp=[8, 6, 4], dim_comp=[10, 10, 10]):
             Wcoord = lcoord_next.W
             bcoord = lcoord_next.b
             lays.append(lcoord_next)
+        
+            
+            #lcoord_next = batch_norm(lcoord_next)
 
             lcoord_next = layers.NonlinearityLayer(lcoord_next, T.nnet.sigmoid)
             lcoord_next = layers.ReshapeLayer(lcoord_next, ([0], nb_comp_next, 2))
@@ -6655,12 +6657,13 @@ def model96(w=32, h=32,c=1, nb_comp=[8, 6, 4], dim_comp=[10, 10, 10]):
             lays.append(lrepr_next)
             Wrepr = lrepr_next.W
             brepr = lrepr_next.b
-
+            
+            #lrepr_next = batch_norm(lrepr_next)
             lrepr_next = layers.ReshapeLayer(lrepr_next, ([0], nb_comp_next, nb_dim_next))
             lrepr_next = layers.ExpressionLayer(lrepr_next, lambda x:sparsemax_seq(x), output_shape='auto', name='repr_{}_{}_normalized'.format(i, depth))
             lays.append(lrepr_next)
 
-            add_program_layer(lcoord_next, lrepr_next, depth=depth + 1)
+            add_program_layer(lrepr_next, lcoord_next, depth=depth + 1)
 
     add_program_layer(depth=0)
     raw_out = layers.ElemwiseSumLayer(brushes, name="raw_out")
@@ -6696,6 +6699,7 @@ if __name__ == '__main__':
     import theano
     import theano.tensor as T
     import lasagne
+    from lasagnekit.misc.draw_net import  draw_to_file
 
     doc = """
     Usage: model.py MODEL
@@ -6705,6 +6709,7 @@ if __name__ == '__main__':
     model = globals()[model]
     w, h, c = 28, 28, 1
     all_layers = model(w=w, h=h, c=c)
+    draw_to_file(lasagne.layers.get_all_layers(all_layers['output']), 'out.svg')
     for layer in all_layers.items():
         print(layer)
     x = T.tensor4()

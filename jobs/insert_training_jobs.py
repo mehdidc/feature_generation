@@ -2556,9 +2556,13 @@ def jobset56():
     nb = rng.randint(1, 5)
     dim_comp = [rng.randint(1,10)*10 for _ in range(nb)]
     nb_comp = [rng.randint(2, 10) for _ in range(nb)]
+    nb_patches = rng.choice((1,))
+    patch_size = rng.choice((2, 3, 4, 5, 6, 7 ,8))
     model_params = OrderedDict(
         dim_comp=dim_comp,
-        nb_comp=nb_comp
+        nb_comp=nb_comp,
+        nb_patches=nb_patches,
+        patch_size=patch_size
     )
     params = OrderedDict(
         model_params=model_params,
