@@ -46,7 +46,7 @@ def softmax_seq(x):
 
 def is_max_seq(x):
     m = x.max(axis=2, keepdims=True)
-    return x*T.eq(x, m)# / m
+    return T.eq(x, m)# / m
 
 get_nonlinearity = dict(
     linear=linear,
@@ -6546,17 +6546,18 @@ def model96(w=32, h=32,c=1, nb_comp=[3, 3, 3, 3], dim_comp=[10, 10, 10, 10], sca
 
     lays = []
     in_ = layers.InputLayer((None, c, w, h), name="input")
-
-    hid = layers.DenseLayer(in_, 500, nonlinearity=rectify)
+    hid = layers.DenseLayer(in_, 500, nonlinearity=rectify, name='hid')
+    lays.append(hid)
     conv = hid
 
     brushes = []
     patches_all_brushes = np.ones((nb_patches, 1, patch_size, patch_size)).astype(np.float32)
     params_per_depth = {}
-
+    
+    #selector = lambda x:x
     #selector = sparsemax_seq
-    #selector = is_max_seq
-    selector = softmax_seq
+    selector = is_max_seq
+    #selector = softmax_seq
     def add_program_layer(lrepr=None, lcoord=None, depth=0):
         nb_comp_cur = nb_comp[depth]
         nb_dim_cur = dim_comp[depth]
@@ -6620,7 +6621,7 @@ def model96(w=32, h=32,c=1, nb_comp=[3, 3, 3, 3], dim_comp=[10, 10, 10, 10], sca
             lcoord_cur = layers.SliceLayer(lcoord, i, axis=1, name='coord_cur_{}_{}'.format(i, depth))
             lrepr_cur = layers.SliceLayer(lrepr, i, axis=1, name='repr_cur_{}_{}'.format(i, depth))
             lfeats = layers.ConcatLayer((lcoord_cur, lrepr_cur), axis=1)
-            #lfeats = layers.DenseLayer(lfeats, 256, nonlinearity=rectify)
+            lfeats = layers.DenseLayer(lfeats, 256, nonlinearity=rectify)
             # coord next
             lcoord_next = layers.DenseLayer(
                     lfeats, nb_comp_next * 2, 
@@ -6639,8 +6640,10 @@ def model96(w=32, h=32,c=1, nb_comp=[3, 3, 3, 3], dim_comp=[10, 10, 10, 10], sca
 
             def fn(abs, rel):
                 abs = abs[:, None, :]
-                r = abs + (abs + abs + scales[depth]) * rel
+                #r = (abs + abs + scales[depth]) * rel
                 #r = abs + abs * rel
+                r = abs + rel
+                r = theano.tensor.clip(r, 0, 1)
                 return r
             lcoord_next = ExpressionLayerMulti(
                     (lcoord_cur, lcoord_next), 

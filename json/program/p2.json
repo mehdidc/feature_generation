@@ -1,9 +1,8 @@
 {
     "model_name": "model96",
     "model_params": {
-        "dim_comp": [10, 10],
-        "nb_comp": [6, 3],
-        "scales": [0.5],
+        "dim_comp": [100, 50, 10],
+        "nb_comp": [5, 5, 5],
         "patch_size": 3
     },
     "dataset": "digits",
