@@ -552,6 +552,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
         if self.x_sigma == 'predicted':
             log_x_sigma = X[:, pointer]
             x_sigma = T.exp(log_x_sigma)
+            x_sigma = self.normalize_func(log_x_sigma) * pw
             self.assign_['x_sigma'] = pointer
             pointer += 1
         else:
@@ -560,6 +561,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
         if self.y_sigma == 'predicted':
             log_y_sigma = X[:, pointer]
             y_sigma = T.exp(log_y_sigma)
+            y_sigma = self.normalize_func(log_y_sigma) * ph
             self.assign_['y_sigma'] = pointer
             pointer += 1
         else:

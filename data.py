@@ -175,10 +175,12 @@ def load_data(dataset="digits",
         cr = 6
         if w is None or h is None:
             w, h = 28 - cr * 2, 28 - cr * 2
+        w_crop = 28 - cr * 2
+        h_crop = 28 - cr * 2
         def preprocess(X):
             X = X.reshape((X.shape[0], 28, 28))
             X = X[:, cr:-cr, cr:-cr]
-            X = X.reshape((X.shape[0], w*h))
+            X = X.reshape((X.shape[0], w_crop*h_crop))
             return X
         train_data = load_once(MNIST)(which='train')
         train_data = load_once(Transformed)(train_data, preprocess, per_example=False)
@@ -335,22 +337,37 @@ def load_data(dataset="digits",
                 data.test.load()
 
     elif dataset == "svhn":
-        from lasagnekit.datasets.svhn import SVHN
-        from lasagnekit.datasets.helpers import load_once
         from lasagnekit.datasets.rescaled import Rescaled
-        w, h = 28, 28
+        from lasagnekit.datasets.transformed import Transformed
+        from lasagnekit.datasets.manual import Manual
+        from lasagnekit.datasets.subsampled import SubSampled
+        from lasagnekit.datasets.helpers import load_once
+        from skimage.io import imread_collection
+        from skimage.transform import resize
+        if w is None and h is None:
+            w, h = 32, 32
         c = 3
-        data = SVHN(which='train', size=(w, h), nb=batch_size)
-        data.load()
-        print(data.X.shape)
-
+        folder = "{}/svhn/**/*.png".format(os.getenv("DATA_PATH"))
+        collection = imread_collection(folder)
+        collection = list(collection)
+        X = np.array(collection)
+        X_rescaled = np.empty((len(X), w, h, 3))
+        for i in range(len(X)):
+            X_rescaled[i] = resize(X[i], (w, h), preserve_range=True)
+        X = X_rescaled
+        X = X.astype(np.float32)
+        print(X_rescaled.shape)
+        data = Manual(X=X)
         def preprocess(X):
+            print(X.min(), X.max())
+            X = X.reshape((X.shape[0], w, h, c))
             X = X.transpose((0, 3, 1, 2))
             X = X.reshape((X.shape[0], -1))
-            return X
-        data = Transformed(data, preprocess, per_example=False)
+            return X / 255.
+        data = load_once(Transformed)(data, preprocess, per_example=False)
+        data = SubSampled(data, batch_size)
         data.load()
-        print(data.X.shape)
+        print(data.X.min(), data.X.max())
     elif dataset == 'stl':
         from lasagnekit.datasets.rescaled import Rescaled
         from lasagnekit.datasets.subsampled import SubSampled

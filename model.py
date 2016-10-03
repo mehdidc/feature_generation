@@ -5534,7 +5534,10 @@ def model88(w=32, h=32, c=1,
     for n, net in enumerate(nets):
         hid = Repeat(net[-1], n_steps)
         for l in range(nb_recurrent_layers):
-            hid = recurrent_model(hid, nb_recurrent_units[l], name="recurrent{}_{}".format(l, n))
+            hid = recurrent_model(
+                    hid, 
+                    nb_recurrent_units[l], 
+                    name="recurrent{}_{}".format(l, n))
         net.append(hid)
     
     nb = ( 2 +
