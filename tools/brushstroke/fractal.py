@@ -3,9 +3,11 @@ import numpy as np
 import pandas as pd
 from skimage.io import imsave
 from skimage.util import pad
-from common import load_model, disp_grid
+from common import load_model, disp_grid, seq_to_video
 import sys
 import os
+import shutil
+
 sys.path.append(os.path.dirname(__file__)  + '/../../')
 from helpers import salt_and_pepper
 def normalize(img):
@@ -36,7 +38,7 @@ def upscale_simple(x, scale=2):
     y[::scale, ::scale] = x
     return y
 
-def gen(neuralnets, nb_iter=10, w=32, h=32, init='random', out='out.png', rng=np.random):
+def gen(neuralnets, nb_iter=10, w=32, h=32, init='random', out='out.png', rng=np.random, video=True):
     out_img = rng.uniform(size=(h, w)) if init == 'random' else init
     snapshots = []
     nb_full = 0
@@ -68,20 +70,35 @@ def gen(neuralnets, nb_iter=10, w=32, h=32, init='random', out='out.png', rng=np
             nb_iter_local = nnet.get('nb_iter', 10)
             thresh = nnet.get('thresh', 0.5)
             whitepx_ratio = nnet.get('whitepx_ratio', 0.5)
-            img = out_img
+
             noise = nnet.get('noise', 0)
             noise_type = nnet.get('noise_type', 'zero_masking')
             scale = nnet.get('scale', 1)
             if scale == 'random':
-                scale = rng.randint(*nnet.get('scale_range', 4))
-            py = rng.randint(0, img.shape[0])
-            px = rng.randint(0, img.shape[1])
+                pr = nnet.get('scale_probas', [1])
+                scales = nnet.get('scales', [1])
+                scale = rng.choice(scales, p=pr)
             
+            def padwithrnd(vector, pad_width, iaxis, kw):
+                return np.random.uniform(size=vector.shape)
+
+            img = np.lib.pad(out_img, (scale * patch_h/2, scale * patch_w/2), padwithrnd)
+
+            py_center_orig = rng.randint(0, h) # position of the center in the original out_img
+            px_center_orig = rng.randint(0, w) # position of the center in the original out_img
+            
+            px_center = px_center_orig + patch_w / 2 # position of the center in img
+            py_center = py_center_orig + patch_h / 2 # position of the center in img
+
+            px = px_center - patch_h / 2 # position of the top-left in img
+            py = py_center - patch_w / 2 # poisiton of the top-left in img
+
             step_y = scale
             step_x = scale
+
             patch = np.random.uniform(size=(patch_h, patch_w))
             crop = img[py:py + patch_h*step_y:step_y, px:px + patch_w*step_x:step_x]
-            patch[:crop.shape[0], :crop.shape[1]] = crop
+            patch[:, :] = crop
             patch = patch[np.newaxis, np.newaxis, :, :]
             patch = patch.astype(np.float32)
             for _ in range(nb_iter_local):
@@ -98,9 +115,16 @@ def gen(neuralnets, nb_iter=10, w=32, h=32, init='random', out='out.png', rng=np
                 if thresh: patch = patch > thresh_
                 patch = patch.astype(np.float32)
             p = patch[0, 0]
-            shape = img[py:py + p.shape[0] * step_y:step_y, px:px + p.shape[1] * step_x:step_x].shape
-            p_cropped = p[:shape[0], :shape[1]]
-            out_img[py:py + p.shape[0] * step_y:step_y, px:px + p.shape[1] * step_x:step_x] = p_cropped
+            prev = img[py:py + patch_h*step_y:step_y, px:px + patch_w*step_x:step_x]
+            new = p
+            img[py:py + patch_h*step_y:step_y, px:px + patch_w*step_x:step_x] = (prev * 0.9 + new * 0.1)
+            out_img[:] = img[scale*patch_h/2:-scale*patch_h/2, scale*patch_w/2:-scale*patch_w/2]
+            snapshots.append(out_img.copy())
+            if i % 1000==0 and video:
+                s = np.array(snapshots)
+                s = s[None, :, None, :, :]
+                seq_to_video(s, filename='out.mp4')
+                shutil.copy('out.mp4', 'cur.mp4')
     return out_img, snapshots
 
 def serialrun():
@@ -113,72 +137,58 @@ def serialrun():
     scale_8_8 = ['b']
     
     models = defaultdict(list)
-
+    
+    """
     for s in scale_128_128:
         model, data, layers = load_model('training/fractal/{}/model.pkl'.format(s))
         models[128].append((s, model))
-
 
     for s in scale_64_64:
         model, data, layers = load_model('training/fractal/{}/model.pkl'.format(s))
         models[64].append((s, model))
 
     for s in scale_32_32:
-        model, data, layers = load_model('training/fractal/{}/model.pkl'.format(s))
+        model, d/ata, layers = load_model('training/fractal/{}/model.pkl'.format(s))
         models[32].append((s, model))
-
+    """
     for s in scale_16_16:
         model, data, layers = load_model('training/fractal/{}/model.pkl'.format(s))
         models[16].append((s, model))
-
+    """
     for s in scale_8_8:
         model, data, layers = load_model('training/fractal/{}/model.pkl'.format(s))
         models[8].append((s, model))
+    """
     nb_trials = 100000
     import random
     trials = []
     rng = random
     for i in range(nb_trials):
-        sa, model_a  = rng.choice(models[8])
-        sb, model_b  = rng.choice(models[16])
-        sc, model_c = rng.choice(models[32])
-        sd, model_d = rng.choice(models[64])
-        se, model_e = rng.choice(models[128])
-
-        nb_iter_a = rng.randint(1, 20)
-        nb_iter_b = rng.randint(1, 20)
-        nb_iter_c = rng.randint(1, 20)
-        nb_iter_d = rng.randint(1, 20)
-        nb_iter_e = rng.randint(1, 20)
-
-
-        whena = rng.choice(  ('always',  rng.uniform(0, 0.5)   )   )
-        whenb = rng.choice(  ('always',  rng.uniform(0, 0.5)   )   )
-        whenc = rng.choice(  ('always',  rng.uniform(0, 0.5)   )   )
-        whend = rng.choice(  ('always',  rng.uniform(0, 0.5)   )   )
-        whene = rng.choice(  ('always',  rng.uniform(0, 0.5)   )   )
-
-        wa = rng.uniform(0.1, 0.5)
-        wb = rng.uniform(0.1, 0.5)
-        wc = rng.uniform(0.1, 0.5)
-        wd = rng.uniform(0.1, 0.5)
-        we = rng.uniform(0.1, 0.2)
-
-        trial_conf = [sa, sb, sc, sd, nb_iter_a, nb_iter_b, nb_iter_c, nb_iter_d, whena, whenb, whenc, whend, whene, wa, wb, wc, wd, we]
+        scale = 16
+        name, model = rng.choice(models[scale])
+        nb_iter = 1
+        when = 'always'
+        w = rng.uniform(0.1, 0.5)
+        thresh = rng.choice((None, 'moving'))
+        learning_rate = rng.uniform(0.5, 1)
+        trial_conf = [name, nb_iter, when, w, thresh, learning_rate]
         trials.append(trial_conf)
         with open('exported_data/fractal/trials.json', 'w') as fd:
             fd.write(json.dumps(trials))
+        proba = [0.6, 0.2, 0.1, 0.1]
+        scales = [1, 2, 3, 4]
         neuralnets = [
-            {'model': model_a, 'on': 'crops', 'padlen': 3,   'nb_iter':  nb_iter_a,   'thresh': 'moving', 'when': whena, 'whitepx_ratio': wa},
-            {'model': model_b, 'on': 'crops', 'padlen': 3,   'nb_iter':  nb_iter_b,   'thresh': 'moving', 'when': whenb, 'whitepx_ratio': wb},
-            {'model': model_c, 'on': 'crops', 'padlen': 3,   'nb_iter':  nb_iter_c,   'thresh': 'moving', 'when': whenc, 'whitepx_ratio': wc},
-            {'model': model_d, 'on': 'crops', 'padlen': 3,   'nb_iter':  nb_iter_d,   'thresh': 'moving', 'when': whend, 'whitepx_ratio': wd},
-            {'model': model_e, 'on': 'crops', 'padlen': 3,   'nb_iter':  nb_iter_e,   'thresh': 'moving', 'when': whene, 'whitepx_ratio': we},
+        {'model': model, 'nb_iter':  nb_iter, 'thresh': thresh, 'when': when, 'whitepx_ratio': w, 'scales': scales, 'scale_probas': proba},
         ]
-        img, snap = gen(neuralnets, nb_iter=5000, w=2**7, h=2**7, init='random')
+        img, snap = gen(neuralnets, nb_iter=10000, w=2**6, h=2**6, init='random', video=False)
+        img -= img.min()
+        img /= img.max()
         imsave('exported_data/fractal/trial{:05d}.png'.format(i), img)
      
 if __name__ == '__main__':
+    # center
+    # black/white inversion
+    # video
     from docopt import docopt
     doc = """
     Usage: fractal.py MODE
@@ -189,20 +199,21 @@ if __name__ == '__main__':
     args = docopt(doc)
     mode = args['MODE']
     if mode == 'serial':
+        np.random.seed(42)
         serialrun()
     elif mode == 'manual':
         model_a, data, layers = load_model("training/fractal/a6/model.pkl")
         neuralnets = [
                 { 'model': model_a, 
-                  'nb_iter':  5,
+                  'nb_iter':  1,
                   'thresh': 'moving', 
                   'when': 'always', 
                   'whitepx_ratio': 0.2, 
                   'scale': 'random', 
-                  'scale_range':(1, 10)},
+                  'scale_range':(1,5)},
         ]
         imgs = []
-        img, snap = gen(neuralnets, nb_iter=1000, w=2**5, h=2**5, init='random', out='manual.png')
+        img, snap = gen(neuralnets, nb_iter=100000, w=2**6, h=2**6, init='random', out='manual.png')
         imgs = img[np.newaxis, np.newaxis, :, :]
         img = disp_grid(imgs, border=1, bordercolor=(0.3, 0, 0))
         imsave('grid.png', img)
