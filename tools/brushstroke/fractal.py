@@ -70,6 +70,7 @@ def gen(neuralnets, nb_iter=10, w=32, h=32, init='random', out='out.png', rng=np
             nb_iter_local = nnet.get('nb_iter', 10)
             thresh = nnet.get('thresh', 0.5)
             whitepx_ratio = nnet.get('whitepx_ratio', 0.5)
+            lr = nnet.get('learning_rate', 0.1)
 
             noise = nnet.get('noise', 0)
             noise_type = nnet.get('noise_type', 'zero_masking')
@@ -117,7 +118,7 @@ def gen(neuralnets, nb_iter=10, w=32, h=32, init='random', out='out.png', rng=np
             p = patch[0, 0]
             prev = img[py:py + patch_h*step_y:step_y, px:px + patch_w*step_x:step_x]
             new = p
-            img[py:py + patch_h*step_y:step_y, px:px + patch_w*step_x:step_x] = (prev * 0.9 + new * 0.1)
+            img[py:py + patch_h*step_y:step_y, px:px + patch_w*step_x:step_x] = (prev * (1 - lr) + new * lr)
             out_img[:] = img[scale*patch_h/2:-scale*patch_h/2, scale*patch_w/2:-scale*patch_w/2]
             snapshots.append(out_img.copy())
             if i % 1000==0 and video:
@@ -135,9 +136,7 @@ def serialrun():
     scale_32_32 = ['a6']
     scale_16_16 = ['b3', 'b2', 'a5', 'a4', 'a3', 'a2', 'a']
     scale_8_8 = ['b']
-    
     models = defaultdict(list)
-    
     """
     for s in scale_128_128:
         model, data, layers = load_model('training/fractal/{}/model.pkl'.format(s))
@@ -170,15 +169,23 @@ def serialrun():
         when = 'always'
         w = rng.uniform(0.1, 0.5)
         thresh = rng.choice((None, 'moving'))
-        learning_rate = rng.uniform(0.5, 1)
-        trial_conf = [name, nb_iter, when, w, thresh, learning_rate]
+        learning_rate = 0.1
+
+        trial_conf = {
+            'name': name, 
+            'nb_iter': nb_iter, 
+            'when': when, 
+            'whitepx_ratio': w, 
+            'thresh': thresh, 
+            'learning_rate': learning_rate
+        }
         trials.append(trial_conf)
         with open('exported_data/fractal/trials.json', 'w') as fd:
-            fd.write(json.dumps(trials))
+            fd.write(json.dumps(trials, indent=4))
         proba = [0.6, 0.2, 0.1, 0.1]
         scales = [1, 2, 3, 4]
         neuralnets = [
-        {'model': model, 'nb_iter':  nb_iter, 'thresh': thresh, 'when': when, 'whitepx_ratio': w, 'scales': scales, 'scale_probas': proba},
+            {'model': model, 'nb_iter':  nb_iter, 'thresh': thresh, 'when': when, 'whitepx_ratio': w, 'scales': scales, 'scale_probas': proba},
         ]
         img, snap = gen(neuralnets, nb_iter=10000, w=2**6, h=2**6, init='random', video=False)
         img -= img.min()
