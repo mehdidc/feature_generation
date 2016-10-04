@@ -11,9 +11,10 @@ import shutil
 sys.path.append(os.path.dirname(__file__)  + '/../../')
 from helpers import salt_and_pepper
 
-from joblib import Memory
-mem = Memory(cachedir='/tmp/joblib')
-load_model = mem.cache(load_model)
+import random
+
+from cachetools import cached
+load_model = cached(cache={})(load_model)
 
 def normalize(img):
     img = img.copy()
@@ -77,7 +78,7 @@ def gen(config):
                 allow = (i % when) == 0
                 if not allow:
                     continue
-            model = load_model(nnet['model_filename']) # done with caching so no prob, it is loaded once
+            model, _, _ = load_model(nnet['model_filename']) # done with caching so no prob, it is loaded once
             patch_h, patch_w = model.layers['output'].output_shape[2:]
             nb_iter_local = nnet.get('nb_iter', 10)
             thresh = nnet.get('thresh', 0.5)
@@ -134,7 +135,7 @@ def gen(config):
             out_img[:] = img[scale*patch_h/2:-scale*patch_h/2, scale*patch_w/2:-scale*patch_w/2]
             snapshots.append(out_img.copy())
     snapshots = np.array(snapshots)
-    return out_img, snapshots
+    return snapshots
 
 MODELS = {
     8:   ['b'],
@@ -148,9 +149,7 @@ MODELS = {
     for k, v in MODELS.items()
 }
 
-def serial_sample(folder='exported_data/fractal', models=MODELS):
-    from collections import defaultdict
-    import json
+def fractal4(models=MODELS, rng=random):
     trials = []
     rng = random
     scale = 16
@@ -163,8 +162,8 @@ def serial_sample(folder='exported_data/fractal', models=MODELS):
         thresh = rng.choice((None, 'moving'))
         learning_rate = 0.1
         seed = rng.randint(1, 1000000)
-        proba = [0.6, 0.2, 0.1, 0.1]
         scales = [1, 2, 3, 4]
+        proba = [0.6, 0.2, 0.1, 0.1]
         neuralnets = [
             {   
                 'model_filename': model_filename, 
@@ -183,7 +182,45 @@ def serial_sample(folder='exported_data/fractal', models=MODELS):
             'h': 2**6,
             'init': 'random',
             'seed': seed,
-            'folder': folder
+        }
+        yield trial_conf
+ 
+
+def fractal5(models=MODELS, rng=random):
+    trials = []
+    scale = 16
+    nb_trials = 100000
+    for i in range(nb_trials):
+        model_filename = rng.choice(models[scale])
+        nb_iter = 1
+        when = 'always'
+        w = rng.uniform(0.1, 0.5)
+        thresh = rng.choice((None, 'moving'))
+        learning_rate = 0.1
+        seed = rng.randint(1, 1000000)
+        scales = range(1, 17)
+        alpha = 0.8
+        proba = np.array([alpha**i for i in range(len(scales))])
+        proba /= proba.sum()
+        proba = proba.tolist()
+        neuralnets = [
+            {   
+                'model_filename': model_filename, 
+                'nb_iter':  nb_iter, 
+                'thresh': thresh, 
+                'when': when, 
+                'whitepx_ratio': w, 
+                'scales': scales, 
+                'scale_probas': proba
+            }
+        ]
+        trial_conf = {
+            'neuralnets': neuralnets,
+            'nb_iter': 100000,
+            'w': 2**8,
+            'h': 2**8,
+            'init': 'random',
+            'seed': seed,
         }
         yield trial_conf
     
@@ -197,34 +234,45 @@ if __name__ == '__main__':
     import json
 
     doc = """
-    Usage: fractal.py MODE [FOLDER]
+    Usage: fractal.py JOB [FOLDER]
     
     MODE: serial
     """
     args = docopt(doc)
-    mode = args['MODE']
+    job = args['JOB']
+    serial_sample = globals()[job]
     folder = args['FOLDER']
-    if not folder: folder = 'exported_data/fractal'
-    if mode == 'serial':
-        try:
-            os.mkdir(folder + '/videos')
-            os.mkdir(folder + '/images')
-        except OSError:
-            pass
-        os.listdir(folder)
-        random.seed(42)
-        trials = []
-        for trial_conf in serial_sample(folder=folder, models=MODELS):
-            trials.append(trial_conf)
-            with open('{}/trials.json'.format(folder), 'w') as fd:
-                fd.write(json.dumps(trials, indent=4))
-            img, snaps = gen(trial_conf)
-            snaps = snaps[None, :, None, :, :]
-            video_filename = '{}/videos/trials{:05d}.mp4'.format(folder, i)
-            seq_to_video(snaps, filename=video_filename)
-            img -= img.min()
-            img /= img.max()
-            image_filename = '{}/images/trial{:05d}.png'.format(i)
-            imsave(image_filename, img)
-    else:
-        raise Exception('Unknown mode : {}'.format(mode))
+    if not folder: folder = 'exported_data/fractal/{}'.format(job)
+    try:
+        os.mkdir(folder)
+    except OSError:
+        pass
+    try:
+        os.mkdir(folder + '/videos')
+    except OSError:
+        pass
+    try:
+        os.mkdir(folder + '/images')
+    except OSError:
+        pass
+
+    os.listdir(folder)
+    random.seed(42)
+    trials = []
+    i = 0
+    for trial_conf in serial_sample(models=MODELS):
+        trials.append(trial_conf)
+        trial_conf['folder'] = folder
+        with open('{}/trials.json'.format(folder), 'w') as fd:
+            fd.write(json.dumps(trials, indent=2))
+        snaps = gen(trial_conf)
+        snaps -= snaps.min(axis=(1,2), keepdims=True)
+        snaps /= snaps.max(axis=(1,2), keepdims=True)
+        image_filename = '{}/images/trial{:05d}.png'.format(folder, i)
+        img = snaps[-1]
+        imsave(image_filename, img)
+
+        snaps = snaps[None, :, None, :, :]
+        video_filename = '{}/videos/trials{:05d}.mp4'.format(folder, i)
+        seq_to_video(snaps, filename=video_filename, framerate=300, rate=300)
+        i += 1
