@@ -10,6 +10,11 @@ import shutil
 
 sys.path.append(os.path.dirname(__file__)  + '/../../')
 from helpers import salt_and_pepper
+
+from joblib import Memory
+mem = Memory(cachedir='/tmp/joblib')
+load_model = mem.cache(load_model)
+
 def normalize(img):
     img = img.copy()
     img -= img.min()
@@ -38,7 +43,14 @@ def upscale_simple(x, scale=2):
     y[::scale, ::scale] = x
     return y
 
-def gen(neuralnets, nb_iter=10, w=32, h=32, init='random', out='out.png', rng=np.random, video=True):
+def gen(config):
+    neuralnets = config['neuralnets']
+    nb_iter = config['nb_iter']
+    w = config['w']
+    h = config['h']
+    init = config['init']
+    seed = config['seed']
+    rng = np.random.RandomState(seed)
     out_img = rng.uniform(size=(h, w)) if init == 'random' else init
     snapshots = []
     nb_full = 0
@@ -65,7 +77,7 @@ def gen(neuralnets, nb_iter=10, w=32, h=32, init='random', out='out.png', rng=np
                 allow = (i % when) == 0
                 if not allow:
                     continue
-            model = nnet['model']
+            model = load_model(nnet['model_filename']) # done with caching so no prob, it is loaded once
             patch_h, patch_w = model.layers['output'].output_shape[2:]
             nb_iter_local = nnet.get('nb_iter', 10)
             thresh = nnet.get('thresh', 0.5)
@@ -81,7 +93,7 @@ def gen(neuralnets, nb_iter=10, w=32, h=32, init='random', out='out.png', rng=np
                 scale = rng.choice(scales, p=pr)
             
             def padwithrnd(vector, pad_width, iaxis, kw):
-                return np.random.uniform(size=vector.shape)
+                return rng.uniform(size=vector.shape)
 
             img = np.lib.pad(out_img, (scale * patch_h/2, scale * patch_w/2), padwithrnd)
 
@@ -97,7 +109,7 @@ def gen(neuralnets, nb_iter=10, w=32, h=32, init='random', out='out.png', rng=np
             step_y = scale
             step_x = scale
 
-            patch = np.random.uniform(size=(patch_h, patch_w))
+            patch = rng.uniform(size=(patch_h, patch_w))
             crop = img[py:py + patch_h*step_y:step_y, px:px + patch_w*step_x:step_x]
             patch[:, :] = crop
             patch = patch[np.newaxis, np.newaxis, :, :]
@@ -121,108 +133,98 @@ def gen(neuralnets, nb_iter=10, w=32, h=32, init='random', out='out.png', rng=np
             img[py:py + patch_h*step_y:step_y, px:px + patch_w*step_x:step_x] = (prev * (1 - lr) + new * lr)
             out_img[:] = img[scale*patch_h/2:-scale*patch_h/2, scale*patch_w/2:-scale*patch_w/2]
             snapshots.append(out_img.copy())
-            if i % 1000==0 and video:
-                s = np.array(snapshots)
-                s = s[None, :, None, :, :]
-                seq_to_video(s, filename='out.mp4')
-                shutil.copy('out.mp4', 'cur.mp4')
+    snapshots = np.array(snapshots)
     return out_img, snapshots
 
-def serialrun():
+MODELS = {
+    8:   ['b'],
+    16:  ['b3', 'b2', 'a5', 'a4', 'a3', 'a2', 'a'],
+    32:  ['a6'],
+    64:  ['c'],
+    128: ['d']
+}
+MODELS = {
+    k: map(lambda name:'training/fractal/{}/model.pkl'.format(name), v) 
+    for k, v in MODELS.items()
+}
+
+def serial_sample(folder='exported_data/fractal', models=MODELS):
     from collections import defaultdict
     import json
-    scale_128_128 = ['d']
-    scale_64_64 = ['c']
-    scale_32_32 = ['a6']
-    scale_16_16 = ['b3', 'b2', 'a5', 'a4', 'a3', 'a2', 'a']
-    scale_8_8 = ['b']
-    models = defaultdict(list)
-    """
-    for s in scale_128_128:
-        model, data, layers = load_model('training/fractal/{}/model.pkl'.format(s))
-        models[128].append((s, model))
-
-    for s in scale_64_64:
-        model, data, layers = load_model('training/fractal/{}/model.pkl'.format(s))
-        models[64].append((s, model))
-
-    for s in scale_32_32:
-        model, d/ata, layers = load_model('training/fractal/{}/model.pkl'.format(s))
-        models[32].append((s, model))
-    """
-    for s in scale_16_16:
-        model, data, layers = load_model('training/fractal/{}/model.pkl'.format(s))
-        models[16].append((s, model))
-    """
-    for s in scale_8_8:
-        model, data, layers = load_model('training/fractal/{}/model.pkl'.format(s))
-        models[8].append((s, model))
-    """
-    nb_trials = 100000
-    import random
     trials = []
     rng = random
+    scale = 16
+    nb_trials = 100000
     for i in range(nb_trials):
-        scale = 16
-        name, model = rng.choice(models[scale])
+        model_filename = rng.choice(models[scale])
         nb_iter = 1
         when = 'always'
         w = rng.uniform(0.1, 0.5)
         thresh = rng.choice((None, 'moving'))
         learning_rate = 0.1
-
-        trial_conf = {
-            'name': name, 
-            'nb_iter': nb_iter, 
-            'when': when, 
-            'whitepx_ratio': w, 
-            'thresh': thresh, 
-            'learning_rate': learning_rate
-        }
-        trials.append(trial_conf)
-        with open('exported_data/fractal/trials.json', 'w') as fd:
-            fd.write(json.dumps(trials, indent=4))
+        seed = rng.randint(1, 1000000)
         proba = [0.6, 0.2, 0.1, 0.1]
         scales = [1, 2, 3, 4]
         neuralnets = [
-            {'model': model, 'nb_iter':  nb_iter, 'thresh': thresh, 'when': when, 'whitepx_ratio': w, 'scales': scales, 'scale_probas': proba},
+            {   
+                'model_filename': model_filename, 
+                'nb_iter':  nb_iter, 
+                'thresh': thresh, 
+                'when': when, 
+                'whitepx_ratio': w, 
+                'scales': scales, 
+                'scale_probas': proba
+            }
         ]
-        img, snap = gen(neuralnets, nb_iter=10000, w=2**6, h=2**6, init='random', video=False)
-        img -= img.min()
-        img /= img.max()
-        imsave('exported_data/fractal/trial{:05d}.png'.format(i), img)
-     
+        trial_conf = {
+            'neuralnets': neuralnets,
+            'nb_iter': 100000,
+            'w': 2**6,
+            'h': 2**6,
+            'init': 'random',
+            'seed': seed,
+            'folder': folder
+        }
+        yield trial_conf
+    
 if __name__ == '__main__':
     # center
     # black/white inversion
     # video
     from docopt import docopt
-    doc = """
-    Usage: fractal.py MODE
+    import random
+    import os
+    import json
 
-    Arguments:
-    MODE serial/manual
+    doc = """
+    Usage: fractal.py MODE [FOLDER]
+    
+    MODE: serial
     """
     args = docopt(doc)
     mode = args['MODE']
+    folder = args['FOLDER']
+    if not folder: folder = 'exported_data/fractal'
     if mode == 'serial':
-        np.random.seed(42)
-        serialrun()
-    elif mode == 'manual':
-        model_a, data, layers = load_model("training/fractal/a6/model.pkl")
-        neuralnets = [
-                { 'model': model_a, 
-                  'nb_iter':  1,
-                  'thresh': 'moving', 
-                  'when': 'always', 
-                  'whitepx_ratio': 0.2, 
-                  'scale': 'random', 
-                  'scale_range':(1,5)},
-        ]
-        imgs = []
-        img, snap = gen(neuralnets, nb_iter=100000, w=2**6, h=2**6, init='random', out='manual.png')
-        imgs = img[np.newaxis, np.newaxis, :, :]
-        img = disp_grid(imgs, border=1, bordercolor=(0.3, 0, 0))
-        imsave('grid.png', img)
+        try:
+            os.mkdir(folder + '/videos')
+            os.mkdir(folder + '/images')
+        except OSError:
+            pass
+        os.listdir(folder)
+        random.seed(42)
+        trials = []
+        for trial_conf in serial_sample(folder=folder, models=MODELS):
+            trials.append(trial_conf)
+            with open('{}/trials.json'.format(folder), 'w') as fd:
+                fd.write(json.dumps(trials, indent=4))
+            img, snaps = gen(trial_conf)
+            snaps = snaps[None, :, None, :, :]
+            video_filename = '{}/videos/trials{:05d}.mp4'.format(folder, i)
+            seq_to_video(snaps, filename=video_filename)
+            img -= img.min()
+            img /= img.max()
+            image_filename = '{}/images/trial{:05d}.png'.format(i)
+            imsave(image_filename, img)
     else:
         raise Exception('Unknown mode : {}'.format(mode))
