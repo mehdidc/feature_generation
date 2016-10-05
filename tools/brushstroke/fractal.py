@@ -51,24 +51,40 @@ def gen(config):
     h = config['h']
     init = config['init']
     seed = config['seed']
+    nb_snapshots = config['nb_snapshots']
+    
+    if nb_snapshots == 'all':
+        snapshot_indices = set(range(nb_iter))
+    else:
+        step_size = nb_iter / nb_snapshots
+        step_size = max(step_size, 1)
+        snapshot_indices = range(0, nb_iter, step_size)
+        if snapshot_indices[-1] != nb_iter - 1:
+            snapshot_indices.append(nb_iter - 1)
+        if len(snapshot_indices) > nb_iter:
+            surplus = len(snapshot_indices) - nb_iter
+            snapshot_indices = snapshot_indices[0:-1-surplus] + [snapshot_indices[-1]]
+        print(len(snapshot_indices))
+        snapshot_indices = set(snapshot_indices)
+
     rng = np.random.RandomState(seed)
     out_img = rng.uniform(size=(h, w)) if init == 'random' else init
     snapshots = []
     nb_full = 0
     for i in tqdm(range(nb_iter)):
         for nnet in neuralnets:
-            when = nnet.get('when', 'always')
+            when = nnet['when']
             if type(when) == list:
                 allow = False
-                for w in when:
-                    if type(w) == tuple:
-                        w1 = int(w[0] * nb_iter)
-                        w2 = int(w[1] * nb_iter)
+                for when_cur in when:
+                    if type(when_cur) == tuple:
+                        w1 = int(when_cur[0] * nb_iter)
+                        w2 = int(when_cur[1] * nb_iter)
                         if (i >= w1 and i < w2):
                             allow = True
                     else:
-                        w = int(w*nb_iter)
-                        if i == w:
+                        when_cur = int(when_cur*nb_iter)
+                        if i == when_cur:
                             allow = True    
                 if not allow:
                     continue
@@ -80,23 +96,33 @@ def gen(config):
                     continue
             model, _, _ = load_model(nnet['model_filename']) # done with caching so no prob, it is loaded once
             patch_h, patch_w = model.layers['output'].output_shape[2:]
-            nb_iter_local = nnet.get('nb_iter', 10)
-            thresh = nnet.get('thresh', 0.5)
-            whitepx_ratio = nnet.get('whitepx_ratio', 0.5)
-            lr = nnet.get('learning_rate', 0.1)
+            nb_iter_local = nnet['nb_iter']
+            thresh = nnet['thresh']
+            whitepx_ratio = nnet['whitepx_ratio']
+            noise = nnet['noise']
+            noise_type = nnet['noise_type']
 
-            noise = nnet.get('noise', 0)
-            noise_type = nnet.get('noise_type', 'zero_masking')
-            scale = nnet.get('scale', 1)
-            if scale == 'random':
-                pr = nnet.get('scale_probas', [1])
-                scales = nnet.get('scales', [1])
-                scale = rng.choice(scales, p=pr)
+            scale_choice = nnet['scale']
+            scales = nnet['scales']
+            if scale_choice == 'random':
+                pr = nnet['scale_probas']
+                scale_choice = rng.choice(np.arange(len(scales)), p=pr)
+            else:
+                pass
+            scale = scales[scale_choice]
+
+            lr_choice = nnet['learning_rate']
+            if type(lr_choice) != list:
+                lr_choice = [lr_choice] * len(scale_choice)
+            lr = lr_choice[scale_choice]
             
             def padwithrnd(vector, pad_width, iaxis, kw):
                 return rng.uniform(size=vector.shape)
+            
+            def padwithzero(vector, pad_width, iaxis, kw):
+                return np.zeros(vector.shape)
 
-            img = np.lib.pad(out_img, (scale * patch_h/2, scale * patch_w/2), padwithrnd)
+            img = np.lib.pad(out_img, (scale * patch_h/2, scale * patch_w/2), padwithzero)
 
             py_center_orig = rng.randint(0, h) # position of the center in the original out_img
             px_center_orig = rng.randint(0, w) # position of the center in the original out_img
@@ -133,7 +159,12 @@ def gen(config):
             new = p
             img[py:py + patch_h*step_y:step_y, px:px + patch_w*step_x:step_x] = (prev * (1 - lr) + new * lr)
             out_img[:] = img[scale*patch_h/2:-scale*patch_h/2, scale*patch_w/2:-scale*patch_w/2]
-            snapshots.append(out_img.copy())
+            if i in snapshot_indices:
+                im = out_img.copy()
+                im -= im.min()
+                im /= im.max()
+                imsave('fractal.png', im)
+                snapshots.append(out_img.copy())
     snapshots = np.array(snapshots)
     return snapshots
 
@@ -171,8 +202,12 @@ def fractal4(models=MODELS, rng=random):
                 'thresh': thresh, 
                 'when': when, 
                 'whitepx_ratio': w, 
+                'scale': 'random',
                 'scales': scales, 
-                'scale_probas': proba
+                'scale_probas': proba,
+                'learning_rate': learning_rate,
+                'noise': None,
+                'noise_type': None
             }
         ]
         trial_conf = {
@@ -182,6 +217,7 @@ def fractal4(models=MODELS, rng=random):
             'h': 2**6,
             'init': 'random',
             'seed': seed,
+            'nb_snapshots': 'all'
         }
         yield trial_conf
  
@@ -192,38 +228,41 @@ def fractal5(models=MODELS, rng=random):
     nb_trials = 100000
     for i in range(nb_trials):
         model_filename = rng.choice(models[scale])
-        nb_iter = 1
-        when = 'always'
-        w = rng.uniform(0.1, 0.5)
-        thresh = rng.choice((None, 'moving'))
-        learning_rate = 0.1
-        seed = rng.randint(1, 1000000)
-        scales = range(1, 17)
-        alpha = 0.8
-        proba = np.array([alpha**i for i in range(len(scales))])
-        proba /= proba.sum()
-        proba = proba.tolist()
+        scales = [1, 2]
+        pr = rng.uniform(0, 1)
+        proba = [pr, 1 - pr]
         neuralnets = [
             {   
                 'model_filename': model_filename, 
-                'nb_iter':  nb_iter, 
-                'thresh': thresh, 
-                'when': when, 
-                'whitepx_ratio': w, 
+                'nb_iter':  1, 
+                'thresh': rng.choice((None, 'moving')), 
+                'when': 'always', 
+                'whitepx_ratio': rng.uniform(0.1, 0.5), 
+                'scale': 'random',
                 'scales': scales, 
-                'scale_probas': proba
+                'scale_probas': proba,
+                'learning_rate': 0.3,
+                'noise': None,
+                'noise_type': None
             }
         ]
         trial_conf = {
             'neuralnets': neuralnets,
-            'nb_iter': 100000,
+            'nb_iter': 20000,
             'w': 2**8,
             'h': 2**8,
             'init': 'random',
-            'seed': seed,
+            'seed': rng.randint(1, 10000000),
+            'nb_snapshots': 1000
         }
         yield trial_conf
     
+def silent_create_folder(folder):
+    try:
+        os.mkdir(folder)
+    except OSError:
+        pass
+
 if __name__ == '__main__':
     # center
     # black/white inversion
@@ -243,20 +282,10 @@ if __name__ == '__main__':
     serial_sample = globals()[job]
     folder = args['FOLDER']
     if not folder: folder = 'exported_data/fractal/{}'.format(job)
-    try:
-        os.mkdir(folder)
-    except OSError:
-        pass
-    try:
-        os.mkdir(folder + '/videos')
-    except OSError:
-        pass
-    try:
-        os.mkdir(folder + '/images')
-    except OSError:
-        pass
-
-    os.listdir(folder)
+    print(folder)
+    silent_create_folder(folder)
+    silent_create_folder(folder + '/videos')
+    silent_create_folder(folder + '/images')
     random.seed(42)
     trials = []
     i = 0
@@ -271,8 +300,7 @@ if __name__ == '__main__':
         image_filename = '{}/images/trial{:05d}.png'.format(folder, i)
         img = snaps[-1]
         imsave(image_filename, img)
-
         snaps = snaps[None, :, None, :, :]
         video_filename = '{}/videos/trials{:05d}.mp4'.format(folder, i)
-        seq_to_video(snaps, filename=video_filename, framerate=300, rate=300)
+        seq_to_video(snaps, filename=video_filename, framerate=10, rate=10)
         i += 1

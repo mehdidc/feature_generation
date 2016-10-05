@@ -368,6 +368,45 @@ def load_data(dataset="digits",
         data = SubSampled(data, batch_size)
         data.load()
         print(data.X.min(), data.X.max())
+
+    elif dataset == "sketchy":
+        from lasagnekit.datasets.rescaled import Rescaled
+        from lasagnekit.datasets.transformed import Transformed
+        from lasagnekit.datasets.manual import Manual
+        from lasagnekit.datasets.subsampled import SubSampled
+        from lasagnekit.datasets.helpers import load_once
+        from skimage.io import imread_collection
+        from skimage.transform import resize
+        if w is None and h is None:
+            w, h = 64, 64
+        c = 1
+        folder = "{}/sketchy/256x256/sketch/tx_000000000000/**/*.png".format(os.getenv("DATA_PATH"))
+        collection = imread_collection(folder)
+        if 'nb_examples' in kw:
+            nb = kw.get('nb_examples')
+            collection = collection[0:nb]
+        collection = list(collection)
+        X = np.array(collection)
+        X_rescaled = np.empty((len(X), w, h))
+        for i in range(len(X)):
+            X_rescaled[i] = resize(X[i], (w, h), preserve_range=True)[:, :, 0]
+        X = X_rescaled
+        X = X.astype(np.float32)
+        print(X_rescaled.shape)
+        data = Manual(X=X)
+        def preprocess(X):
+            print(X.min(), X.max())
+            X = X.reshape((X.shape[0], w, h, c))
+            X = X.transpose((0, 3, 1, 2))
+            X = X.reshape((X.shape[0], -1))
+            return ((1 - X / 255.)>0).astype(np.float32)
+        data = load_once(Transformed)(data, preprocess, per_example=False)
+        data.load()
+        data.img_dim = (w, h)
+        data = SubSampled(data, batch_size)
+        data.load()
+        print(data.X.min(), data.X.max())
+
     elif dataset == 'stl':
         from lasagnekit.datasets.rescaled import Rescaled
         from lasagnekit.datasets.subsampled import SubSampled
