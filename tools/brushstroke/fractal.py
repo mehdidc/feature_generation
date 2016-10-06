@@ -265,7 +265,7 @@ def fractal6(models=MODELS, rng=random):
         model_filename = rng.choice(models[scale])
         scales = [1, 2, 3]
         pr1 = rng.uniform(0, 1)
-        pr2 = rng.uniform(0, 1)
+        pr2 = rng.uniform(0, 1 - pr1)
         proba = [pr1, pr2, 1 - pr1 - pr2]
         neuralnets = [
             {   
