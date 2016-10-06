@@ -4,7 +4,6 @@ from skimage.io import imread
 from lasagnekit.datasets.helpers import split
 from helpers import DataGen
 
-
 def load_data(dataset="digits",
               w=None, h=None,
               include_test=False,
@@ -395,7 +394,6 @@ def load_data(dataset="digits",
         print(X_rescaled.shape)
         data = Manual(X=X)
         def preprocess(X):
-            print(X.min(), X.max())
             X = X.reshape((X.shape[0], w, h, c))
             X = X.transpose((0, 3, 1, 2))
             X = X.reshape((X.shape[0], -1))
@@ -406,6 +404,7 @@ def load_data(dataset="digits",
         data = SubSampled(data, batch_size)
         data.load()
         print(data.X.min(), data.X.max())
+        print(data.X.mean())
 
     elif dataset == 'stl':
         from lasagnekit.datasets.rescaled import Rescaled
@@ -826,3 +825,11 @@ def load_data(dataset="digits",
     data.h = h
     data.c = c
     return data
+
+if __name__ == '__main__':
+    data = load_data('sketchy', nb_examples=1000)
+    pixels = data.X.sum(axis=1)
+    print(pixels.mean())
+    print(pixels.std())
+    print(np.median(pixels))
+    print(pixels.max(), pixels.min())
