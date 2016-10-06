@@ -2,14 +2,31 @@ import numpy as np
 import os
 from skimage.io import imread
 from lasagnekit.datasets.helpers import split
-from helpers import DataGen
+from helpers import DataGen, DataFutureWrapper
+from data_future import loader
 
 def load_data(dataset="digits",
               w=None, h=None,
               include_test=False,
               batch_size=128,
               mode='random', **kw):
-    if dataset == 'random':
+
+    if dataset == 'loader':
+        from datakit.helpers import minibatch, expand_dict, dict_apply
+        from itertools import cycle, imap
+        from functools import partial
+        from helpers import floatX
+        kw_loader = kw
+        iterator = loader(kw_loader)
+        iterator = minibatch(iterator, batch_size=batch_size)
+        iterator = expand_dict(iterator)
+        iterator = imap(partial(dict_apply, fn=floatX, cols=['X']), iterator)
+        iterator = cycle(iterator)
+        data = DataFutureWrapper(iterator)
+        data.load()
+        data.c, data.h, data.w = data.X.shape[1:]
+     
+    elif dataset == 'random':
         c = 1
         w, h = 28, 28
         prob = 0.1
@@ -44,7 +61,7 @@ def load_data(dataset="digits",
         data.load()
         print(data.X.shape)
 
-    if dataset == 'fonts_big':
+    elif dataset == 'fonts_big':
         import h5py
         from lasagnekit.datasets.manual import Manual
         from lasagnekit.datasets.subsampled import SubSampled
@@ -65,7 +82,7 @@ def load_data(dataset="digits",
         data.load()
         print(data.X.shape)
 
-    if dataset == 'chinese_icdar':
+    elif dataset == 'chinese_icdar':
         import h5py
         from lasagnekit.datasets.manual import Manual
         from lasagnekit.datasets.subsampled import SubSampled
@@ -86,7 +103,7 @@ def load_data(dataset="digits",
         data = Rescaled(data, (w, h))
         data = Transformed(data, lambda X: X.astype(np.float32), per_example=False)
 
-    if dataset == 'chinese_icdar_big':
+    elif dataset == 'chinese_icdar_big':
         import h5py
         from lasagnekit.datasets.manual import Manual
         from lasagnekit.datasets.subsampled import SubSampled
@@ -107,7 +124,7 @@ def load_data(dataset="digits",
         data = Rescaled(data, (w, h))
         data = Transformed(data, lambda X: X.astype(np.float32), per_example=False)
 
-    if dataset == "digits":
+    elif dataset == "digits":
         from lasagnekit.datasets.mnist import MNIST
         from lasagnekit.datasets.subsampled import SubSampled
         from lasagnekit.datasets.helpers import load_once
@@ -147,7 +164,7 @@ def load_data(dataset="digits",
                 data.test.X = data.test.X[included]
                 data.test.y = data.test.y[included]
 
-    if dataset == "rescaled_digits":
+    elif dataset == "rescaled_digits":
         from lasagnekit.datasets.mnist import MNIST
         from lasagnekit.datasets.subsampled import SubSampled
         from lasagnekit.datasets.helpers import load_once
@@ -162,7 +179,7 @@ def load_data(dataset="digits",
         data = Rescaled(data, (w, h))
         data.load()
 
-    if dataset == "cropped_digits":
+    elif dataset == "cropped_digits":
         from lasagnekit.datasets.subsampled import SubSampled
         from lasagnekit.datasets.mnist import MNIST
         from lasagnekit.datasets.transformed import Transformed
@@ -200,11 +217,12 @@ def load_data(dataset="digits",
         data.train = train_data
         data.test = test_data
 
-    if dataset == "random_cropped_digits":
+    elif dataset == "random_cropped_digits":
         from lasagnekit.datasets.mnist import MNIST
         from lasagnekit.datasets.transformed import Transformed
         from lasagnekit.datasets.helpers import load_once
         from skimage.transform import resize
+        from skimage.util import pad
         if w is None and h is None:
             w, h = 8, 8
         c = 1
@@ -219,8 +237,9 @@ def load_data(dataset="digits",
                 while True:
                     idx = np.random.randint(X.shape[0])
                     img = X[idx]
-                    y = np.random.randint(0, 28 - h + 1)
-                    x = np.random.randint(0, 28 - w + 1)
+                    y = np.random.randint(0, 28)
+                    x = np.random.randint(0, 28)
+                    img = pad(img, (h/2, w/2), 'constant', constant_values=0)
                     im = img[y:y+h, x:x+w]
                     if im.sum() < 0.1*(w*h):
                         continue
@@ -237,7 +256,7 @@ def load_data(dataset="digits",
         data.load()
         print('loaded')
 
-    if dataset == "olivetti":
+    elif dataset == "olivetti":
         from lasagnekit.datasets.helpers import load_once
         from sklearn.datasets import fetch_olivetti_faces
         from lasagnekit.datasets.manual import Manual
@@ -255,7 +274,7 @@ def load_data(dataset="digits",
         data = load_once(Rescaled)(data, (w, h))
         data = SubSampled(data, batch_size)
 
-    if dataset == "notdigits":
+    elif dataset == "notdigits":
         from lasagnekit.datasets.notmnist import NotMNIST
         from lasagnekit.datasets.subsampled import SubSampled
         from lasagnekit.datasets.helpers import load_once
@@ -376,31 +395,55 @@ def load_data(dataset="digits",
         from lasagnekit.datasets.helpers import load_once
         from skimage.io import imread_collection
         from skimage.transform import resize
+        from skimage.util import pad
+
         if w is None and h is None:
             w, h = 64, 64
         c = 1
         folder = "{}/sketchy/256x256/sketch/tx_000000000000/**/*.png".format(os.getenv("DATA_PATH"))
         collection = imread_collection(folder)
+        transformation = kw.get('transformation', 'resize')
         if 'nb_examples' in kw:
             nb = kw.get('nb_examples')
             collection = collection[0:nb]
         collection = list(collection)
         X = np.array(collection)
-        X_rescaled = np.empty((len(X), w, h))
-        for i in range(len(X)):
-            X_rescaled[i] = resize(X[i], (w, h), preserve_range=True)[:, :, 0]
-        X = X_rescaled
-        X = X.astype(np.float32)
-        print(X_rescaled.shape)
-        data = Manual(X=X)
-        def preprocess(X):
-            X = X.reshape((X.shape[0], w, h, c))
-            X = X.transpose((0, 3, 1, 2))
-            X = X.reshape((X.shape[0], -1))
-            return ((1 - X / 255.)>0).astype(np.float32)
-        data = load_once(Transformed)(data, preprocess, per_example=False)
-        data.load()
-        data.img_dim = (w, h)
+        X = X[:,:,:,0]
+        X = ((1 - X / 255.)>0).astype(np.float32)
+
+        if transformation == 'resize':
+            X_rescaled = np.empty((len(X), w, h))
+            for i in range(len(X)):
+                X_rescaled[i] = resize(X[i], (w, h), preserve_range=True)[:, :, 0]
+            X = X_rescaled
+            X = X.astype(np.float32)
+            data = Manual(X=X)
+            data.img_dim = (h, w)
+        elif transformation == 'crop':
+            def gen(nb):
+                print(X.shape)
+                X_ = X.reshape((X.shape[0], 256, 256))
+                X_out = np.zeros((nb, c, w, h))
+                for i in range(nb):
+                    while True:
+                        idx = np.random.randint(X_.shape[0])
+                        img = X_[idx]
+                        y = np.random.randint(0, 256)
+                        x = np.random.randint(0, 256)
+                        img = pad(img, (h/2, w/2), 'constant', constant_values=0)
+                        im = img[y:y+h, x:x+w]
+                        if im.sum() < 0.1*(w*h):
+                            continue
+                        X_out[i, 0] = im
+                        break
+                X_out = X_out.reshape((X_out.shape[0], -1))
+                X_out = X_out.astype(np.float32)
+                return X_out
+            data = DataGen(
+                gen_func=gen, batch_size=batch_size,
+                nb_chunks=1000)
+            data.img_dim = (h, w)
+            data.load()
         data = SubSampled(data, batch_size)
         data.load()
         print(data.X.min(), data.X.max())
@@ -820,16 +863,7 @@ def load_data(dataset="digits",
         data = Data()
         data.load()
 
-    data.load()
-    data.w = w
-    data.h = h
-    data.c = c
+    if not hasattr(data, 'w'): data.w = w
+    if not hasattr(data, 'h'): data.h = h
+    if not hasattr(data, 'c'): data.c = c
     return data
-
-if __name__ == '__main__':
-    data = load_data('sketchy', nb_examples=1000)
-    pixels = data.X.sum(axis=1)
-    print(pixels.mean())
-    print(pixels.std())
-    print(np.median(pixels))
-    print(pixels.max(), pixels.min())

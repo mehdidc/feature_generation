@@ -1,13 +1,13 @@
 from tqdm import tqdm
 import numpy as np
 import pandas as pd
-from skimage.io import imsave
+from skimage.io import imsave, imread
 from skimage.util import pad
 from common import load_model, disp_grid, seq_to_video
 import sys
 import os
 import shutil
-
+import subprocess
 sys.path.append(os.path.dirname(__file__)  + '/../../')
 from helpers import salt_and_pepper
 
@@ -170,7 +170,7 @@ def gen(config):
 
 MODELS = {
     8:   ['b'],
-    16:  ['b3', 'b2', 'a5', 'a4', 'a3', 'a2', 'a'],
+    16:  ['b3', 'b2', 'a5', 'a4', 'a3', 'a2', 'a', 'sieve'],
     32:  ['a6'],
     64:  ['c'],
     128: ['d']
@@ -292,13 +292,103 @@ def fractal6(models=MODELS, rng=random):
             'nb_snapshots': 1000
         }
         yield trial_conf
+
+def fractal7(models=MODELS, rng=random):
+    trials = []
+    scale = 16
+    nb_trials = 100000
+    for i in range(nb_trials):
+        model_filename = 'training/fractal/sieve/model.pkl'
+        scales = [1, 2]
+        pr = rng.uniform(0, 1)
+        proba = [pr, 1 - pr]
+        neuralnets = [
+            {   
+                'model_filename': model_filename, 
+                'nb_iter':  1, 
+                'thresh': rng.choice((None, 'moving')), 
+                'when': 'always', 
+                'whitepx_ratio': rng.uniform(0.1, 0.5), 
+                'scale': 'random',
+                'scales': scales, 
+                'scale_probas': proba,
+                'learning_rate': 0.3,
+                'noise': None,
+                'noise_type': None
+            }
+        ]
+        trial_conf = {
+            'neuralnets': neuralnets,
+            'nb_iter': 20000,
+            'w': 2**8,
+            'h': 2**8,
+            'init': 'random',
+            'seed': rng.randint(1, 10000000),
+            'nb_snapshots': 1000
+        }
+        yield trial_conf
+
+def fractal8(models=MODELS, rng=random):
+    trials = []
+    scale = 16
+    nb_trials = 100000
+    for i in range(nb_trials):
+        model_filename = rng.choice(models[scale])
+        scales = [1, 2, 3, 4]
+        pr1 = rng.uniform(0, 1)
+        pr2 = rng.uniform(0, 1 - pr1)
+        pr3 = rng.uniform(0, 1 - pr1 - pr2)
+        pr4 = 1 - pr1 - pr2 - pr3
+        proba = [pr1, pr2, pr3, pr4]
+        neuralnets = [
+            {   
+                'model_filename': model_filename, 
+                'nb_iter':  1, 
+                'thresh': rng.choice((None, 'moving')), 
+                'when': 'always', 
+                'whitepx_ratio': rng.uniform(0.1, 0.5), 
+                'scale': 'random',
+                'scales': scales, 
+                'scale_probas': proba,
+                'learning_rate': 0.3,
+                'noise': None,
+                'noise_type': None
+            }
+        ]
+        trial_conf = {
+            'neuralnets': neuralnets,
+            'nb_iter': 100000,
+            'w': 2**6,
+            'h': 2**6,
+            'init': 'random',
+            'seed': rng.randint(1, 10000000),
+            'nb_snapshots': 1000
+        }
+        yield trial_conf
  
+
 def silent_create_folder(folder):
     try:
         os.mkdir(folder)
     except OSError:
         pass
 
+def migrate(folder):
+    import json
+    import shutil
+    import os
+    silent_create_folder(folder+'/bak')
+    trials = json.load(open(folder+'/trials.json'))
+    for i, trial_conf in enumerate(trials):
+        image_filename = '{}/images/trial{:05d}.png'.format(folder, i)
+        img = imread(image_filename)
+        h, w = img.shape
+        label = json.dumps(trial_conf, indent=2)
+        shutil.copy(image_filename, folder+'/bak')
+        cmd = "montage \( {} -set label '{}' \) -geometry {}x{} {}".format(image_filename, label, w*2, h*2, image_filename)
+        subprocess.call(cmd, shell=True)
+        print(image_filename)
+ 
 if __name__ == '__main__':
     # center
     # black/white inversion
@@ -307,7 +397,6 @@ if __name__ == '__main__':
     import random
     import os
     import json
-
     doc = """
     Usage: fractal.py JOB [FOLDER]
     
@@ -318,7 +407,6 @@ if __name__ == '__main__':
     serial_sample = globals()[job]
     folder = args['FOLDER']
     if not folder: folder = 'exported_data/fractal/{}'.format(job)
-    print(folder)
     silent_create_folder(folder)
     silent_create_folder(folder + '/videos')
     silent_create_folder(folder + '/images')
@@ -336,6 +424,10 @@ if __name__ == '__main__':
         image_filename = '{}/images/trial{:05d}.png'.format(folder, i)
         img = snaps[-1]
         imsave(image_filename, img)
+        h, w = img.shape
+        label = json.dumps(trial_conf, indent=2)
+        cmd = "montage \( {} -set label '{}' \) -geometry {}x{} {}".format(image_filename, label, w*2, h*2, image_filename)
+        subprocess.call(cmd, shell=True)
         snaps = snaps[None, :, None, :, :]
         video_filename = '{}/videos/trials{:05d}.mp4'.format(folder, i)
         seq_to_video(snaps, filename=video_filename, framerate=10, rate=10)

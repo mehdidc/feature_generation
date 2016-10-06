@@ -504,9 +504,16 @@ def build_capsule_(layers, data, nbl, nbc,
                                      rng=theano_rng, backend='theano')
         elif noise == "zero_masking":
             Xtilde = zero_masking(X, corruption_level=pr, rng=theano_rng)
+        elif noise == "gaussian":
+            Xtilde = X + theano_rng.normal(size=X.shape, std=pr)
         elif noise == "superpose":
             perm = theano_rng_cpu.permutation(n=X.shape[0])
             Xtilde = X - X[perm]
+        elif noise == "sieve":
+            s = train_params.get('sieve_scale', 2)
+            X = T.set_subtensor(X[:, :, ::s, ::s], 0)
+            Xtilde = salt_and_pepper(X, corruption_level=pr,
+                                     rng=theano_rng, backend='theano')
         return Xtilde
 
     def stoch_reconstruct_and_sample(model, X):

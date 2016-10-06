@@ -843,6 +843,18 @@ def axify(fn):
         return x
     return fn_
 
+class DataFutureWrapper(object):
+
+    def __init__(self, iterator):
+        self.iterator = iterator
+
+    def load(self):
+        vals = next(self.iterator)
+        for k, v in vals.items():
+            setattr(self, k, v)
+
+def floatX(X):
+    return np.array(X, dtype=theano.config.floatX)
 
 if __name__ == '__main__':
     test_generic_batch_layer()
