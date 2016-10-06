@@ -2636,7 +2636,7 @@ def jobset57():
 
 
 def jobset58():
-    # hyperoptng sketchy dataset with conv and more parallel and possibility to have nonlinear_out=linear
+    # jobset57 but with conv and more parallel pointers and possibility to have nonlinear_out=linear
     def update(params):
         rng = random
         sigma = 1
@@ -2725,8 +2725,6 @@ def jobset59():
         return params
 
     return jobset_recurrent_brush_stroke('jobset59', 'model88', update=update)
-
-
 
 @click.command()
 @click.option('--where', default='', help='jobset name', required=False)
