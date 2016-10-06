@@ -2602,7 +2602,7 @@ def jobset57():
         sigma = 1
         stride = 1
         model_params = dict(
-            nonlin_out='sigmoid',
+            nonlin_out=rng.choice(('linear', 'sigmoid')),
             reduce_func=rng.choice(('sum', 'over', 'max')),
             normalize_func='sigmoid',
             x_sigma=sigma,
@@ -2619,7 +2619,7 @@ def jobset57():
             recurrent_model='lstm',
             eps=0,
             n_steps=rng.randint(1, 100),
-            parallel=rng.choice((1, 2, 3, 4)),
+            parallel=rng.choice((1, 2, 3, 4, 5, 6, 7 , 8)),
             parallel_share=False,
             parallel_reduce_func='sum',
         )
@@ -2633,6 +2633,59 @@ def jobset57():
         return params
 
     return jobset_recurrent_brush_stroke('jobset57', 'model88', update=update)
+
+
+def jobset58():
+    # hyperoptng sketchy dataset with conv and more parallel and possibility to have nonlinear_out=linear
+    def update(params):
+        rng = random
+        sigma = 1
+        stride = 1
+
+        nb_conv_layers = rng.randint(0, 3)
+        nb_conv_filters = [rng.choice((16, 32, 64, 128)) for _ in range(nb_conv_layers)]
+        size_conv_filters = [rng.choice((3, 5, 7)) for _ in range(nb_conv_layers)]
+        pooling = rng.choice((True, False))
+
+        model_params = dict(
+            nonlin_out=rng.choice(('linear', 'sigmoid')),
+            reduce_func=rng.choice(('sum', 'over', 'max')),
+            normalize_func='sigmoid',
+            x_sigma=sigma,
+            y_sigma=sigma,
+            x_stride=stride,
+            y_stride=stride,
+            patch_index=0,
+            patch_size=rng.choice((1,2)),
+            color=[1.],
+            x_min=0,
+            x_max='width',
+            y_min=0,
+            y_max='height',
+            recurrent_model='lstm',
+            eps=0,
+            n_steps=rng.randint(1, 100),
+            parallel=rng.choice((1, 2, 3, 4, 5, 6, 7 , 8)),
+            parallel_share=False,
+            parallel_reduce_func='sum',
+
+            nb_conv_layers=nb_conv_layers,
+            nb_conv_filters=nb_conv_filters,
+            size_conv_filters=size_conv_filters,
+            pooling=pooling
+ 
+        )
+        params['model_params'].update(model_params)
+        params['data_params'] = {
+            'nb_examples': 1000
+        }
+        params['dataset'] = 'sketchy'
+        params['force_w'] = 64
+        params['force_h'] = 64
+        return params
+
+    return jobset_recurrent_brush_stroke('jobset58', 'model88', update=update)
+
 
 @click.command()
 @click.option('--where', default='', help='jobset name', required=False)

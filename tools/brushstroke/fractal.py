@@ -113,7 +113,7 @@ def gen(config):
 
             lr_choice = nnet['learning_rate']
             if type(lr_choice) != list:
-                lr_choice = [lr_choice] * len(scale_choice)
+                lr_choice = [lr_choice] * len(scales)
             lr = lr_choice[scale_choice]
             
             def padwithrnd(vector, pad_width, iaxis, kw):
@@ -256,7 +256,43 @@ def fractal5(models=MODELS, rng=random):
             'nb_snapshots': 1000
         }
         yield trial_conf
-    
+
+def fractal6(models=MODELS, rng=random):
+    trials = []
+    scale = 16
+    nb_trials = 100000
+    for i in range(nb_trials):
+        model_filename = rng.choice(models[scale])
+        scales = [1, 2, 3]
+        pr1 = rng.uniform(0, 1)
+        pr2 = rng.uniform(0, 1)
+        proba = [pr1, pr2, 1 - pr1 - pr2]
+        neuralnets = [
+            {   
+                'model_filename': model_filename, 
+                'nb_iter':  1, 
+                'thresh': rng.choice((None, 'moving')), 
+                'when': 'always', 
+                'whitepx_ratio': rng.uniform(0.1, 0.5), 
+                'scale': 'random',
+                'scales': scales, 
+                'scale_probas': proba,
+                'learning_rate': 0.3,
+                'noise': None,
+                'noise_type': None
+            }
+        ]
+        trial_conf = {
+            'neuralnets': neuralnets,
+            'nb_iter': 20000,
+            'w': 2**8,
+            'h': 2**8,
+            'init': 'random',
+            'seed': rng.randint(1, 10000000),
+            'nb_snapshots': 1000
+        }
+        yield trial_conf
+ 
 def silent_create_folder(folder):
     try:
         os.mkdir(folder)

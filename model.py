@@ -5630,7 +5630,7 @@ def conv_fc(x,
     for i in range(len(num_filters)):
         l_hid = layers.Conv2DLayer(
             l_hid,
-            num_filters=nb_conv_filters[i],
+            num_filters=num_filters[i],
             filter_size=(size_conv_filters[i], size_conv_filters[i]),
             nonlinearity=nonlin,
             W=init_method(),
