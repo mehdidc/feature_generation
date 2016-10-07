@@ -864,5 +864,5 @@ def load_data(dataset="digits",
     if not hasattr(data, 'w'): data.w = w
     if not hasattr(data, 'h'): data.h = h
     if not hasattr(data, 'c'): data.c = c
-    print(data.X.shape)
+    print(data.X.shape, data.w, data.h, data.c)
     return data

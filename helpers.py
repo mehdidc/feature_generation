@@ -582,6 +582,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
         elif self.color == 'patches':
             colors = theano.shared(T.ones((1, 1, 1, 1)))
         else:
+            assert len(self.color) == self.nb_col_channels
             colors = self.color
 
         assert nb_features >= pointer, "The number of input features to Brush should be {} insteaf of {} (or at least bigger)".format(pointer, nb_features)

@@ -50,8 +50,10 @@ def load_model(filename, **kw):
     force_h = None
     params = None
     layers, params = load_(filename)
+    data_params = {}
     if params:
         dataset = params.get('dataset', 'digits')
+        data_params = params.get('data_params', {})
         force_w = params.get('force_w')
         force_h = params.get('force_h')
     model, data, layers, w, h, c = load_filename(
@@ -60,6 +62,7 @@ def load_model(filename, **kw):
             dataset=dataset, 
             force_w=force_w, 
             force_h=force_h, 
+            kw_load_data=data_params,
             **kw)
     return model, data, layers
 

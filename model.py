@@ -4,6 +4,7 @@ from lasagne.nonlinearities import (
         linear, sigmoid, rectify, very_leaky_rectify, softmax, tanh)
 from lasagnekit.layers import Deconv2DLayer
 from helpers import FeedbackGRULayer, TensorDenseLayer
+from layers import FeedbackGRULayerClean, AddParams
 from helpers import Deconv2DLayer as deconv2d
 from helpers import correct_over_op, over_op, sum_op, max_op, thresh_op, normalized_over_op
 from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse, norm_maxmin
@@ -69,7 +70,8 @@ reduce_funcs = {
     'over': over_op,
     'normalized_over': normalized_over_op,
     'max': max_op,
-    'new': lambda prev, new: new+prev-prev
+    'new': lambda prev, new: new+prev-prev,
+    'prev': lambda prev, new: prev+new-new
 }
 
 proba_funcs = {
@@ -6685,6 +6687,153 @@ def model96(w=32, h=32,c=1, nb_comp=[3, 3, 3, 3], dim_comp=[10, 10, 10, 10], sca
        nonlinearity=T.nnet.sigmoid,
        name="output")
     return layers_from_list_to_dict([in_] + lays + [raw_out, scaled_out, biased_out, out])
+
+
+def model97(w=32, h=32, c=1,
+            nb_fc_layers=3,
+            nb_recurrent_units=100,
+            nb_fc_units=1000,
+            nb_conv_layers=0,
+            nb_conv_filters=64,
+            size_conv_filters=3,
+            nonlin='relu',
+            nonlin_out='sigmoid',
+            pooling=True,
+            n_steps=10,
+            patch_size=3,
+            w_out=-1,
+            h_out=-1,
+            reduce_func='sum',
+            proba_func='sparsemax',
+            normalize_func='sigmoid',
+            update_in_func='prev',
+            update_out_func='new',
+            x_sigma=0.5,
+            y_sigma=0.5,
+            x_stride=1,
+            y_stride=1,
+            patch_index=0,
+            color='predicted',
+            x_min=0,
+            x_max='width',
+            y_min=0,
+            y_max='height',
+            patches=None,
+            col=None,
+            eps=0):
+
+    """
+    model88 but using feedback and attention
+    """
+
+    # INIT
+    def init_method(): return init.GlorotUniform(gain='relu')
+    if type(nb_fc_units) != list: nb_fc_units = [nb_fc_units] * nb_fc_layers
+    if type(nb_conv_filters) != list: nb_conv_filters = [nb_conv_filters] * nb_conv_layers
+    if type(size_conv_filters) != list: size_conv_filters = [size_conv_filters] * nb_conv_layers
+    if w_out == -1: w_out = w
+    if h_out == -1: h_out = h
+    output_shape = (None, c, h_out, w_out)
+    nonlin = get_nonlinearity[nonlin]
+    if patches is None:patches = np.ones((1, c, patch_size * (h_out/h), patch_size * (w_out/w)));patches = patches.astype(np.float32)
+    extra_layers = []
+
+    ##  ENCODING part
+    in_ = layers.InputLayer((None, c, w, h), name="input")
+    hid = in_
+    nets = []
+    hids = conv_fc(
+      hid, 
+      num_filters=nb_conv_filters, 
+      size_conv_filters=size_conv_filters, 
+      init_method=init_method,
+      pooling=pooling,
+      nb_fc_units=nb_fc_units,
+      nonlin=nonlin,
+      names_prefix='')
+    hid = hids[-1]
+
+    nb = ( 2 +
+          (1 if x_sigma == 'predicted' else 0) +
+          (1 if y_sigma == 'predicted' else 0) +
+          (1 if x_stride == 'predicted' else 0) +
+          (1 if y_stride == 'predicted' else 0) +
+          (c if color == 'predicted' else 0) +
+          (1 if patch_index == 'predicted' else 0))
+    hid.name = 'in_to_repr'
+    in_to_repr = hid
+    hidden_state = layers.InputLayer((None, nb_recurrent_units))
+    hid_to_out = layers.DenseLayer(hidden_state, nb, nonlinearity=linear, name='hid_to_out')
+    hid_to_in = layers.DenseLayer(hidden_state, w*h, nonlinearity=sigmoid)
+    hid_to_in = layers.ReshapeLayer(hid_to_in, ([0], w, h), name='hid_to_in')
+    extra_layers.append(in_to_repr)
+    extra_layers.append(hid_to_out)
+    extra_layers.append(hid_to_in)
+
+    def predict_input(xprev, hprev, oprev):
+        return layers.get_output(hid_to_in, hprev)[:, None, :, :] * xprev
+    
+    def predict_repr(x):
+        return layers.get_output(in_to_repr, x)
+
+    def predict_output(oprev, hcur):
+        return layers.get_output(hid_to_out, hcur)
+    
+    repr_shape = in_to_repr.output_shape
+    out_shape = hid_to_out.output_shape
+    
+    coord = FeedbackGRULayerClean(
+        in_, nb_recurrent_units, 
+        predict_input=predict_input,
+        predict_output=predict_output,
+        predict_repr=predict_repr,
+        repr_shape=repr_shape,
+        out_shape=out_shape,
+        n_steps=n_steps,
+        name='coord')
+
+    # DECODING PART
+    brush = GenericBrushLayer(
+        coord,
+        w_out, h_out,
+        n_steps=n_steps,
+        patches=patches,
+        col=col if col else ('rgb' if c == 3 else 'grayscale'),
+        return_seq=True,
+        reduce_func=reduce_funcs[reduce_func],
+        to_proba_func=proba_funcs[proba_func],
+        normalize_func=normalize_funcs[normalize_func],
+        x_sigma=x_sigma,
+        y_sigma=y_sigma,
+        x_stride=x_stride,
+        y_stride=y_stride,
+        patch_index=patch_index,
+        color=color,
+        x_min=x_min,
+        x_max=x_max,
+        y_min=y_min,
+        y_max=y_max,
+        eps=eps,
+        name="brush"
+    )
+    raw_out = layers.ExpressionLayer(
+        brush,
+        lambda x: x[:, -1, :, :],
+        name="raw_output",
+        output_shape='auto')
+    raw_out = AddParams(raw_out, [in_to_repr, hid_to_out, hid_to_in], name="raw_output")
+    scaled_out = layers.ScaleLayer(
+        raw_out, scales=init.Constant(2.), name="scaled_output")
+    biased_out = layers.BiasLayer(
+        scaled_out, b=init.Constant(-1), name="biased_output")
+
+    out = layers.NonlinearityLayer(
+        biased_out,
+        nonlinearity=get_nonlinearity[nonlin_out],
+        name="output")
+    all_layers = ([in_] +
+                  hids + extra_layers + [coord, brush] + [raw_out, scaled_out, biased_out, out])
+    return layers_from_list_to_dict(all_layers)
 
 build_convnet_simple = model1
 build_convnet_simple_2 = model2
