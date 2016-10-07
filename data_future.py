@@ -10,7 +10,7 @@ from skimage.io import imread
 import numpy as np
 
 import datakit
-from datakit.helpers import dict_apply, minibatch, expand_dict, data_path
+from datakit.helpers import dict_apply, minibatch, expand_dict, data_path, ncycles
 
 dataset_patterns = {
     'sketchy': 'sketchy/256x256/sketch/tx_000000000000/**/*.png',
@@ -24,7 +24,6 @@ dataset_patterns = {
     'kanji': 'kanji/cleanpngsmall/*.png',
     'iam': 'iam/**/**/*.png',
 }
-
 
 def apply_to(iterator, fn, cols=None):
     iterator = imap(partial(dict_apply, fn=fn, cols=cols), iterator)
@@ -41,17 +40,20 @@ def crop(img, shape=(1, 1), pos='random', mode='constant', rng=np.random):
     img_h, img_w, img_c = img.shape
     h, w = shape
     if pos == 'random':
-        y = rng.randint(0, img_h)
-        x = rng.randint(0, img_w)
+        y = rng.randint(0, img_h - 1)
+        x = rng.randint(0, img_w - 1)
+    elif pos == 'random_inside':
+        y = rng.randint(h, img_h - h//2 - 1)
+        x = rng.randint(w, img_w - w//2 - 1)
     elif pos == 'center':
         y = img_h // 2
         x = img_w // 2
     else:
         raise Exception('Unkown mode')
     out_img = np.empty((h, w, img_c))
-    img_ = np.empty((img_h + h, img_w + w, img_c))
+    img_ = np.zeros((img_h + h, img_w + w, img_c))
     for c in range(img_c):
-        img_[:, :, c] = pad(img[:, :, c], (h/2, w/2), str(mode))
+        img_[:, :, c] = pad(img[:, :, c], (h//2, w//2), str(mode))
     img = img_[y:y+h, x:x+w, :]
     return img
 
@@ -101,6 +103,9 @@ def pipeline_normalize_shape(iterator):
     # if shape = 3, leave it as it is
     return apply_to(iterator, lambda x:x[:, :, np.newaxis] if len(x.shape) == 2 else x, cols=['X'])
 
+def pipeline_repeat(iterator, nb=1):
+    return ncycles(iterator, n=nb)
+
 def pipeline_load_dataset(iterator, name, *args, **kwargs):
     assert hasattr(datakit, name)
     module = getattr(datakit, name)
@@ -117,7 +122,8 @@ operators = {
     'limit': pipeline_limit,
     'order': pipeline_order,
     'normalize_shape': pipeline_normalize_shape,
-    'shuffle': pipeline_shuffle
+    'shuffle': pipeline_shuffle,
+    'repeat': pipeline_repeat
 }
 
 def loader(params):
@@ -131,23 +137,28 @@ def loader(params):
 if __name__ == '__main__':
     from tools.brushstroke.common import disp_grid
     from skimage.io import imsave
-    pattern = '{chairs}'
-    pipeline = [
-        {'name': 'imagefilelist', 'params': {'pattern': pattern}},
-        {'name': 'shuffle', 'params': {}},
-        {'name': 'limit', "params": {"nb": 10}},
-        {'name': 'imageread', 'params': {}},
-        {'name': 'normalize_shape', 'params': {}},
-        {'name': 'crop', 'params': {'shape': (300, 300), 'pos': 'center', 'mode': 'constant'}},
-        {'name': 'resize', "params": {'shape': (64, 64)}},
-        {'name': 'divide_by', "params": {"value": 255}},
-        #{'name': 'invert', "params": {}},
-        {'name': 'order', "params": {'order': 'th'}}
-    ]
-    iterator = loader({'pipeline': pipeline})
+    import numpy as np
+    import random
+
+    params = {
+        "pipeline": [
+            {"name": "imagefilelist", "params": {"pattern": "{shoes}"}},
+            {"name": "repeat", "params": {"nb": 10}},
+            {"name": "shuffle", "params": {}},
+            {"name": "imageread", "params": {}},
+            {"name": "normalize_shape", "params": {}},
+            {"name": "crop", "params": {"shape": (64, 64), "pos": "center", "mode": "constant"}},
+            {"name": "crop", "params": {"shape": (16, 16), "pos": "random_inside", "mode": "reflect"}},
+            {"name": "divide_by", "params": {"value": 255}},
+            {"name": "order", "params": {"order": "th"}}
+        ]
+    }
+    random.seed(10)
+    np.random.seed(10)
+    iterator = loader(params)
     iterator = minibatch(iterator, batch_size=9)
     iterator = expand_dict(iterator)
     iterator = imap(partial(dict_apply, fn=np.array, cols=['X']), iterator)
-    X = (next(iterator)['X'])
+    X = next(iterator)['X']
     img = disp_grid(X, border=1, bordercolor=(0.3,0,0))
     imsave('out.png', img)

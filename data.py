@@ -41,7 +41,6 @@ def load_data(dataset="digits",
                 self.X = np.random.uniform(size=self.shape) <= prob
                 self.X = self.X.reshape((self.shape[0], -1))
                 self.X = self.X.astype(np.float32)
-
         data = Random((batch_size, c, w, h))
         data.load()
     elif dataset == 'omniglot':
@@ -862,8 +861,8 @@ def load_data(dataset="digits",
                 self.cnt += 1
         data = Data()
         data.load()
-
     if not hasattr(data, 'w'): data.w = w
     if not hasattr(data, 'h'): data.h = h
     if not hasattr(data, 'c'): data.c = c
+    print(data.X.shape)
     return data
