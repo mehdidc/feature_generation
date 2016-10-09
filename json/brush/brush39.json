@@ -1,0 +1,51 @@
+{
+"comment": "testing the new parallel brush",
+"binarize_thresh": null,
+"budget_hours": 10,
+"contractive": false,
+"contractive_coef": null,
+"dataset": "sketchy",
+"denoise": null,
+"marginalized": false,
+"model_name": "model88",
+"force_w": 32,
+"force_h": 32,
+"data_params":{
+    "nb_examples": 10,
+    "transformation": "crop"
+},
+"model_params": {   
+        "n_steps": 80,
+        "nb_fc_layers": 1,
+        "nb_fc_units": [300],
+        "nb_recurrent_layers": 2,
+        "nb_recurrent_units": [32, 64],
+        "nonlin": "very_leaky_rectify",
+        "patch_size": 3,
+        "reduce_func": "over",
+        "nonlin_out": "linear",
+        "normalize_func": "sigmoid",
+        "x_sigma": 0.5,
+        "y_sigma": 0.5,
+        "x_stride": 1,
+        "y_stride": 1,
+        "color": [1],
+        "x_min": 0,
+        "x_max": "width",
+        "y_min": 0,
+        "y_max": "height",
+        "recurrent_model": "lstm",
+        "parallel": 4,
+        "parallel_reduce_func": "sum",
+        "parallel_share": false
+},
+"noise": null,
+"optimization": {
+    "algo": "adadelta",
+    "max_nb_epochs": 9999999999,
+    "patience_nb_epochs": 500
+},
+"walkback": 1,
+"report_rec_error": false,
+"walkback_mode": "bengio_without_sampling"
+}
