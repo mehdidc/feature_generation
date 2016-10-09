@@ -25,13 +25,10 @@ dataset_patterns = {
     'iam': 'iam/**/**/*.png',
 }
 
-def apply_to(iterator, fn, cols=None):
-    iterator = imap(partial(dict_apply, fn=fn, cols=cols), iterator)
-    return iterator
-
-def as_iterator_func(fn):
+def apply_to(fn, cols=None):
     def fn_(iterator, *args, **kwargs):
-        return apply_to(iterator, partial(fn, *args, **kwargs), cols=['X'])
+        iterator = imap(partial(dict_apply, fn=partial(fn, *args, **kwargs), cols=cols), iterator)
+        return iterator
     return fn_
 
 def crop(img, shape=(1, 1), pos='random', mode='constant', rng=np.random):
@@ -57,26 +54,46 @@ def crop(img, shape=(1, 1), pos='random', mode='constant', rng=np.random):
     img = img_[y:y+h, x:x+w, :]
     return img
 
-def pipeline_crop(iterator, shape, pos='random', mode='constant', rng=np.random, **kw):
-    crop_ = partial(crop, shape=shape, pos=pos, mode=mode, rng=rng)
-    return apply_to(iterator, crop_, cols=['X'])
-
-def pipeline_order(iterator, order='th'):
+def order(X, order='th'):
     if order == 'th':
-        fn = lambda X:X.transpose((2, 0, 1))
+        X = X.transpose((2, 0, 1))
     elif order == 'tf':
-        fn = lambda X:X.transpose((1, 2, 0))
-    return apply_to(iterator, fn, cols=['X'])
+        X = X.transpose((1, 2, 0))
+    return X
 
-def pipeline_resize(iterator, shape, **kw):
-    resize_ = partial(resize, output_shape=shape, preserve_range=True)
-    return apply_to(iterator, resize_, cols=['X'])
+def resize_(X, shape=(1,1)):
+    X = resize(X, output_shape=shape, preserve_range=True)
+    return X
 
-def pipeline_invert(iterator, **kw):
-    return apply_to(iterator, lambda x:1-x, cols=['X'])
+def invert(X):
+    return 1 - X
 
-def pipeline_divide_by(iterator, value=255., **kw):
-    return apply_to(iterator, lambda x:x/float(value), cols=['X'])
+def divide_by(X, value=255.):
+    return X / value
+
+def normalize_shape(X):
+    # if shape = 2, add a new axis at the right
+    # if shape = 3, leave it as it is
+    if len(X.shape) == 2:
+        X = X[:, :, np.newaxis]
+    if X.shape[2] > 3:
+        # if alpha channel, remove it
+        X = X[:, :, 0:-1]
+    return X
+
+def force_rgb(X):
+    # if 1 channel, force to have 3 channels
+    if X.shape[2] == 1:
+        X = X * np.ones((1, 1, 3))
+    return X
+
+pipeline_crop = apply_to(crop, cols=['X'])
+pipeline_order = apply_to(order, cols=['X'])
+pipeline_resize = apply_to(resize_, cols=['X'])
+pipeline_invert = apply_to(invert, cols=['X'])
+pipeline_divide_by = apply_to(divide_by, cols=['X'])
+pipeline_normalize_shape = apply_to(normalize_shape, cols=['X'])
+pipeline_force_rgb = apply_to(force_rgb, cols=['X'])
 
 def pipeline_limit(iterator, nb=100):
     buffer = []
@@ -98,11 +115,6 @@ def pipeline_imagefilelist(iterator, pattern=''):
 def pipeline_imageread(iterator):
     return datakit.imagecollection.load_as_iterator(iterator)
 
-def pipeline_normalize_shape(iterator):
-    # if shape = 2, add a new axis at the right
-    # if shape = 3, leave it as it is
-    return apply_to(iterator, lambda x:x[:, :, np.newaxis] if len(x.shape) == 2 else x, cols=['X'])
-
 def pipeline_repeat(iterator, nb=1):
     return ncycles(iterator, n=nb)
 
@@ -123,7 +135,8 @@ operators = {
     'order': pipeline_order,
     'normalize_shape': pipeline_normalize_shape,
     'shuffle': pipeline_shuffle,
-    'repeat': pipeline_repeat
+    'repeat': pipeline_repeat,
+    'force_rgb': pipeline_force_rgb
 }
 
 def loader(params):

@@ -374,6 +374,28 @@ def over_op(prev, new):
     new = (new)
     return prev + new * (1 - prev)
 
+def mask_op(new, prev):
+    img1 = prev
+    img2 = new
+    eps=0.4
+    a1 = 1 - (T.abs_(img1[:,0])<eps) * (T.abs_(img1[:,1])<eps) * (T.abs_(img1[:,2])<eps)
+    a2 = 1 - (T.abs_(img2[:,0])<eps) * (T.abs_(img2[:,1])<eps) * (T.abs_(img2[:,2])<eps)
+    a1=a1[:, None, :, :]
+    a2=a2[:,None, :, :]
+    img = img1 * (1 - a2) + img2 * a2
+    return img
+
+def mask_smooth_op(new, prev):
+    img1 = prev
+    img2 = new
+    a1 = img1.mean(axis=1,keepdims=True) 
+    a1 = T.cast(a1, 'float32')
+    a2 = img2.mean(axis=1,keepdims=True) 
+    a2 = T.cast(a2, 'float32')
+    #a1=a1[:, None, :, :]
+    #a2=a2[:, None, :, :]
+    img = img1 * (1 - a2) + img2 * a2
+    return img
 
 def normalized_over_op(prev, new):
     prev = (prev)
@@ -498,6 +520,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
                 shape = self.patches.shape
             else:
                 shape = self.patches.get_value().shape
+            assert shape[1] == self.nb_col_channels
             self.ph, self.pw = shape[2:]
             self.patches_ = self.add_param(self.patches, shape, name="patches")
         else:
@@ -505,10 +528,10 @@ class GenericBrushLayer(lasagne.layers.Layer):
                 shape = self.patches.shape
             else:
                 shape = self.patches.get_value().shape
+            assert shape[1] == self.nb_col_channels
             self.ph, self.pw = shape[2:]
             self.patches_ = theano.shared(self.patches)
-        self.eps = 0
-
+        self.eps = eps
         self._nb_input_features = incoming.output_shape[2]
         self.assign_ = {}
 
@@ -531,6 +554,8 @@ class GenericBrushLayer(lasagne.layers.Layer):
 
         gx = self.normalize_func(gx) * (self.x_max - self.x_min) + self.x_min
         gy = self.normalize_func(gy) * (self.y_max - self.y_min) + self.y_min
+        self.assign_['gx'] = 0
+        self.assign_['gy'] = 1
 
         pointer = 2
         if self.x_stride == 'predicted':
@@ -538,6 +563,14 @@ class GenericBrushLayer(lasagne.layers.Layer):
             sx = self.normalize_func(gx)#* (self.x_max - self.x_min) + self.x_min
             self.assign_['x_stride'] = pointer
             pointer += 1
+        elif type(self.x_stride) == list:
+            xs = (np.array(self.x_stride).astype(np.float32))
+            xs_pr = X[:, pointer:pointer + len(xs)]
+            xs_pr = self.to_proba_func(xs_pr) * xs
+            xs_pr = xs_pr.sum(axis=1)
+            sx = xs_pr
+            self.assign_['x_stride'] = (pointer, pointer + len(xs))
+            pointer += len(xs)
         else:
             sx = T.ones_like(gx) * self.x_stride
 
@@ -546,6 +579,14 @@ class GenericBrushLayer(lasagne.layers.Layer):
             sy = self.normalize_func(gy)#* (self.y_max - self.y_min) + self.y_min
             self.assign_['y_stride'] = pointer
             pointer += 1
+        elif type(self.y_stride) == list:
+            ys = (np.array(self.y_stride).astype(np.float32))
+            ys_pr = X[:, pointer:pointer + len(ys)]
+            ys_pr = self.to_proba_func(ys_pr) * ys
+            ys_pr = ys_pr.sum(axis=1)
+            sy = ys_pr
+            self.assign_['y_stride'] = (pointer, pointer + len(ys))
+            pointer += len(ys)
         else:
             sy = T.ones_like(gy) * self.y_stride
 
@@ -555,6 +596,14 @@ class GenericBrushLayer(lasagne.layers.Layer):
             x_sigma = self.normalize_func(log_x_sigma) * pw
             self.assign_['x_sigma'] = pointer
             pointer += 1
+        elif type(self.x_sigma) == list:
+            xs = (np.array(self.x_sigma).astype(np.float32))
+            xs_pr = X[:, pointer:pointer + len(xs)]
+            xs_pr = self.to_proba_func(xs_pr) * xs
+            xs_pr = xs_pr.sum(axis=1)
+            x_sigma = xs_pr
+            self.assign_['x_sigma'] = (pointer, pointer + len(xs))
+            pointer += len(xs)
         else:
             x_sigma = T.ones_like(gx) * self.x_sigma
 
@@ -564,6 +613,14 @@ class GenericBrushLayer(lasagne.layers.Layer):
             y_sigma = self.normalize_func(log_y_sigma) * ph
             self.assign_['y_sigma'] = pointer
             pointer += 1
+        elif type(self.y_sigma) == list:
+            ys = (np.array(self.y_sigma).astype(np.float32))
+            ys_pr = X[:, pointer:pointer + len(ys)]
+            ys_pr = self.to_proba_func(ys_pr) * ys
+            ys_pr = ys_pr.sum(axis=1)
+            y_sigma = ys_pr
+            self.assign_['y_sigma'] = (pointer, pointer + len(ys))
+            pointer += len(ys)
         else:
             y_sigma = T.ones_like(gy) * self.y_sigma
 
@@ -659,12 +716,11 @@ class GenericBrushLayer(lasagne.layers.Layer):
             (self.nb_col_channels, self.h, self.w))
         init_val = T.zeros(output_shape)
         init_val = T.unbroadcast(init_val, 0, 1, 2, 3)
-        # the above is to avoid this error:
+        # the above single line is to avoid this error:
         # "an input and an output are associated with the same recurrent state
         # and should have the same type but have type 'CudaNdarrayType(float32,
         # (False, True, False, False))' and 'CudaNdarrayType(float32, 4D)'
         # respectively.'))"
-
         output, _ = recurrent_accumulation(
             # 'time' should be the first dimension
             input.dimshuffle(1, 0, 2),
@@ -856,6 +912,17 @@ class DataFutureWrapper(object):
 
 def floatX(X):
     return np.array(X, dtype=theano.config.floatX)
+
+
+def grad_noise(loss_or_grads, params, algo, rng=None, n=1, gamma=0.55):
+    updates = algo(loss_or_grads, params)
+    t_prev = theano.shared(lasagne.utils.floatX(0.))
+    t = t_prev + 1
+    std = n / (t ** gamma)
+    for p in params:
+        updates[p] = updates[p] + rng.normal(std=std)
+    updates[t_prev] = t
+    return upadtes
 
 if __name__ == '__main__':
     test_generic_batch_layer()

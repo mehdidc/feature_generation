@@ -664,7 +664,6 @@ def build_capsule_(layers, data, nbl, nbc,
             return X > thresh
         else:
             return X
-
     mode = train_params.get("mode", "random")
     if batch_optimizer.whole_dataset_in_device is True:
         assert mode == 'minibatch'
@@ -674,6 +673,8 @@ def build_capsule_(layers, data, nbl, nbc,
         batch_iterator = None
     else:
         raise Exception('Unknown mode : {}'.format(mode))
+    def transform_grads(x):
+        return x
     # put all together
     capsule = Capsule(
         input_variables,
@@ -682,6 +683,7 @@ def build_capsule_(layers, data, nbl, nbc,
         functions=functions,
         batch_optimizer=batch_optimizer,
         batch_iterator=batch_iterator,
+        transform_grads=transform_grads,
         rng=theano_rng
     )
     capsule.layers = layers
