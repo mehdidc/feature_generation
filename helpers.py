@@ -637,7 +637,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
             self.assign_['color'] = (pointer, pointer + self.nb_col_channels)
             pointer += self.nb_col_channels
         elif self.color == 'patches':
-            colors = theano.shared(T.ones((1, 1, 1, 1)))
+            colors = T.ones((1, 1, 1, 1))
         else:
             assert len(self.color) == self.nb_col_channels
             colors = self.color
