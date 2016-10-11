@@ -642,7 +642,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
             assert len(self.color) == self.nb_col_channels
             colors = self.color
 
-        assert nb_features >= pointer, "The number of input features to Brush should be {} insteaf of {} (or at least bigger)".format(pointer, nb_features)
+        assert nb_features >= pointer, "The number of input features to Brush should be {} instead of {} (or at least bigger)".format(pointer, nb_features)
 
         a, _ = np.indices((w, pw))
         a = a.astype(np.float32)

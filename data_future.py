@@ -27,7 +27,8 @@ dataset_patterns = {
     'yale_b': 'yale_b/**/**/*.pgm',
     'eyes': 'eyes/**/**/*.png',
     'gametiles': 'gametiles/zw-tilesets/img/*.png',
-    'faces94': 'faces94/**/**/*.jpg'
+    'faces94': 'faces94/**/**/*.jpg',
+    'dlibfaces': 'dlibfaces/dlib_face_detection_dataset/**/**/*.png'
 }
 
 def apply_to(fn, cols=None):
@@ -160,7 +161,7 @@ if __name__ == '__main__':
 
     params = {
         "pipeline": [
-            {"name": "imagefilelist", "params": {"pattern": "{yale_b}"}},
+            {"name": "imagefilelist", "params": {"pattern": "{dlibfaces}"}},
             {"name": "shuffle", "params": {}},
             {"name": "imageread", "params": {}},
             {"name": "normalize_shape", "params": {}},

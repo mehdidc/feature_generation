@@ -5462,12 +5462,14 @@ def model88(w=32, h=32, c=1,
             x_stride=1,
             y_stride=1,
             patch_index=0,
+            nb_patches=1,
             color='predicted',
             x_min=0,
             x_max='width',
             y_min=0,
             y_max='height',
             recurrent_model='gru',
+            learn_patches=False,
             variational=False,
             variational_nb_hidden=100,
             variational_seed=1,
@@ -5493,7 +5495,7 @@ def model88(w=32, h=32, c=1,
     output_shape = (None, c, h_out, w_out)
     nonlin = get_nonlinearity[nonlin]
     recurrent_model = recurrent_models[recurrent_model]
-    if patches is None:patches = np.ones((1, c, patch_size * (h_out/h), patch_size * (w_out/w)));patches = patches.astype(np.float32)
+    if patches is None:patches = np.ones((nb_patches, c, patch_size * (h_out/h), patch_size * (w_out/w)));patches = patches.astype(np.float32)
     extra_layers = []
 
     ##  ENCODING part
@@ -5551,12 +5553,17 @@ def model88(w=32, h=32, c=1,
     
     nb = ( 2 +
           (1 if x_sigma == 'predicted' else 0) +
+          (len(x_sigma) if type(x_sigma) == list else 0) + 
           (1 if y_sigma == 'predicted' else 0) +
+          (len(y_sigma) if type(y_sigma) == list else 0) + 
           (1 if x_stride == 'predicted' else 0) +
+          (len(x_stride) if type(x_stride) == list else 0) + 
           (1 if y_stride == 'predicted' else 0) +
+          (len(y_stride) if type(y_stride) == list else 0) + 
           (c if color == 'predicted' else 0) +
-          (1 if patch_index == 'predicted' else 0))
-    
+          (1 if patch_index == 'predicted' else 0) +
+          (nb_patches if patch_index == 'predicted' else 0))
+
     for i, net in enumerate(nets):
         hid = net[-1]
         coord = TensorDenseLayer(hid, nb, nonlinearity=linear, name="coord_{}".format(i))
@@ -5581,6 +5588,7 @@ def model88(w=32, h=32, c=1,
             x_stride=x_stride,
             y_stride=y_stride,
             patch_index=patch_index,
+            learn_patches=learn_patches,
             color=color,
             x_min=x_min,
             x_max=x_max,
@@ -7469,7 +7477,6 @@ def model100(w=32, h=32, c=1,
           (c if color == 'predicted' else 0) +
           (1 if patch_index == 'predicted' else 0) +
           (nb_patches if patch_index == 'predicted' else 0))
-
     for i, net in enumerate(nets):
         hid = net[-1]
         coord = TensorDenseLayer(hid, nb, nonlinearity=linear, name="coord_{}".format(i))
