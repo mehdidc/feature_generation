@@ -23,6 +23,11 @@ dataset_patterns = {
     'aloi': 'aloi/png4/**/*.png',
     'kanji': 'kanji/cleanpngsmall/*.png',
     'iam': 'iam/**/**/*.png',
+    'yale': 'yale/YALE/**/*.pgm',
+    'yale_b': 'yale_b/**/**/*.pgm',
+    'eyes': 'eyes/**/**/*.png',
+    'gametiles': 'gametiles/zw-tilesets/img/*.png',
+    'faces94': 'faces94/**/**/*.jpg'
 }
 
 def apply_to(fn, cols=None):
@@ -155,13 +160,11 @@ if __name__ == '__main__':
 
     params = {
         "pipeline": [
-            {"name": "imagefilelist", "params": {"pattern": "{shoes}"}},
-            {"name": "repeat", "params": {"nb": 10}},
+            {"name": "imagefilelist", "params": {"pattern": "{yale_b}"}},
             {"name": "shuffle", "params": {}},
             {"name": "imageread", "params": {}},
             {"name": "normalize_shape", "params": {}},
-            {"name": "crop", "params": {"shape": (64, 64), "pos": "center", "mode": "constant"}},
-            {"name": "crop", "params": {"shape": (16, 16), "pos": "random_inside", "mode": "reflect"}},
+            {"name": "resize", "params": {"shape": [40, 40]}},
             {"name": "divide_by", "params": {"value": 255}},
             {"name": "order", "params": {"order": "th"}}
         ]
@@ -169,9 +172,10 @@ if __name__ == '__main__':
     random.seed(10)
     np.random.seed(10)
     iterator = loader(params)
-    iterator = minibatch(iterator, batch_size=9)
+    iterator = minibatch(iterator, batch_size=10000)
     iterator = expand_dict(iterator)
     iterator = imap(partial(dict_apply, fn=np.array, cols=['X']), iterator)
     X = next(iterator)['X']
+    print(len(X))
     img = disp_grid(X, border=1, bordercolor=(0.3,0,0))
     imsave('out.png', img)

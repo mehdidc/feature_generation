@@ -2766,6 +2766,59 @@ def jobset60():
 
     return jobset_recurrent_brush_stroke('jobset60', 'model88', update=update)
 
+def jobset61():
+    # hyperopt the new enhance module on yale_b
+    def update(params):
+        rng = random
+        sigma = 1
+        stride = 1
+        nb_layers_resid = rng.choice((1, 2, 3, 4, 5))
+        nb_filters_resid = [rng.choice((8, 16, 32, 64, 128)) for _ in range(nb_layers_resid)]
+        size_filters_resid = [rng.choice((1, 3, 5)) for _ in range(nb_layers_resid)]
+        nb_levels_resid = 1
+        model_params = dict(
+            nonlin_out=rng.choice(('linear', 'sigmoid')),
+            reduce_func=rng.choice(('sum', 'over', 'max')),
+            normalize_func='sigmoid',
+            x_sigma=sigma,
+            y_sigma=sigma,
+            x_stride=stride,
+            y_stride=stride,
+            patch_index=0,
+            patch_size=rng.choice((1,2,3)),
+            color=rng.choice(([1.], 'predicted')),
+            x_min=0,
+            x_max='width',
+            y_min=0,
+            y_max='height',
+            recurrent_model=rng.choice(('gru', 'lstm')),
+            eps=0,
+            n_steps=rng.randint(1, 100),
+            parallel=rng.choice((1, 2)),
+            parallel_share=False,
+            parallel_reduce_func='sum',
+            merge_op_resid='mean',
+            nb_filters_resid=nb_filters_resid,
+            size_filters_resid=size_filters_resid,
+            nb_levels_resid=nb_levels_resid
+        )
+        params['model_params'].update(model_params)
+        params['data_params'] = {
+            "pipeline": [
+                {"name": "imagefilelist", "params": {"pattern": "{yale_b}"}},
+                {"name": "shuffle", "params": {}},
+                {"name": "imageread", "params": {}},
+                {"name": "normalize_shape", "params": {}},
+                {"name": "resize", "params": {"shape": [32, 32]}},
+                {"name": "divide_by", "params": {"value": 255}},
+                {"name": "order", "params": {"order": "th"}}
+            ]
+        }
+        params['dataset'] = 'loader'
+        return params
+    return jobset_recurrent_brush_stroke('jobset61', 'model100', update=update)
+
+
 @click.command()
 @click.option('--where', default='', help='jobset name', required=False)
 @click.option('--nb', default=1, help='nb of repetitions', required=False)
