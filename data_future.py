@@ -161,7 +161,7 @@ if __name__ == '__main__':
 
     params = {
         "pipeline": [
-            {"name": "imagefilelist", "params": {"pattern": "{dlibfaces}"}},
+            {"name": "imagefilelist", "params": {"pattern": "{chairs}"}},
             {"name": "shuffle", "params": {}},
             {"name": "imageread", "params": {}},
             {"name": "normalize_shape", "params": {}},
@@ -173,10 +173,13 @@ if __name__ == '__main__':
     random.seed(10)
     np.random.seed(10)
     iterator = loader(params)
-    iterator = minibatch(iterator, batch_size=10000)
+    iterator = minibatch(iterator, batch_size=1000)
     iterator = expand_dict(iterator)
     iterator = imap(partial(dict_apply, fn=np.array, cols=['X']), iterator)
-    X = next(iterator)['X']
-    print(len(X))
+    i = 0
+    for data in iterator:
+        X = data['X']
+        i += len(X)
+        print(i)
     img = disp_grid(X, border=1, bordercolor=(0.3,0,0))
     imsave('out.png', img)

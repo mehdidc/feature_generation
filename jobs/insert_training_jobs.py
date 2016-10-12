@@ -2823,7 +2823,7 @@ def jobset62():
     rng = random 
     nb_layers = rng.randint(1, 3)
     nb_filters = [2 ** rng.randint(5, 9) for _ in range(nb_layers)]
-    k = [rng.randint(1, 16) for _ in range(nb_layers)]
+    k = [1 for _ in range(nb_layers)]
     model_params = OrderedDict(
         nb_layers=nb_layers,
         nb_filters=nb_filters,
