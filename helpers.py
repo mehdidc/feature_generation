@@ -26,7 +26,6 @@ def wta_spatial(X):
     mask = (equals_(X, T.max(X, axis=(2, 3), keepdims=True))) * 1
     return X * mask
 
-
 def wta_k_spatial(nb=1):
 
     def apply_(X):

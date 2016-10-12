@@ -14,6 +14,7 @@ from datakit.helpers import dict_apply, minibatch, expand_dict, data_path, ncycl
 
 dataset_patterns = {
     'sketchy': 'sketchy/256x256/sketch/tx_000000000000/**/*.png',
+    'omniglot': 'omniglot/**/**/**/*.png',
     'flaticon': 'flaticon/**/png/*.png',
     'lfw': 'lfw/imgaligned/**/*.jpg',
     'shoes': 'shoes/ut-zap50k-images/Shoes/**/**/*.jpg',
@@ -93,6 +94,21 @@ def force_rgb(X):
         X = X * np.ones((1, 1, 3))
     return X
 
+def random_colorize(X, foreground=128, op='threshold', rng=np.random):
+    if X.shape[2] == 1:
+        if op == 'threshold':
+            foreground_mask = (X > foreground)
+        elif op == 'threshold_inv':
+            foreground_mask = (X <= foreground)
+        else:
+            raise Exception('Unknown op : {}'.format(op))
+        col = np.random.uniform(size=3)
+        foreground_color = np.random.uniform(size=3)
+        X_new = np.ones((X.shape[0], X.shape[1], 3)) * col[np.newaxis, np.newaxis, :]
+        X_new = X_new * (1 - foreground_mask) + foreground_mask * foreground_color
+        X = X_new
+    return X
+
 pipeline_crop = apply_to(crop, cols=['X'])
 pipeline_order = apply_to(order, cols=['X'])
 pipeline_resize = apply_to(resize_, cols=['X'])
@@ -100,7 +116,7 @@ pipeline_invert = apply_to(invert, cols=['X'])
 pipeline_divide_by = apply_to(divide_by, cols=['X'])
 pipeline_normalize_shape = apply_to(normalize_shape, cols=['X'])
 pipeline_force_rgb = apply_to(force_rgb, cols=['X'])
-
+pipeline_random_colorize = apply_to(random_colorize, cols=['X'])
 def pipeline_limit(iterator, nb=100):
     buffer = []
     for _ in range(nb):
@@ -131,6 +147,7 @@ def pipeline_load_dataset(iterator, name, *args, **kwargs):
 
 operators = {
     'dataset': pipeline_load_dataset,
+    'random_colorize': pipeline_random_colorize,
     'imagefilelist': pipeline_imagefilelist,
     'imageread': pipeline_imageread,
     'crop': pipeline_crop,
@@ -161,11 +178,13 @@ if __name__ == '__main__':
 
     params = {
         "pipeline": [
-            {"name": "imagefilelist", "params": {"pattern": "{chairs}"}},
+            {"name": "imagefilelist", "params": {"pattern": "{omniglot}"}},
             {"name": "shuffle", "params": {}},
             {"name": "imageread", "params": {}},
             {"name": "normalize_shape", "params": {}},
-            {"name": "resize", "params": {"shape": [40, 40]}},
+            {"name": "random_colorize", "params":{"op": "threshold_inv"}},
+            {"name": "resize", "params": {"shape": [32, 32]}},
+            {"name": "force_rgb", "params": {}},
             {"name": "divide_by", "params": {"value": 255}},
             {"name": "order", "params": {"order": "th"}}
         ]
@@ -181,5 +200,6 @@ if __name__ == '__main__':
         X = data['X']
         i += len(X)
         print(i)
+        break
     img = disp_grid(X, border=1, bordercolor=(0.3,0,0))
     imsave('out.png', img)
