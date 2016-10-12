@@ -2892,7 +2892,7 @@ def jobset63():
             y_stride=stride,
             patch_index=0,
             patch_size=rng.choice((1,2,3)),
-            color=rng.choice(([1.], 'predicted')),
+            color=rng.choice(([1., 1., 1.], 'predicted')),
             x_min=0,
             x_max='width',
             y_min=0,
