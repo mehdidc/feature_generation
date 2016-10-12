@@ -2852,6 +2852,7 @@ def jobset62():
             {"name": "shuffle", "params": {}},
             {"name": "imageread", "params": {}},
             {"name": "normalize_shape", "params": {}},
+            {"name": "force_rgb", "params": {}},
             {"name": "resize", "params": {"shape": [16, 16]}},
             {"name": "divide_by", "params": {"value": 255}},
             {"name": "order", "params": {"order": "th"}}
