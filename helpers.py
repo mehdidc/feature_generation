@@ -40,6 +40,20 @@ def wta_k_spatial(nb=1):
         return X_
     return apply_
 
+def max_k_spatial(nb=1):
+
+    def apply_(X):
+        shape = X.shape
+        X_ = X.reshape((X.shape[0] * X.shape[1], X.shape[2] * X.shape[3]))
+        idx = T.argsort(X_, axis=1)[:, X_.shape[1] - nb]
+        val = X_[T.arange(X_.shape[0]), idx]
+        mask = X_ >= val.dimshuffle(0, 'x')
+        eps = 1e-10
+        X_ = (X_ * mask) / (X_ + eps)
+        X_ = X_.reshape(shape)
+        return X_
+    return apply_
+
 
 def wta_lifetime(percent):
 

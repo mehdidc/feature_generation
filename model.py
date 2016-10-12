@@ -7,7 +7,7 @@ from helpers import FeedbackGRULayer, TensorDenseLayer
 from layers import FeedbackGRULayerClean, AddParams
 from helpers import Deconv2DLayer as deconv2d
 from helpers import correct_over_op, over_op, sum_op, max_op, thresh_op, normalized_over_op, mask_op, mask_smooth_op
-from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse, norm_maxmin
+from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse, norm_maxmin, max_k_spatial
 from helpers import Repeat
 from helpers import BrushLayer, GenericBrushLayer
 from helpers import GaussianSampleLayer, ExpressionLayerMulti, axify
@@ -7611,6 +7611,101 @@ def conv_fc(x,
         hids.append(l_hid)
     return hids
 
+
+def model101(nb_filters=64, w=32, h=32, c=1,
+            nb_layers=None,
+            filter_size=5,
+            sparse_func='wta_spatial',
+            k=1,
+            weight_sharing=False,
+            merge_op='sum'):
+    """
+    model73 but with different kinds of sparsity
+    """
+    merge_op = {'sum': T.add, 'mul': T.mul, 'over': over_op}[merge_op]
+    sparse_funcs  ={
+        'wta_k_spatial': wta_k_spatial,
+        'wta_spatial': lambda k:wta_spatial,
+        'max_k_spatial': max_k_spatial,
+    }
+    if nb_layers is None:
+        nb_layers = len(nb_filters)
+    if type(filter_size) != list:
+        filter_size = [filter_size] * nb_layers
+    if type(nb_filters) != list:
+        nb_filters = [nb_filters] * nb_layers
+    if type(k) != list:
+        k = [k] * nb_layers
+    if type(weight_sharing) != list:
+        weight_sharing = [weight_sharing] * nb_layers
+    sparse_layers = []
+    def sparse(l):
+        i = len(sparse_layers)
+        fn = sparse_funcs[sparse_func](nb=k[i])
+        l = layers.NonlinearityLayer(l, fn, name='sparse{}'.format(i))
+        sparse_layers.append(l)
+        return l
+
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_conv = l_in
+    convs = []
+    convs_sparse = []
+    for i in range(nb_layers):
+        l_conv = layers.Conv2DLayer(
+            l_conv,
+            num_filters=nb_filters[i],
+            filter_size=(filter_size[i], filter_size[i]),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            name="conv{}".format(i + 1))
+        print(l_conv.output_shape)
+        convs.append(l_conv)
+        l_conv_sparse = sparse(l_conv)
+        convs_sparse.append(l_conv_sparse)
+
+    conv_backs = []
+    back = {}
+    back_layers = {}
+    for i in range(nb_layers): #[0, 1, 2]
+        l_conv_back = convs_sparse[i]
+        for j in range(i): # for 0 : [], for 1 : [0], for 2 : [0, 1]
+            if weight_sharing[i - j - 1] and i > 0 and j > 0:
+                W = back_layers[(i - 1, j - 1)].W
+            else:
+                W = init.GlorotUniform()
+            l_conv_back = layers.Conv2DLayer(
+                l_conv_back,
+                num_filters=nb_filters[i - j - 1],
+                filter_size=(filter_size[i - j - 1], filter_size[i - j - 1]),
+                nonlinearity=rectify,
+                W=W,
+                pad='full',
+                name='conv_back_{}_{}'.format(i + 1, j + 1)
+            )
+            back_layers[(i, j)] = l_conv_back
+            #back[(i, j)] = l_conv_back.W
+        #l_conv_back.name = 'conv_back{}'.format(i + 1)
+        conv_backs.append(l_conv_back)
+    #print(conv_backs)
+    outs = []
+    for i, conv_back in enumerate(conv_backs):
+        if i == 0 or not weight_sharing[0]:
+            W = init.GlorotUniform()
+        else:
+            W = outs[0].W
+        l_out = layers.Conv2DLayer(
+            conv_back,
+            num_filters=c,
+            filter_size=(filter_size[0], filter_size[0]),
+            nonlinearity=linear,
+            W=W,
+            pad='full',
+            name='out{}'.format(i + 1))
+        outs.append(l_out)
+    l_out = layers.ElemwiseMergeLayer(outs, merge_op)
+    l_out = layers.NonlinearityLayer(l_out, sigmoid, name='output')
+    all_layers = [l_in] + convs + sparse_layers + back_layers.values() + outs + [l_out]
+    return layers_from_list_to_dict(all_layers)
 
 build_convnet_simple = model1
 build_convnet_simple_2 = model2

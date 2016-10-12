@@ -2793,8 +2793,8 @@ def jobset61():
             y_max='height',
             recurrent_model=rng.choice(('gru', 'lstm')),
             eps=0,
-            n_steps=rng.randint(1, 100),
-            parallel=rng.choice((1, 2)),
+            n_steps=rng.randint(20, 30),
+            parallel=1,
             parallel_share=False,
             parallel_reduce_func='sum',
             merge_op_resid='mean',
@@ -2818,6 +2818,58 @@ def jobset61():
         return params
     return jobset_recurrent_brush_stroke('jobset61', 'model100', update=update)
 
+def jobset62():
+    # vertebrate convnet hyperopt search for 16x16 gametiles and max_spatial
+    rng = random 
+    nb_layers = rng.randint(1, 3)
+    nb_filters = [2 ** rng.randint(5, 9) for _ in range(nb_layers)]
+    k = [rng.randint(1, 16) for _ in range(nb_layers)]
+    model_params = OrderedDict(
+        nb_layers=nb_layers,
+        nb_filters=nb_filters,
+        filter_size=rng.choice((3, 5)),
+        k=k,
+        weight_sharing=rng.choice((True, False)),
+        merge_op=rng.choice(('sum', 'mul')),
+        sparse_func="max_k_spatial"
+    )
+    params = OrderedDict(
+        model_params=model_params,
+        denoise=None,
+        noise=None,
+        walkback=1,
+        walkback_mode='bengio_without_sampling',
+        autoencoding_loss='squared_error',
+        mode='random',
+        contractive=False,
+        contractive_coef=None,
+        marginalized=False,
+        binarize_thresh=None,
+    )
+    params['data_params'] = {
+        "pipeline": [
+            {"name": "imagefilelist", "params": {"pattern": "{gametiles}"}},
+            {"name": "shuffle", "params": {}},
+            {"name": "imageread", "params": {}},
+            {"name": "normalize_shape", "params": {}},
+            {"name": "resize", "params": {"shape": [16, 16]}},
+            {"name": "divide_by", "params": {"value": 255}},
+            {"name": "order", "params": {"order": "th"}}
+        ]
+    }
+    budget_hours = 10 
+    model_name = 'model101'
+    dataset = 'loader'
+    jobset_name = "jobset62"
+    params['model_name'] = model_name
+    params['dataset'] = dataset
+    params['budget_hours'] = budget_hours
+    cmd = build_cmd(model_name=model_name,
+                    dataset=dataset,
+                    params=params,
+                    budget_hours=budget_hours)
+    nb = job_write(params, cmd, where=jobset_name)
+    return nb
 
 @click.command()
 @click.option('--where', default='', help='jobset name', required=False)
