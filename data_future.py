@@ -155,7 +155,7 @@ def pipeline_repeat(iterator, nb=1):
 def pipeline_load_dataset(iterator, name, *args, **kwargs):
     assert hasattr(datakit, name)
     module = getattr(datakit, name)
-    return module.as_iterator(*args, **kwargs)
+    return module.load_as_iterator(*args, **kwargs)
 
 operators = {
     'dataset': pipeline_load_dataset,
@@ -190,12 +190,12 @@ if __name__ == '__main__':
 
     params = {
         "pipeline": [
-            {"name": "imagefilelist", "params": {"pattern": "{omniglot}"}},
+            {"name": "dataset", "params": {"name": "mnist", "which":"train"}},
+            {"name": "order", "params": {"order": "tf"}},
             {"name": "shuffle", "params": {}},
-            {"name": "imageread", "params": {}},
             {"name": "normalize_shape", "params": {}},
             {"name": "random_colorize", "params":{"op": "threshold_inv"}},
-            {"name": "resize", "params": {"shape": [32, 32]}},
+            {"name": "resize", "params": {"shape": [16, 16]}},
             {"name": "force_rgb", "params": {}},
             {"name": "divide_by", "params": {"value": 255}},
             {"name": "order", "params": {"order": "th"}}
