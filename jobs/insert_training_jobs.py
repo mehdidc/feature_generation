@@ -2926,6 +2926,57 @@ def jobset63():
         return params
     return jobset_recurrent_brush_stroke('jobset63', 'model100', update=update)
 
+def jobset64():
+    # hyperopt the colored mnist problem
+    def update(params):
+        rng = random
+        sigma = 1
+        stride = rng.choice(('predicted', [0.125, 0.25, 0.5, 1]))
+        model_params = dict(
+            nonlin_out=rng.choice(('linear', 'sigmoid')),
+            reduce_func=rng.choice(('sum', 'over', 'max')),
+            normalize_func='sigmoid',
+            x_sigma=sigma,
+            y_sigma=sigma,
+            x_stride=stride,
+            y_stride=stride,
+            patch_index=0,
+            patch_size=16,
+            color='predicted',
+            x_min=0,
+            x_max='width',
+            y_min=0,
+            y_max='height',
+            recurrent_model=rng.choice(('gru', 'lstm')),
+            eps=0,
+            n_steps=rng.randint(10, 80),
+            parallel=1,
+            parallel_share=False,
+            parallel_reduce_func='sum',
+            w_left_pad="half_patch",
+            w_right_pad="half_patch",
+            h_left_pad="half_patch",
+            h_right_pad="half_patch",
+        )
+        params['model_params'].update(model_params)
+        params['data_params'] = {
+            "pipeline": [
+                {"name": "dataset", "params": {"name": "mnist", "which":"train"}},
+                {"name": "order", "params": {"order": "tf"}},
+                {"name": "shuffle", "params": {}},
+                {"name": "normalize_shape", "params": {}},
+                {"name": "random_colorize", "params":{"op": "threshold_inv"}},
+                {"name": "resize", "params": {"shape": [16, 16]}},
+                {"name": "force_rgb", "params": {}},
+                {"name": "divide_by", "params": {"value": 255}},
+                {"name": "order", "params": {"order": "th"}}
+            ]
+        }
+        params['dataset'] = 'loader'
+        params['budget_hours'] = 4
+        return params
+    return jobset_recurrent_brush_stroke('jobset64', 'model88', update=update)
+
 @click.command()
 @click.option('--where', default='', help='jobset name', required=False)
 @click.option('--nb', default=1, help='nb of repetitions', required=False)

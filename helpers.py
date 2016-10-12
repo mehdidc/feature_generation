@@ -463,6 +463,10 @@ class GenericBrushLayer(lasagne.layers.Layer):
                  x_max='width',
                  y_min=0,
                  y_max='height',
+                 w_left_pad=0,
+                 w_right_pad=0,
+                 h_left_pad=0,
+                 h_right_pad=0,
                  eps=0,
                  learn_patches=False,
                  **kwargs):
@@ -500,7 +504,15 @@ class GenericBrushLayer(lasagne.layers.Layer):
 
         y_min : the minimum value for the coords in the w scale
         y_max : if 'height' it is equal to h, else use the provided value
-
+        
+        w_left_pad  : int/'half_patch'.
+                      augment virtually the resulting image with padding to take into account pixels outside
+                      the image to have proper normalization of Fx.
+                      if 'half_patch', then the padding is the half of the patch width so that a coordinate
+                      of 0, 0 with x_min=0 and x_max='width' will show the bottom right quarter of the patch
+        w_right_pad : same than w_left_pad but right of the image
+        h_left_pad  : like w_left_pad but for height
+        h_right_pad :  like w_right_pad but for height
         """
         super(GenericBrushLayer, self).__init__(incoming, **kwargs)
         self.incoming = incoming
@@ -528,6 +540,11 @@ class GenericBrushLayer(lasagne.layers.Layer):
         self.patch_index = patch_index
         self.color = color
         self.learn_patches = learn_patches
+        self.w_left_pad = w_left_pad
+        self.w_right_pad = w_right_pad
+        self.h_left_pad = h_left_pad
+        self.h_right_pad = h_right_pad
+
         if learn_patches:
             if isinstance(self.patches, np.ndarray):
                 shape = self.patches.shape
@@ -656,12 +673,36 @@ class GenericBrushLayer(lasagne.layers.Layer):
             colors = self.color
 
         assert nb_features >= pointer, "The number of input features to Brush should be {} instead of {} (or at least bigger)".format(pointer, nb_features)
+        
+        if self.w_left_pad and self.w_right_pad:
+            w_left_pad = self.w_left_pad
+            if w_left_pad == 'half_patch':
+                w_left_pad = pw / 2
+            w_right_pad = self.w_right_pad
+            if w_right_pad == 'half_patch':
+                w_right_pad = pw / 2
+            a, _ = np.indices((w + w_left_pad + w_right_pad, pw)) - w_left_pad
+        else:
+            w_left_pad = 0
+            w_right_pad = 0
+            a, _ = np.indices((w, pw))
 
-        a, _ = np.indices((w, pw))
         a = a.astype(np.float32)
         a = a.T
         a = theano.shared(a)
-        b, _ = np.indices((h, ph))
+
+        if self.w_left_pad and self.w_right_pad:
+            h_left_pad = self.h_left_pad
+            if h_left_pad == 'half_patch':
+                h_left_pad = ph / 2
+            h_right_pad = self.h_right_pad
+            if h_right_pad == 'half_patch':
+                h_right_pad = ph / 2
+            b, _ = np.indices((h + h_left_pad + h_right_pad, pw)) - h_left_pad
+        else:
+            h_left_pad = 0
+            h_right_pad = 0
+            b, _ = np.indices((h, ph))
         b = b.astype(np.float32)
         b = b.T
         b = theano.shared(b)
@@ -680,6 +721,8 @@ class GenericBrushLayer(lasagne.layers.Layer):
 
         Fx = T.exp(-(a_ - ux_) ** 2 / (2 * x_sigma_ ** 2))
         Fx = Fx / (Fx.sum(axis=2, keepdims=True) + self.eps)
+        if w_left_pad and w_right_pad:
+            Fx = Fx[:, :, w_left_pad:-w_right_pad]
 
         uy = (gy.dimshuffle(0, 'x') +
               (T.arange(1, ph + 1) - ph/2. - 0.5) * sy.dimshuffle(0, 'x'))
@@ -689,6 +732,9 @@ class GenericBrushLayer(lasagne.layers.Layer):
         Fy = T.exp(-(b_ - uy_) ** 2 / (2 * y_sigma_ ** 2))
         # shape of Fy : (nb_examples, ph, h)
         Fy = Fy / (Fy.sum(axis=2, keepdims=True) + self.eps)
+        if h_left_pad and h_right_pad:
+            Fy = Fy[:, :, h_left_pad:-h_right_pad]
+        
         patches = self.patches_
         # patches : (nbp, c, ph, pw)
         # Fy : (nb_examples, ph, h)
@@ -774,10 +820,11 @@ def test_generic_batch_layer():
     patches[1, :] = np.array(p2)
     #patches[:] = 1.
     patches = patches.astype(np.float32)
-
+    w, h = 64, 64
+    pad = 10
     brush = GenericBrushLayer(
         inp,
-        64, 64,
+        w, h,
         n_steps=n_steps,
         patches=patches,
         col='rgb',
@@ -796,6 +843,10 @@ def test_generic_batch_layer():
         x_max='width',
         y_min=0,
         y_max='height',
+        w_left_pad='half_patch',
+        w_right_pad='half_patch',
+        h_left_pad='half_patch',
+        h_right_pad='half_patch',
         eps=0)
     X = T.tensor3()
     fn = theano.function([X], layers.get_output(brush, X))

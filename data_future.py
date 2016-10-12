@@ -102,8 +102,7 @@ colors = [
     [0, 1, 1],
     [1, 0, 1]
 ]
-colors = np.array(colors, dtype='float32') * 255.
-print(colors.shape)
+colors = np.array(colors, dtype='float32') * 255
 def random_colorize(X, foreground=128, op='threshold', rng=np.random):
     if X.shape[2] == 1:
         if op == 'threshold':
@@ -114,7 +113,7 @@ def random_colorize(X, foreground=128, op='threshold', rng=np.random):
             raise Exception('Unknown op : {}'.format(op))
         #col = np.random.uniform(size=3)
         col = colors[rng.randint(0, len(colors) - 1)]
-        foreground_color = 1 - col
+        foreground_color = 255 - col
         #foreground_color = np.random.uniform(size=3)
         X_new = np.ones((X.shape[0], X.shape[1], 3)) * col[np.newaxis, np.newaxis, :]
         X_new = X_new * (1 - foreground_mask) + foreground_mask * foreground_color

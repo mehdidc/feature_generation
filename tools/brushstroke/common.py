@@ -199,7 +199,7 @@ def normalize(x, axis=1):
 def sigmoid(x):
     return 1./(1. + np.exp(-x))
 
-def build_pointer_images(coord, color, w, h, p=2):
+def build_pointer_images(coord, color, w, h, p=2, sx=None, sy=None):
     color = np.array(color)
     nb_examples, T, _ = coord.shape
     imgs = np.zeros((nb_examples, T, 3, w, h))
@@ -207,7 +207,15 @@ def build_pointer_images(coord, color, w, h, p=2):
         for t in range(T):
             x, y = coord[e, t, :]
             x, y = int(x), int(y)
-            imgs[e, t, :, y-p:y+p, x-p:x+p] = color[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis]
+            if sx is None: w = 2
+            else: w = sx[e,t]
+            if sy is None: h = 2
+            else: h = sy[e, t]
+            p = 2
+            imgs[e, t, :, y:y+1, x:x+w] = color[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis]
+            imgs[e, t, :, y+h:y+h+1, x:x+w] = color[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis]
+            imgs[e, t, :, y:y+h, x:x+1] = color[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis]
+            imgs[e, t, :, y:y+h, x+w:x+w+1] = color[np.newaxis, np.newaxis, :, np.newaxis, np.newaxis]
     return imgs
 
 def build_encoders(layers, nb_parallel=None):

@@ -5478,6 +5478,10 @@ def model88(w=32, h=32, c=1,
             parallel=1,
             parallel_share=True,
             parallel_reduce_func='sum',
+            w_left_pad=0,
+            w_right_pad=0,
+            h_left_pad=0,
+            h_right_pad=0,
             eps=0):
 
     """
@@ -5594,6 +5598,10 @@ def model88(w=32, h=32, c=1,
             x_max=x_max,
             y_min=y_min,
             y_max=y_max,
+            w_left_pad=w_left_pad,
+            w_right_pad=w_right_pad,
+            h_left_pad=h_left_pad,
+            h_right_pad=h_right_pad,
             eps=eps,
             name="brush_{}".format(i)
         )
