@@ -3051,24 +3051,26 @@ def jobset66():
     def update(params):
         rng = random
         sigma = 0.5
-        stride = rng.choice(('predicted', 0.25, [0.125, 0.25, 0.5, 1]))
+        stride = rng.choice(('predicted', 0.25, [0.25, 1]))
+        cmin = rng.choice((-1, 0))
+        cmax = 1
         model_params = dict(
             nonlin_out='sigmoid',
             reduce_func='sum',
             normalize_func='sigmoid',
-            proba_func='softmax',
+            proba_func=rng.choice(('softmax', 'sparsemax')),
             x_sigma=sigma,
             y_sigma=sigma,
             x_stride=stride,
             y_stride=stride,
             patch_index=0,
             patch_size=16,
-            color_min=0,
-            color_max=1,
+            color_min=cmin,
+            color_max=cmax,
             color=rng.choice((2, [1])),
             recurrent_model=rng.choice(('gru', 'lstm')),
             eps=0,
-            n_steps=rng.choice((2, 4, 8, 16)),
+            n_steps=2,
             parallel=1,
             parallel_share=False,
             parallel_reduce_func='sum',            
@@ -3077,10 +3079,10 @@ def jobset66():
 
         if rng.uniform(0,1) <= 0.5:
             model_params.update(dict(
-                w_left_pad=10,
-                w_right_pad=10,
-                h_left_pad=10,
-                h_right_pad=10,
+                w_left_pad=16,
+                w_right_pad=16,
+                h_left_pad=16,
+                h_right_pad=16,
                 x_min=-8,
                 x_max=16+8,
                 y_min=-8,
