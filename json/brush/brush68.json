@@ -3,7 +3,7 @@
 "dataset": "loader",
 "data_params":{
     "pipeline": [
-        {"name": "toy", "params": {"nb": 9, "w": 16, "h": 16, "pw": 4, "ph": 4}},
+        {"name": "toy", "params": {"nb": 10000, "w": 16, "h": 16, "pw": 4, "ph": 4}},
         {"name": "shuffle", "params": {}},
         {"name": "normalize_shape", "params": {}},
         {"name": "random_colorize", "params":{"op": "threshold_inv"}},
@@ -13,39 +13,9 @@
         {"name": "order", "params": {"order": "th"}}
     ]
 },
-"model_name": "model88",
+"model_name": "model102",
 "model_params": {   
-        "n_steps": 2,
-        "nb_fc_layers": 0,
-        "nb_fc_units": [32],
-        "nb_recurrent_units": [64],
-        "nonlin": "very_leaky_rectify",
-        "reduce_func": "sum",
-        "color_min": 0,
-        "color_max": 1,
-        "nonlin_out": "sigmoid",
-        "recurrent_model": "lstm",
-        "normalize_func": "sigmoid",
-        "proba_func": "softmax",
-        "x_sigma": 0.5,
-        "y_sigma": 0.5,
-        "x_stride": [0.125, 0.25, 0.5, 1],
-        "y_stride": [0.125, 0.25, 0.5, 1],
-        "stride_normalize": true,
-        "patch_size": 16,
-        "color": 10,
-        "x_min": -16,
-        "x_max": 32,
-        "y_min": -16,
-        "y_max": 32,
-        "parallel": 1,
-        "nb_patches": 1,
-        "patch_index": 0,
-        "learn_patches": false,
-        "w_left_pad": 24,
-        "w_right_pad": 24,
-        "h_left_pad": 24,
-        "h_right_pad": 24
+        "n_steps": 2
 },
 "optimization": {
     "algo": "adadelta",

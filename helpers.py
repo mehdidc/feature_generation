@@ -616,11 +616,9 @@ class GenericBrushLayer(lasagne.layers.Layer):
         ph = self.ph
         pw = self.pw
         nb_features = self._nb_input_features
-
-        gx, gy = X[:, 0], X[:, 1]
-    
         pointer = 0
         if self.coords == 'continuous':
+            gx, gy = X[:, 0], X[:, 1]
             gx = self.normalize_func(gx) * (self.x_max - self.x_min) + self.x_min
             gy = self.normalize_func(gy) * (self.y_max - self.y_min) + self.y_min
             self.assign_['gx'] = 0
@@ -635,7 +633,6 @@ class GenericBrushLayer(lasagne.layers.Layer):
             gx = gx * (self.x_max - self.x_min) + self.x_min
             self.assign_['gx'] = (pointer, pointer + nx)
             pointer += nx
-
             ny = self.y_max - self.y_min
             cy = theano.shared(np.linspace(0, 1, ny).astype(np.float32))
             gy_pr = X[:, pointer:pointer + ny]

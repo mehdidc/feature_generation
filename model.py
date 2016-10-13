@@ -5574,10 +5574,8 @@ def model88(w=32, h=32, c=1,
           (nb_patches if patch_index == 'predicted' else 0) +
           (color if type(color) == int else 0)
     )
-
     if type(color) == int:
         color = np.random.normal(0.01, size=(color, c)).astype(np.float32)
-
     for i, net in enumerate(nets):
         hid = net[-1]
         coord = TensorDenseLayer(hid, nb, nonlinearity=linear, name="coord_{}".format(i))
@@ -7727,6 +7725,60 @@ def model101(nb_filters=64, w=32, h=32, c=1,
     l_out = layers.ElemwiseMergeLayer(outs, merge_op)
     l_out = layers.NonlinearityLayer(l_out, sigmoid, name='output')
     all_layers = [l_in] + convs + sparse_layers + back_layers.values() + outs + [l_out]
+    return layers_from_list_to_dict(all_layers)
+
+
+def model102(w=32, h=32, c=1, n_steps=1, patch_size=4):
+    """
+    """
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    hid = layers.DenseLayer(l_in, 256, nonlinearity=rectify, name="hid")
+    hid = layers.DenseLayer(hid, 128, nonlinearity=rectify, name="hid")
+    #hid = layers.DenseLayer(hid, n_steps * 2, nonlinearity=linear, name="hid")
+    #l_coord = layers.ReshapeLayer(hid, ([0], n_steps, 2), name="coord")
+    
+    #hid = Repeat(hid, n_steps)
+    hid = layers.DenseLayer(hid, 32*n_steps, nonlinearity=rectify, name="hid")
+    hid = layers.ReshapeLayer(hid, ([0], n_steps, 32), name="hid")
+    hid = layers.GRULayer(hid, 128)
+    l_coord = TensorDenseLayer(hid, 100, nonlinearity=linear, name="coord")
+    
+    patches = np.ones((1, c, patch_size, patch_size))
+    patches = patches.astype(np.float32)
+    l_brush = GenericBrushLayer(
+        l_coord,
+        w, h,
+        n_steps=n_steps,
+        patches=patches,
+        col='rgb' if c == 3 else 'grayscale',
+        return_seq=False,
+        reduce_func=reduce_funcs['sum'],
+        to_proba_func=proba_funcs['softmax'],
+        normalize_func=normalize_funcs['sigmoid'],
+        x_sigma=0.5,
+        y_sigma=0.5,
+        x_stride=[0.25, 1],
+        y_stride=[0.25, 1],
+        patch_index=0,
+        color=np.ones((6, 3)).astype(np.float32),
+        x_min=0,
+        x_max='width',
+        y_min=0,
+        y_max='height',
+        name="brush",
+        coords='continuous',
+    )
+    l_raw_out = l_brush
+    l_scaled_out = layers.ScaleLayer(
+        l_raw_out, scales=init.Constant(2.), name="scaled_output")
+    l_biased_out = layers.BiasLayer(
+        l_scaled_out, b=init.Constant(-1), name="biased_output")
+    l_out = layers.NonlinearityLayer(
+        l_biased_out,
+        nonlinearity=get_nonlinearity['sigmoid'],
+        name="output")
+    all_layers = ([l_in] +
+                  [l_coord, l_brush, l_raw_out, l_biased_out, l_scaled_out,  l_out])
     return layers_from_list_to_dict(all_layers)
 
 build_convnet_simple = model1

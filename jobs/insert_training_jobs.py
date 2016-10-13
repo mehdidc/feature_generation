@@ -3032,7 +3032,7 @@ def jobset65():
         params['model_params'].update(model_params)
         params['data_params'] = {
             "pipeline": [
-                {"name": "toy", "params": {"nb": 9, "w": 16, "h": 16, "pw": 4, "ph": 4, "nb_patches": 2}},
+                {"name": "toy", "params": {"nb": 10000, "w": 16, "h": 16, "pw": 4, "ph": 4, "nb_patches": 2}},
                 {"name": "shuffle", "params": {}},
                 {"name": "normalize_shape", "params": {}},
                 {"name": "resize", "params": {"shape": [16, 16]}},
@@ -3044,6 +3044,74 @@ def jobset65():
         params['budget_hours'] = 1
         return params
     return jobset_recurrent_brush_stroke('jobset65', 'model88', update=update)
+
+
+def jobset66():
+    # hyperopt the toy problem with colors
+    def update(params):
+        rng = random
+        sigma = 0.5
+        stride = rng.choice(('predicted', 0.25, [0.125, 0.25, 0.5, 1]))
+        model_params = dict(
+            nonlin_out='sigmoid',
+            reduce_func='sum',
+            normalize_func='sigmoid',
+            proba_func='softmax',
+            x_sigma=sigma,
+            y_sigma=sigma,
+            x_stride=stride,
+            y_stride=stride,
+            patch_index=0,
+            patch_size=16,
+            color_min=0,
+            color_max=1,
+            color=rng.choice((2, [1])),
+            recurrent_model=rng.choice(('gru', 'lstm')),
+            eps=0,
+            n_steps=rng.choice((2, 4, 8, 16)),
+            parallel=1,
+            parallel_share=False,
+            parallel_reduce_func='sum',            
+            stride_normalize=rng.choice((True, False))
+        )
+
+        if rng.uniform(0,1) <= 0.5:
+            model_params.update(dict(
+                w_left_pad=10,
+                w_right_pad=10,
+                h_left_pad=10,
+                h_right_pad=10,
+                x_min=-8,
+                x_max=16+8,
+                y_min=-8,
+                y_max=16+8))
+        else:
+            model_params.update(dict(
+                w_left_pad=0,
+                w_right_pad=0,
+                h_left_pad=0,
+                h_right_pad=0,
+                x_min=0,
+                x_max='width',
+                y_min=0,
+                y_max='height'))
+        params['model_params'].update(model_params)
+        params['data_params'] = {
+            "pipeline": [
+                {"name": "toy", "params": {"nb": 10000, "w": 16, "h": 16, "pw": 4, "ph": 4}},
+                {"name": "shuffle", "params": {}},
+                {"name": "normalize_shape", "params": {}},
+                {"name": "random_colorize", "params":{"op": "threshold_inv"}},
+                {"name": "resize", "params": {"shape": [16, 16]}},
+                {"name": "force_rgb", "params": {}},
+                {"name": "divide_by", "params": {"value": 255}},
+                {"name": "order", "params": {"order": "th"}}
+            ]
+        }
+        params['dataset'] = 'loader'
+        params['budget_hours'] = 1
+        return params
+    return jobset_recurrent_brush_stroke('jobset66', 'model88', update=update)
 
 
 @click.command()
