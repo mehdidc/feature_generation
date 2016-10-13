@@ -2928,7 +2928,10 @@ def jobset63():
 
 def jobset64():
     # hyperopt the colored mnist problem
+    ## NOTE: all jobs in jobset64 with stride=predicted are FALSE, there was a bug
+    # in GenericBrushLayer.
     def update(params):
+
         rng = random
         sigma = 1
         stride = rng.choice(('predicted', [0.125, 0.25, 0.5, 1]))

@@ -387,10 +387,14 @@ def over_op(prev, new):
     new = (new)
     return prev + new * (1 - prev)
 
+
+def sub_op(new, prev):
+    return prev - new
+
 def mask_op(new, prev):
     img1 = prev
     img2 = new
-    eps=0.4
+    eps=0.1
     a1 = 1 - (T.abs_(img1[:,0])<eps) * (T.abs_(img1[:,1])<eps) * (T.abs_(img1[:,2])<eps)
     a2 = 1 - (T.abs_(img2[:,0])<eps) * (T.abs_(img2[:,1])<eps) * (T.abs_(img2[:,2])<eps)
     a1=a1[:, None, :, :]
@@ -467,6 +471,8 @@ class GenericBrushLayer(lasagne.layers.Layer):
                  w_right_pad=0,
                  h_left_pad=0,
                  h_right_pad=0,
+                 color_min=0,
+                 color_max=1,
                  eps=0,
                  learn_patches=False,
                  **kwargs):
@@ -544,6 +550,8 @@ class GenericBrushLayer(lasagne.layers.Layer):
         self.w_right_pad = w_right_pad
         self.h_left_pad = h_left_pad
         self.h_right_pad = h_right_pad
+        self.color_min = color_min
+        self.color_max = color_max
 
         if learn_patches:
             if isinstance(self.patches, np.ndarray):
@@ -590,7 +598,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
         pointer = 2
         if self.x_stride == 'predicted':
             sx = X[:, pointer]
-            sx = self.normalize_func(gx)#* (self.x_max - self.x_min) + self.x_min
+            sx = self.normalize_func(sx)
             self.assign_['x_stride'] = pointer
             pointer += 1
         elif type(self.x_stride) == list:
@@ -606,7 +614,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
 
         if self.y_stride == 'predicted':
             sy = X[:, pointer]
-            sy = self.normalize_func(gy)#* (self.y_max - self.y_min) + self.y_min
+            sy = self.normalize_func(sy)
             self.assign_['y_stride'] = pointer
             pointer += 1
         elif type(self.y_stride) == list:
@@ -663,7 +671,8 @@ class GenericBrushLayer(lasagne.layers.Layer):
 
         if self.color == 'predicted':
             colors = X[:, pointer:pointer + self.nb_col_channels]
-            colors = self.normalize_func(colors)
+            #colors = self.normalize_func(colors) * (self.color_max - self.color_min)
+            colors =  T.tanh(colors)
             self.assign_['color'] = (pointer, pointer + self.nb_col_channels)
             pointer += self.nb_col_channels
         elif self.color == 'patches':
