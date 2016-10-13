@@ -7733,14 +7733,14 @@ def model102(w=32, h=32, c=1, n_steps=1, patch_size=4):
     """
     l_in = layers.InputLayer((None, c, w, h), name="input")
     hid = layers.DenseLayer(l_in, 256, nonlinearity=rectify, name="hid")
-    hid = layers.DenseLayer(hid, 128, nonlinearity=rectify, name="hid")
+    hid = layers.DenseLayer(hid, 256, nonlinearity=rectify, name="hid")
     #hid = layers.DenseLayer(hid, n_steps * 2, nonlinearity=linear, name="hid")
     #l_coord = layers.ReshapeLayer(hid, ([0], n_steps, 2), name="coord")
     
     #hid = Repeat(hid, n_steps)
-    hid = layers.DenseLayer(hid, 32*n_steps, nonlinearity=rectify, name="hid")
-    hid = layers.ReshapeLayer(hid, ([0], n_steps, 32), name="hid")
-    hid = layers.GRULayer(hid, 128)
+    hid = layers.DenseLayer(hid, 256*n_steps, nonlinearity=rectify, name="hid")
+    hid = layers.ReshapeLayer(hid, ([0], n_steps, 256), name="hid")
+    hid = layers.GRULayer(hid, 256)
     l_coord = TensorDenseLayer(hid, 100, nonlinearity=linear, name="coord")
     
     patches = np.ones((1, c, patch_size, patch_size))
@@ -7760,7 +7760,7 @@ def model102(w=32, h=32, c=1, n_steps=1, patch_size=4):
         x_stride=[0.25, 1],
         y_stride=[0.25, 1],
         patch_index=0,
-        color=np.ones((12, 3)).astype(np.float32),
+        color=np.ones((18, 3)).astype(np.float32),
         x_min=-8,
         x_max=24,
         y_min=-8,
