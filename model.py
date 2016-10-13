@@ -5559,7 +5559,6 @@ def model88(w=32, h=32, c=1,
                     nb_recurrent_units[l], 
                     name="recurrent{}_{}".format(l, n))
         net.append(hid)
-    
     nb = ( 2 +
           (1 if x_sigma == 'predicted' else 0) +
           (len(x_sigma) if type(x_sigma) == list else 0) + 
@@ -5571,7 +5570,12 @@ def model88(w=32, h=32, c=1,
           (len(y_stride) if type(y_stride) == list else 0) + 
           (c if color == 'predicted' else 0) +
           (1 if patch_index == 'predicted' else 0) +
-          (nb_patches if patch_index == 'predicted' else 0))
+          (nb_patches if patch_index == 'predicted' else 0) +
+          (color if type(color) == int else 0)
+    )
+
+    if type(color) == int:
+        color = np.random.normal(0.01, size=(color, c)).astype(np.float32)
 
     for i, net in enumerate(nets):
         hid = net[-1]

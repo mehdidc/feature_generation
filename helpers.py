@@ -511,9 +511,14 @@ class GenericBrushLayer(lasagne.layers.Layer):
                      patches[patch_index]
         color : if 'predicted' taken from input then merge to patch colors.
                 if 'patch' then use patch colors only.
+                if ndarray, then we have a discrete number of learned colors,
+                and the array represents the initial colors and its shape
+                is (nb_colors, nb_col_channels).
+                
                 otherwise it should be a number if col is 'grayscale' or
                 a 3-tuple if col is 'rgb' and then then same color is
-                merged to the patches at all time steps.
+                merged to the patches at all time steps. 
+
         x_min : the minimum value for the coords in the w scale
         x_max : if 'width' it is equal to w, else use the provided value
 
@@ -588,6 +593,9 @@ class GenericBrushLayer(lasagne.layers.Layer):
             assert shape[1] == self.nb_col_channels
             self.ph, self.pw = shape[2:]
             self.patches_ = theano.shared(self.patches)
+        if type(self.color) == np.ndarray:
+            assert self.color.shape[1] == self.nb_col_channels
+            self.colors_ = self.add_param(self.color, self.color.shape, name="colors")
         self.eps = eps
         self._nb_input_features = incoming.output_shape[2]
         self.assign_ = {}
@@ -688,7 +696,16 @@ class GenericBrushLayer(lasagne.layers.Layer):
         else:
             patch_index = self.patch_index
 
-        if self.color == 'predicted':
+        if type(self.color) == np.ndarray:
+            nb = self.color.shape[0]
+            colors_pr = X[:, pointer:pointer + nb]#(nb_examples, nb_colors)
+            colors_pr = self.to_proba_func(colors_pr) # (nb_examples, nb_colors)
+            colors_mix = colors_pr.dimshuffle(0, 1, 'x') * self.colors_.dimshuffle('x', 0, 1) #(nb_examples, nb_colors, 1) * (1, nb_colors, nb_col_channels) = (nb_examples, nb_colors, nb_col_channels)
+            colors = colors_mix.sum(axis=1) #(nb_examples, nb_col_channels)
+            colors = self.normalize_func(colors) * (self.color_max - self.color_min) + self.color_min
+            self.assign_['color'] = (pointer, pointer + nb)
+            pointer += nb
+        elif self.color == 'predicted':
             colors = X[:, pointer:pointer + self.nb_col_channels]
             colors = self.normalize_func(colors) * (self.color_max - self.color_min)
             self.assign_['color'] = (pointer, pointer + self.nb_col_channels)
@@ -786,7 +803,9 @@ class GenericBrushLayer(lasagne.layers.Layer):
             o = o[:, patch_index]
             # -> shape (nb_examples, c, h, w)
 
-        if self.color == 'predicted':
+        if type(self.color) == np.ndarray:
+            o = o * colors.dimshuffle(0, 1, 'x', 'x')
+        elif self.color == 'predicted':
             o = o * colors.dimshuffle(0, 1, 'x', 'x')
         elif self.color == 'patches':
             pass

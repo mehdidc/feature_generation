@@ -113,7 +113,8 @@ def random_colorize(X, foreground=128, op='threshold', rng=np.random):
             raise Exception('Unknown op : {}'.format(op))
         #col = np.random.uniform(size=3)
         col = colors[rng.randint(0, len(colors) - 1)]
-        foreground_color = 255 - col
+        foreground_color = colors[rng.randint(0, len(colors) - 1)]
+        #foreground_color = 255 - col
         #foreground_color = np.random.uniform(size=3)
         X_new = np.ones((X.shape[0], X.shape[1], 3)) * col[np.newaxis, np.newaxis, :]
         X_new = X_new * (1 - foreground_mask) + foreground_mask * foreground_color
@@ -156,8 +157,26 @@ def pipeline_load_dataset(iterator, name, *args, **kwargs):
     module = getattr(datakit, name)
     return module.load_as_iterator(*args, **kwargs)
 
+def pipeline_load_toy(iterator, nb=100, w=28, h=28, ph=(1, 5), pw=(1, 5), rng=np.random):
+    def fn():
+        for _ in range(nb):
+            if hasattr(ph, '__len__'):
+                ph_ = rng.randint(*ph)
+            else:
+                ph_ = ph
+            if hasattr(pw, '__len__'):
+                pw_ = rng.randint(*pw)
+            else:
+                pw_ = pw
+            img = np.zeros((h + ph_, w + pw_, 1))
+            x, y = rng.randint(ph_/2, w), rng.randint(pw_/2, h)
+            img[y:y+pw_, x:x+ph_] = 255
+            img = img[0:h, 0:w, :]
+            yield {'X': img}
+    return fn()
 operators = {
     'dataset': pipeline_load_dataset,
+    'toy': pipeline_load_toy,
     'random_colorize': pipeline_random_colorize,
     'imagefilelist': pipeline_imagefilelist,
     'imageread': pipeline_imageread,
@@ -170,7 +189,8 @@ operators = {
     'normalize_shape': pipeline_normalize_shape,
     'shuffle': pipeline_shuffle,
     'repeat': pipeline_repeat,
-    'force_rgb': pipeline_force_rgb
+    'force_rgb': pipeline_force_rgb,
+    'toy': pipeline_load_toy
 }
 
 def loader(params):
