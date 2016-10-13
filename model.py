@@ -7760,7 +7760,7 @@ def model102(w=32, h=32, c=1, n_steps=1, patch_size=4):
         x_stride=[0.25, 1],
         y_stride=[0.25, 1],
         patch_index=0,
-        color=np.ones((6, 3)).astype(np.float32),
+        color=np.ones((12, 3)).astype(np.float32),
         x_min=-8,
         x_max=24,
         y_min=-8,
@@ -7769,6 +7769,8 @@ def model102(w=32, h=32, c=1, n_steps=1, patch_size=4):
         h_right_pad=16,
         w_left_pad=16,
         w_right_pad=16,
+        color_min=-1,
+        color_max=1,
         name="brush",
         coords='continuous',
     )
