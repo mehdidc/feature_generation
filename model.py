@@ -6,7 +6,7 @@ from lasagnekit.layers import Deconv2DLayer
 from helpers import FeedbackGRULayer, TensorDenseLayer
 from layers import FeedbackGRULayerClean, AddParams
 from helpers import Deconv2DLayer as deconv2d
-from helpers import correct_over_op, over_op, sum_op, max_op, thresh_op, normalized_over_op, mask_op, mask_smooth_op, sub_op
+from helpers import correct_over_op, over_op, sum_op, max_op, thresh_op, normalized_over_op, mask_op, mask_smooth_op, sub_op, normalized_sum_op
 from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse, norm_maxmin, max_k_spatial
 from helpers import Repeat
 from helpers import BrushLayer, GenericBrushLayer
@@ -71,6 +71,7 @@ normalize_funcs = {
 
 reduce_funcs = {
     'sum': sum_op,
+    'normalized_sum': normalized_sum_op,
     'over': over_op,
     'normalized_over': normalized_over_op,
     'max': max_op,
@@ -5485,6 +5486,7 @@ def model88(w=32, h=32, c=1,
             h_right_pad=0,
             color_min=0,
             color_max=1,
+            stride_normalize=False,
             eps=0):
 
     """
@@ -5607,6 +5609,7 @@ def model88(w=32, h=32, c=1,
             h_right_pad=h_right_pad,
             color_min=color_min,
             color_max=color_max,
+            stride_normalize=stride_normalize,
             eps=eps,
             name="brush_{}".format(i)
         )

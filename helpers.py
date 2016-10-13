@@ -387,6 +387,14 @@ def over_op(prev, new):
     new = (new)
     return prev + new * (1 - prev)
 
+def normalized_sum_op(new, prev):
+    eps = 1e-10
+    # if new and prev used different strides, this is important.
+    new = new - new.min(axis=(1, 2, 2), keepdims=True) 
+    new = new / (new.max(axis=(1, 2, 3), keepdims=True) + eps)
+    prev = prev - prev.min(axis=(1, 2, 3), keepdims=True) 
+    prev = prev / (prev.max(axis=(1, 2, 3), keepdims=True) + eps)
+    return new + prev
 
 def sub_op(new, prev):
     return prev - new
@@ -473,6 +481,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
                  h_right_pad=0,
                  color_min=0,
                  color_max=1,
+                 stride_normalize=False,
                  eps=0,
                  learn_patches=False,
                  **kwargs):
@@ -519,6 +528,15 @@ class GenericBrushLayer(lasagne.layers.Layer):
         w_right_pad : same than w_left_pad but right of the image
         h_left_pad  : like w_left_pad but for height
         h_right_pad :  like w_right_pad but for height
+
+        color_min : min val of color. this and color_max can be helpful to implement negative colors, negative colors can be used
+                    to predicted delta color instead of color so that when canvas are summed up something like opacity could be implemented
+                    . for instance if we have two overlapping brushes (first is bigger than second) and we want want with color [1 0 0] and the second
+                    [0 1 0], what we can do is to predict the color [1 0 0] for the first and the color [-1 1 0] for the second so that the red
+                    component is cancelled.
+        color_max : max val of color
+        stride_normalize : if True multiply Fx by stride_x and Fy by stride_y, this is useful when adding canvas
+                           which has different strides, stride_nornalize makes canvas of different stride on the same scale.
         """
         super(GenericBrushLayer, self).__init__(incoming, **kwargs)
         self.incoming = incoming
@@ -552,6 +570,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
         self.h_right_pad = h_right_pad
         self.color_min = color_min
         self.color_max = color_max
+        self.stride_normalize = stride_normalize
 
         if learn_patches:
             if isinstance(self.patches, np.ndarray):
@@ -671,8 +690,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
 
         if self.color == 'predicted':
             colors = X[:, pointer:pointer + self.nb_col_channels]
-            #colors = self.normalize_func(colors) * (self.color_max - self.color_min)
-            colors =  T.tanh(colors)
+            colors = self.normalize_func(colors) * (self.color_max - self.color_min)
             self.assign_['color'] = (pointer, pointer + self.nb_col_channels)
             pointer += self.nb_col_channels
         elif self.color == 'patches':
@@ -730,9 +748,10 @@ class GenericBrushLayer(lasagne.layers.Layer):
 
         Fx = T.exp(-(a_ - ux_) ** 2 / (2 * x_sigma_ ** 2))
         Fx = Fx / (Fx.sum(axis=2, keepdims=True) + self.eps)
+        if self.stride_normalize:
+            Fx = Fx * sx.dimshuffle(0, 'x', 'x')
         if w_left_pad and w_right_pad:
             Fx = Fx[:, :, w_left_pad:-w_right_pad]
-
         uy = (gy.dimshuffle(0, 'x') +
               (T.arange(1, ph + 1) - ph/2. - 0.5) * sy.dimshuffle(0, 'x'))
         # shape of uy : (nb_examples, ph)
@@ -741,6 +760,8 @@ class GenericBrushLayer(lasagne.layers.Layer):
         Fy = T.exp(-(b_ - uy_) ** 2 / (2 * y_sigma_ ** 2))
         # shape of Fy : (nb_examples, ph, h)
         Fy = Fy / (Fy.sum(axis=2, keepdims=True) + self.eps)
+        if self.stride_normalize:
+            Fy = Fy * sy.dimshuffle(0, 'x', 'x')
         if h_left_pad and h_right_pad:
             Fy = Fy[:, :, h_left_pad:-h_right_pad]
         
