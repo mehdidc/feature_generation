@@ -1,0 +1,49 @@
+{
+"budget_hours": 10,
+"dataset": "loader",
+"data_params":{
+    "pipeline": [
+            {"name": "imagefilelist", "params": {"pattern": "yale/YALE/**/*.pgm"}},
+            {"name": "shuffle", "params": {}},
+            {"name": "imageread", "params": {}},
+            {"name": "normalize_shape", "params": {}},
+            {"name": "resize", "params": {"shape": [32, 32]}},
+            {"name": "divide_by", "params": {"value": 255}},
+            {"name": "order", "params": {"order": "th"}}
+        ]
+},
+"model_name": "model100",
+"model_params": {   
+        "n_steps": 40,
+        "nb_fc_layers": 1,
+        "nb_fc_units": [32],
+        "nb_recurrent_units": 256,
+        "nonlin": "very_leaky_rectify",
+        "patch_size": 1,
+        "reduce_func": "sum",
+        "nonlin_out": "msigmoid",
+        "normalize_func": "sigmoid",
+        "proba_func": "softmax",
+        "x_sigma": 0.5,
+        "y_sigma": 0.5,
+        "x_stride": 1,
+        "y_stride": 1,
+        "color": "predicted",
+        "x_min": 0,
+        "x_max": "width",
+        "y_min": 0,
+        "y_max": "height",
+        "nb_patches": 1,
+        "patch_index": 0,
+        "nb_filters_resid": [32, 64, 32],
+        "size_filters_resid": [3, 3, 3, 3],
+        "merge_op_resid": "mean" 
+},
+"optimization": {
+    "algo": "adadelta",
+    "learning_rate": 0.01,
+    "max_nb_epochs": 9999999999,
+    "patience_nb_epochs": 500
+},
+"report_rec_error": false
+}
