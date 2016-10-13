@@ -484,6 +484,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
                  stride_normalize=False,
                  eps=0,
                  learn_patches=False,
+                 coords='continuous',
                  **kwargs):
         """
         w : width of resulting image
@@ -576,6 +577,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
         self.color_min = color_min
         self.color_max = color_max
         self.stride_normalize = stride_normalize
+        self.coords = coords
 
         if learn_patches:
             if isinstance(self.patches, np.ndarray):
@@ -616,13 +618,34 @@ class GenericBrushLayer(lasagne.layers.Layer):
         nb_features = self._nb_input_features
 
         gx, gy = X[:, 0], X[:, 1]
+    
+        pointer = 0
+        if self.coords == 'continuous':
+            gx = self.normalize_func(gx) * (self.x_max - self.x_min) + self.x_min
+            gy = self.normalize_func(gy) * (self.y_max - self.y_min) + self.y_min
+            self.assign_['gx'] = 0
+            self.assign_['gy'] = 1
+            pointer += 2
+        elif self.coords == 'discrete':
+            nx = self.x_max - self.x_min
+            cx = theano.shared(np.linspace(0, 1, nx).astype(np.float32))
+            gx_pr = X[:, pointer:pointer + nx]
+            gx_pr = self.to_proba_func(gx_pr)
+            gx = T.dot(gx_pr, cx)
+            gx = gx * (self.x_max - self.x_min) + self.x_min
+            self.assign_['gx'] = (pointer, pointer + nx)
+            pointer += nx
 
-        gx = self.normalize_func(gx) * (self.x_max - self.x_min) + self.x_min
-        gy = self.normalize_func(gy) * (self.y_max - self.y_min) + self.y_min
-        self.assign_['gx'] = 0
-        self.assign_['gy'] = 1
-
-        pointer = 2
+            ny = self.y_max - self.y_min
+            cy = theano.shared(np.linspace(0, 1, ny).astype(np.float32))
+            gy_pr = X[:, pointer:pointer + ny]
+            gy_pr = self.to_proba_func(gy_pr)
+            gy = T.dot(gy_pr, cy)
+            gy = gy * (self.y_max - self.y_min) + self.y_min
+            self.assign_['gy'] = (pointer, pointer + ny)
+            pointer += ny
+        else:
+            raise Exception('invalid value : {} for coords'.format(self.coords))
         if self.x_stride == 'predicted':
             sx = X[:, pointer]
             sx = self.normalize_func(sx)
@@ -707,7 +730,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
             pointer += nb
         elif self.color == 'predicted':
             colors = X[:, pointer:pointer + self.nb_col_channels]
-            colors = self.normalize_func(colors) * (self.color_max - self.color_min)
+            colors = self.normalize_func(colors) * (self.color_max - self.color_min) + self.color_min
             self.assign_['color'] = (pointer, pointer + self.nb_col_channels)
             pointer += self.nb_col_channels
         elif self.color == 'patches':

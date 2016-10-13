@@ -157,7 +157,7 @@ def pipeline_load_dataset(iterator, name, *args, **kwargs):
     module = getattr(datakit, name)
     return module.load_as_iterator(*args, **kwargs)
 
-def pipeline_load_toy(iterator, nb=100, w=28, h=28, ph=(1, 5), pw=(1, 5), rng=np.random):
+def pipeline_load_toy(iterator, nb=100, w=28, h=28, ph=(1, 5), pw=(1, 5), nb_patches=1, rng=np.random):
     def fn():
         for _ in range(nb):
             if hasattr(ph, '__len__'):
@@ -169,11 +169,13 @@ def pipeline_load_toy(iterator, nb=100, w=28, h=28, ph=(1, 5), pw=(1, 5), rng=np
             else:
                 pw_ = pw
             img = np.zeros((h + ph_, w + pw_, 1))
-            x, y = rng.randint(ph_/2, w), rng.randint(pw_/2, h)
-            img[y:y+pw_, x:x+ph_] = 255
+            for _ in range(nb_patches):
+                x, y = rng.randint(ph_/2, w), rng.randint(pw_/2, h)
+                img[y:y+pw_, x:x+ph_] = 255
             img = img[0:h, 0:w, :]
             yield {'X': img}
     return fn()
+
 operators = {
     'dataset': pipeline_load_dataset,
     'toy': pipeline_load_toy,

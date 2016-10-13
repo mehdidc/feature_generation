@@ -5559,7 +5559,7 @@ def model88(w=32, h=32, c=1,
                     nb_recurrent_units[l], 
                     name="recurrent{}_{}".format(l, n))
         net.append(hid)
-    nb = ( 2 +
+    nb = ( (2 if coords == 'continuous' else (w+h) if coords == 'discrete' else 0) +
           (1 if x_sigma == 'predicted' else 0) +
           (len(x_sigma) if type(x_sigma) == list else 0) + 
           (1 if y_sigma == 'predicted' else 0) +
@@ -5614,6 +5614,7 @@ def model88(w=32, h=32, c=1,
             color_min=color_min,
             color_max=color_max,
             stride_normalize=stride_normalize,
+            coords=coords,
             eps=eps,
             name="brush_{}".format(i)
         )

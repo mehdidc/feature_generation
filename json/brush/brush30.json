@@ -29,7 +29,7 @@
         "y_min": 0,
         "y_max": "height",
         "recurrent_model": "rnn",
-        "parallel": 2,
+        "parallel": 1,
         "parallel_reduce_func": "sum",
         "parallel_share": false
 },
