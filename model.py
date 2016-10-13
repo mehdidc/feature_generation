@@ -5487,6 +5487,7 @@ def model88(w=32, h=32, c=1,
             color_min=0,
             color_max=1,
             stride_normalize=False,
+            coords='continuous',
             eps=0):
 
     """
