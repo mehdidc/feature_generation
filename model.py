@@ -7802,7 +7802,7 @@ def model102(w=32, h=32, c=1, n_steps=1, patch_size=4):
 
 def model103(w=32, h=32, c=1, patch_size=16, n_steps=2):
 
-    nb_recurrent_units = 32
+    nb_recurrent_units = 64
     nb_coords = 12
 
     output_shape = (None, c, h, w)
@@ -7857,7 +7857,8 @@ def model103(w=32, h=32, c=1, patch_size=16, n_steps=2):
     hid_to_in = layers.ReshapeLayer(hid_to_in, ([0], w, h))
 
     def predict_input(xprev, hprev, oprev):
-        return xprev - oprev
+        oprev_ = oprev.reshape((oprev.shape[0], c, h, w))
+        return xprev - oprev_ 
     
     def predict_repr(x):
         return layers.get_output(in_to_repr, x)
