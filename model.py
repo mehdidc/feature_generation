@@ -7801,10 +7801,8 @@ def model102(w=32, h=32, c=1, n_steps=1, patch_size=4):
     return layers_from_list_to_dict(all_layers)
 
 def model103(w=32, h=32, c=1, patch_size=16, n_steps=2):
-
-    nb_recurrent_units = 256
+    nb_recurrent_units = 10
     nb_coords = 12
-
     output_shape = (None, c, h, w)
     patches = np.ones((1, c, patch_size, patch_size)).astype(np.float32)
     in_ = layers.InputLayer((None, c, w, h), name="input")
@@ -7814,14 +7812,14 @@ def model103(w=32, h=32, c=1, patch_size=16, n_steps=2):
       num_filters=[],
       size_conv_filters=[],
       pooling=False,
-      nb_fc_units=[1000],
+      nb_fc_units=[10],
       nonlin=rectify)
     hid = hids[-1]
     in_to_repr = hid
     hidden_state = layers.InputLayer((None, nb_recurrent_units))
     coord = layers.DenseLayer(hidden_state, nb_coords, nonlinearity=linear)
     coord = layers.ReshapeLayer(coord, ([0], 1, nb_coords))
-    color = np.ones((6, 3)).astype(np.float32)
+    color = np.ones((6, c)).astype(np.float32)
     brush = GenericBrushLayer(
         coord,
         w, h,
@@ -7829,15 +7827,15 @@ def model103(w=32, h=32, c=1, patch_size=16, n_steps=2):
         patches=patches,
         col='rgb' if c == 3 else 'grayscale',
         return_seq=False,
-        reduce_func=reduce_funcs['mask'],
+        reduce_func=reduce_funcs['sum'],
         to_proba_func=proba_funcs['softmax'],
         normalize_func=normalize_funcs['sigmoid'],
         x_sigma=0.5,
         y_sigma=0.5,
-        x_stride=[0.25, 1],
-        y_stride=[0.25, 1],
+        x_stride='predicted',
+        y_stride='predicted',
         patch_index=0,
-        color=color,
+        color=[1],
         x_min=-8,
         x_max=24,
         y_min=-8,
@@ -7887,8 +7885,6 @@ def model103(w=32, h=32, c=1, patch_size=16, n_steps=2):
     all_layers = ([in_] +
                   hids + [raw_out, out])
     return layers_from_list_to_dict(all_layers)
-
-
 
 build_convnet_simple = model1
 build_convnet_simple_2 = model2

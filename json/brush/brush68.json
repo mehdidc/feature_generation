@@ -3,12 +3,9 @@
 "dataset": "loader",
 "data_params":{
     "pipeline": [
-        {"name": "toy", "params": {"nb": 100000, "w": 16, "h": 16, "pw": 4, "ph": 4}},
+        {"name": "toy", "params": {"nb": 10, "w": 16, "h": 16, "pw": 4, "ph": 4}},
         {"name": "shuffle", "params": {}},
         {"name": "normalize_shape", "params": {}},
-        {"name": "random_colorize", "params":{"op": "threshold_inv"}},
-        {"name": "resize", "params": {"shape": [16, 16]}},
-        {"name": "force_rgb", "params": {}},
         {"name": "divide_by", "params": {"value": 255}},
         {"name": "order", "params": {"order": "th"}}
     ]
