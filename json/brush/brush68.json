@@ -3,7 +3,7 @@
 "dataset": "loader",
 "data_params":{
     "pipeline": [
-        {"name": "toy", "params": {"nb": 10, "w": 16, "h": 16, "pw": 4, "ph": 4}},
+        {"name": "toy", "params": {"nb": 10000, "w": 16, "h": 16, "pw": 4, "ph": 4}},
         {"name": "shuffle", "params": {}},
         {"name": "normalize_shape", "params": {}},
         {"name": "random_colorize", "params":{"op": "threshold_inv"}},
