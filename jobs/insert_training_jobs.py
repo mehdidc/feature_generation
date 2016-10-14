@@ -3074,7 +3074,8 @@ def jobset66():
             parallel=1,
             parallel_share=False,
             parallel_reduce_func='sum',            
-            stride_normalize=rng.choice((True, False))
+            stride_normalize=rng.choice((True, False)),
+            learn_bias_scale=False,
         )
 
         if rng.uniform(0,1) <= 0.5:

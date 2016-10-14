@@ -5488,6 +5488,7 @@ def model88(w=32, h=32, c=1,
             color_max=1,
             stride_normalize=False,
             coords='continuous',
+            learn_bias_scale=True,
             eps=0):
 
     """
@@ -5639,11 +5640,14 @@ def model88(w=32, h=32, c=1,
         name="raw_output",
         output_shape=output_shape)
     
-    scaled_out = layers.ScaleLayer(
-        raw_out, scales=init.Constant(2.), name="scaled_output")
-    biased_out = layers.BiasLayer(
-        scaled_out, b=init.Constant(-1), name="biased_output")
-
+    if learn_bias_scale:
+        scaled_out = layers.ScaleLayer(
+            raw_out, scales=init.Constant(2.), name="scaled_output")
+        biased_out = layers.BiasLayer(
+            scaled_out, b=init.Constant(-1), name="biased_output")
+    else:
+        scaled_out = raw_out
+        biased_out = raw_out
     out = layers.NonlinearityLayer(
         biased_out,
         nonlinearity=get_nonlinearity[nonlin_out],
@@ -7732,17 +7736,23 @@ def model102(w=32, h=32, c=1, n_steps=1, patch_size=4):
     """
     """
     l_in = layers.InputLayer((None, c, w, h), name="input")
-    hid = layers.DenseLayer(l_in, 256, nonlinearity=rectify, name="hid")
-    hid = layers.DenseLayer(hid, 256, nonlinearity=rectify, name="hid")
+    hid = layers.Conv2DLayer(
+            l_in,
+            num_filters=64,
+            filter_size=(5, 5),
+            nonlinearity=rectify,
+            W=init.GlorotUniform(),
+            name="conv")
+    #hid = layers.DenseLayer(l_in, 256, nonlinearity=rectify, name="hid")
+    hid = layers.DenseLayer(hid, 128, nonlinearity=rectify, name="hid")
+
     #hid = layers.DenseLayer(hid, n_steps * 2, nonlinearity=linear, name="hid")
     #l_coord = layers.ReshapeLayer(hid, ([0], n_steps, 2), name="coord")
-    
-    #hid = Repeat(hid, n_steps)
-    hid = layers.DenseLayer(hid, 256*n_steps, nonlinearity=rectify, name="hid")
-    hid = layers.ReshapeLayer(hid, ([0], n_steps, 256), name="hid")
+    hid = Repeat(hid, n_steps)
+    #hid = layers.DenseLayer(hid, 256*n_steps, nonlinearity=rectify, name="hid")
+    #hid = layers.ReshapeLayer(hid, ([0], n_steps, 256), name="hid")
     hid = layers.GRULayer(hid, 256)
     l_coord = TensorDenseLayer(hid, 100, nonlinearity=linear, name="coord")
-    
     patches = np.ones((1, c, patch_size, patch_size))
     patches = patches.astype(np.float32)
     l_brush = GenericBrushLayer(
@@ -7775,14 +7785,18 @@ def model102(w=32, h=32, c=1, n_steps=1, patch_size=4):
         coords='continuous',
     )
     l_raw_out = l_brush
-    l_scaled_out = layers.ScaleLayer(
-        l_raw_out, scales=init.Constant(2.), name="scaled_output")
-    l_biased_out = layers.BiasLayer(
-        l_scaled_out, b=init.Constant(-1), name="biased_output")
-    l_out = layers.NonlinearityLayer(
-        l_biased_out,
-        nonlinearity=get_nonlinearity['sigmoid'],
-        name="output")
+    l_out = l_raw_out
+    l_scaled_out = l_raw_out
+    l_biased_out = l_biased_out
+    #l_scaled_out = layers.ScaleLayer(
+    #    l_raw_out, scales=init.Constant(2.), name="scaled_output")
+    #l_biased_out = layers.BiasLayer(
+    #    l_scaled_out, b=init.Constant(-1), name="biased_output")
+    
+    #l_out = layers.NonlinearityLayer(
+    #    l_biased_out,
+    #    nonlinearity=get_nonlinearity['sigmoid'],
+    #    name="output")
     all_layers = ([l_in] +
                   [l_coord, l_brush, l_raw_out, l_biased_out, l_scaled_out,  l_out])
     return layers_from_list_to_dict(all_layers)
