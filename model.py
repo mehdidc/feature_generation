@@ -7787,16 +7787,16 @@ def model102(w=32, h=32, c=1, n_steps=1, patch_size=4):
     l_raw_out = l_brush
     l_out = l_raw_out
     l_scaled_out = l_raw_out
-    l_biased_out = l_biased_out
+    l_biased_out = l_raw_out
     #l_scaled_out = layers.ScaleLayer(
     #    l_raw_out, scales=init.Constant(2.), name="scaled_output")
     #l_biased_out = layers.BiasLayer(
     #    l_scaled_out, b=init.Constant(-1), name="biased_output")
     
-    #l_out = layers.NonlinearityLayer(
-    #    l_biased_out,
-    #    nonlinearity=get_nonlinearity['sigmoid'],
-    #    name="output")
+    l_out = layers.NonlinearityLayer(
+        l_biased_out,
+        nonlinearity=get_nonlinearity['linear'],
+        name="output")
     all_layers = ([l_in] +
                   [l_coord, l_brush, l_raw_out, l_biased_out, l_scaled_out,  l_out])
     return layers_from_list_to_dict(all_layers)
