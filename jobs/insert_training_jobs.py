@@ -3077,7 +3077,6 @@ def jobset66():
             stride_normalize=rng.choice((True, False)),
             learn_bias_scale=False,
         )
-
         if rng.uniform(0,1) <= 0.5:
             model_params.update(dict(
                 w_left_pad=16,

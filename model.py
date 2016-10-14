@@ -7745,7 +7745,6 @@ def model102(w=32, h=32, c=1, n_steps=1, patch_size=4):
             name="conv")
     #hid = layers.DenseLayer(l_in, 256, nonlinearity=rectify, name="hid")
     hid = layers.DenseLayer(hid, 128, nonlinearity=rectify, name="hid")
-
     #hid = layers.DenseLayer(hid, n_steps * 2, nonlinearity=linear, name="hid")
     #l_coord = layers.ReshapeLayer(hid, ([0], n_steps, 2), name="coord")
     hid = Repeat(hid, n_steps)
@@ -7779,7 +7778,7 @@ def model102(w=32, h=32, c=1, n_steps=1, patch_size=4):
         h_right_pad=16,
         w_left_pad=16,
         w_right_pad=16,
-        color_min=-1,
+        color_min=0,
         color_max=1,
         name="brush",
         coords='continuous',
@@ -7792,7 +7791,6 @@ def model102(w=32, h=32, c=1, n_steps=1, patch_size=4):
     #    l_raw_out, scales=init.Constant(2.), name="scaled_output")
     #l_biased_out = layers.BiasLayer(
     #    l_scaled_out, b=init.Constant(-1), name="biased_output")
-    
     l_out = layers.NonlinearityLayer(
         l_biased_out,
         nonlinearity=get_nonlinearity['linear'],
