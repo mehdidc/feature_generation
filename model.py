@@ -9,7 +9,7 @@ from helpers import Deconv2DLayer as deconv2d
 from helpers import correct_over_op, over_op, sum_op, max_op, thresh_op, normalized_over_op, mask_op, mask_smooth_op, sub_op, normalized_sum_op
 from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse, norm_maxmin, max_k_spatial
 from helpers import Repeat
-from helpers import BrushLayer, GenericBrushLayer
+from helpers import BrushLayer, GenericBrushLayer, one_step_brush_layer
 from helpers import GaussianSampleLayer, ExpressionLayerMulti, axify
 from helpers import recurrent_accumulation
 import theano.tensor as T
@@ -77,9 +77,9 @@ reduce_funcs = {
     'max': max_op,
     'new': lambda prev, new: new+prev-prev,
     'prev': lambda prev, new: prev+new-new,
-    'mask_op': mask_op,
+    'mask': mask_op,
     'mask_smooth_op': mask_smooth_op,
-    'sub_op': sub_op
+    'sub': sub_op
 }
 
 proba_funcs = {
@@ -7762,7 +7762,7 @@ def model102(w=32, h=32, c=1, n_steps=1, patch_size=4):
         patches=patches,
         col='rgb' if c == 3 else 'grayscale',
         return_seq=False,
-        reduce_func=reduce_funcs['sum'],
+        reduce_func=reduce_funcs['mask'],
         to_proba_func=proba_funcs['softmax'],
         normalize_func=normalize_funcs['sigmoid'],
         x_sigma=0.5,
@@ -7799,6 +7799,95 @@ def model102(w=32, h=32, c=1, n_steps=1, patch_size=4):
     all_layers = ([l_in] +
                   [l_coord, l_brush, l_raw_out, l_biased_out, l_scaled_out,  l_out])
     return layers_from_list_to_dict(all_layers)
+
+def model103(w=32, h=32, c=1, patch_size=16, n_steps=2):
+
+    nb_recurrent_units = 32
+    nb_coords = 12
+
+    output_shape = (None, c, h, w)
+    patches = np.ones((1, c, patch_size, patch_size)).astype(np.float32)
+    in_ = layers.InputLayer((None, c, w, h), name="input")
+    hid = in_
+    hids = conv_fc(
+      hid, 
+      num_filters=[],
+      size_conv_filters=[],
+      pooling=False,
+      nb_fc_units=[128],
+      nonlin=rectify)
+    hid = hids[-1]
+    in_to_repr = hid
+    hidden_state = layers.InputLayer((None, nb_recurrent_units))
+    coord = layers.DenseLayer(hidden_state, nb_coords, nonlinearity=linear)
+    coord = layers.ReshapeLayer(coord, ([0], 1, nb_coords))
+    color = np.ones((6, 3)).astype(np.float32)
+    brush = GenericBrushLayer(
+        coord,
+        w, h,
+        n_steps=1,
+        patches=patches,
+        col='rgb' if c == 3 else 'grayscale',
+        return_seq=False,
+        reduce_func=reduce_funcs['mask'],
+        to_proba_func=proba_funcs['softmax'],
+        normalize_func=normalize_funcs['sigmoid'],
+        x_sigma=0.5,
+        y_sigma=0.5,
+        x_stride=[0.25, 1],
+        y_stride=[0.25, 1],
+        patch_index=0,
+        color=color,
+        x_min=-8,
+        x_max=24,
+        y_min=-8,
+        y_max=24,
+        h_left_pad=16,
+        h_right_pad=16,
+        w_left_pad=16,
+        w_right_pad=16,
+        color_min=0,
+        color_max=1,
+        name="brush",
+        coords='continuous',
+    )
+    hid_to_out = layers.ReshapeLayer(brush, ([0], c*h*w))
+    
+    hid_to_in = layers.DenseLayer(hidden_state, w*h, nonlinearity=sigmoid)
+    hid_to_in = layers.ReshapeLayer(hid_to_in, ([0], w, h))
+
+    def predict_input(xprev, hprev, oprev):
+        return xprev - oprev
+    
+    def predict_repr(x):
+        return layers.get_output(in_to_repr, x)
+
+    def predict_output(oprev, hcur):
+        return layers.get_output(hid_to_out, hcur)
+    
+    repr_shape = in_to_repr.output_shape
+    out_shape = hid_to_out.output_shape
+    brush = FeedbackGRULayerClean(
+        in_, nb_recurrent_units, 
+        predict_input=predict_input,
+        predict_output=predict_output,
+        predict_repr=predict_repr,
+        repr_shape=repr_shape,
+        out_shape=out_shape,
+        n_steps=n_steps,
+        name='coord')
+    brush = layers.ReshapeLayer(brush, ([0], n_steps, c, h, w))
+    raw_out = layers.ExpressionLayer(brush, lambda x:x.sum(axis=1))
+    raw_out = AddParams(raw_out, [in_to_repr, hid_to_out], name="raw_output")
+    out = layers.NonlinearityLayer(
+        raw_out,
+        nonlinearity=get_nonlinearity['linear'],
+        name="output")
+    all_layers = ([in_] +
+                  hids + [raw_out, out])
+    return layers_from_list_to_dict(all_layers)
+
+
 
 build_convnet_simple = model1
 build_convnet_simple_2 = model2

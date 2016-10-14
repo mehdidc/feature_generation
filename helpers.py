@@ -862,6 +862,8 @@ class GenericBrushLayer(lasagne.layers.Layer):
         else:
             return output[:, -1]
 
+def one_step_brush_layer(*args, **kwargs):
+    return GenericBrushLayer(n_steps=1, return_seq=False, *args, **kwargs)[:, 0, :, :, :]
 
 def test_generic_batch_layer():
     from lasagne import layers

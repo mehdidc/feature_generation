@@ -13,7 +13,7 @@
         {"name": "order", "params": {"order": "th"}}
     ]
 },
-"model_name": "model102",
+"model_name": "model103",
 "model_params": {   
     "n_steps": 2,
     "patch_size": 16          
