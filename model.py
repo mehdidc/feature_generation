@@ -7879,12 +7879,11 @@ def model103(w=32, h=32, c=1, patch_size=16, n_steps=2):
         n_steps=n_steps,
         name='coord')
     brush = layers.ReshapeLayer(brush, ([0], n_steps, c, h, w))
-    raw_out = layers.ExpressionLayer(brush, lambda x:x.sum(axis=1))
-    raw_out = AddParams(raw_out, [in_to_repr, hid_to_out], name="raw_output")
-
+    raw_out = layers.ExpressionLayer(brush, lambda x:x.sum(axis=1), name='raw_output')
     scaled_out = layers.ScaleLayer(raw_out, scales=init.Constant(0.5), name="scaled_output")
+    scaled_out= AddParams(scaled_out, [in_to_repr, hid_to_out], name="scaled_output")
     out = layers.NonlinearityLayer(
-        raw_out,
+        scaled_out,
         nonlinearity=get_nonlinearity['linear'],
         name="output")
     all_layers = ([in_] +
