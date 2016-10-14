@@ -651,9 +651,8 @@ class GenericBrushLayer(lasagne.layers.Layer):
         elif type(self.x_stride) == list:
             xs = (np.array(self.x_stride).astype(np.float32))
             xs_pr = X[:, pointer:pointer + len(xs)]
-            xs_pr = self.to_proba_func(xs_pr) * xs
-            xs_pr = xs_pr.sum(axis=1)
-            sx = xs_pr
+            xs_pr = self.to_proba_func(xs_pr)
+            sx = T.dot(xs_pr, xs)
             self.assign_['x_stride'] = (pointer, pointer + len(xs))
             pointer += len(xs)
         else:
@@ -668,8 +667,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
             ys = (np.array(self.y_stride).astype(np.float32))
             ys_pr = X[:, pointer:pointer + len(ys)]
             ys_pr = self.to_proba_func(ys_pr) * ys
-            ys_pr = ys_pr.sum(axis=1)
-            sy = ys_pr
+            sy = T.dot(ys_pr, ys)
             self.assign_['y_stride'] = (pointer, pointer + len(ys))
             pointer += len(ys)
         else:

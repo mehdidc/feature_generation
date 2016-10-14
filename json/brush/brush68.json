@@ -3,7 +3,7 @@
 "dataset": "loader",
 "data_params":{
     "pipeline": [
-        {"name": "toy", "params": {"nb": 10, "w": 16, "h": 16, "pw": 4, "ph": 4}},
+        {"name": "toy", "params": {"nb": 2000, "w": 16, "h": 16, "pw": 4, "ph": 4, "nb_patches": 2}},
         {"name": "shuffle", "params": {}},
         {"name": "normalize_shape", "params": {}},
         {"name": "divide_by", "params": {"value": 255}},
@@ -13,7 +13,7 @@
 "model_name": "model103",
 "model_params": {   
     "n_steps": 2,
-    "patch_size": 16          
+    "patch_size": 8
 },
 "optimization": {
     "algo": "adadelta",

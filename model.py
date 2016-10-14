@@ -85,7 +85,8 @@ reduce_funcs = {
 proba_funcs = {
     'softmax': T.nnet.softmax,
     'sparsemax': sparsemax,
-    'is_max': is_max
+    'is_max': is_max,
+    'normalize': lambda x:rectify(x) / (rectify(x).sum(axis=1, keepdims=True) + 1e-10)
 }
 
 recurrent_models = {
@@ -7832,18 +7833,19 @@ def model103(w=32, h=32, c=1, patch_size=16, n_steps=2):
         normalize_func=normalize_funcs['sigmoid'],
         x_sigma=0.5,
         y_sigma=0.5,
-        x_stride='predicted',
-        y_stride='predicted',
+        x_stride=[0.5, 1],
+        y_stride=[0.5, 1],
         patch_index=0,
         color=[1],
-        x_min=-8,
-        x_max=24,
-        y_min=-8,
-        y_max=24,
+        x_min=0,
+        x_max='width',
+        y_min=0,
+        y_max='height',
         h_left_pad=16,
         h_right_pad=16,
         w_left_pad=16,
         w_right_pad=16,
+        stride_normalize=True,
         color_min=0,
         color_max=1,
         name="brush",
@@ -7856,6 +7858,7 @@ def model103(w=32, h=32, c=1, patch_size=16, n_steps=2):
 
     def predict_input(xprev, hprev, oprev):
         oprev_ = oprev.reshape((oprev.shape[0], c, h, w))
+        return xprev - oprev_
         return xprev
 
     def predict_repr(x):
@@ -7878,6 +7881,8 @@ def model103(w=32, h=32, c=1, patch_size=16, n_steps=2):
     brush = layers.ReshapeLayer(brush, ([0], n_steps, c, h, w))
     raw_out = layers.ExpressionLayer(brush, lambda x:x.sum(axis=1))
     raw_out = AddParams(raw_out, [in_to_repr, hid_to_out], name="raw_output")
+
+    scaled_out = layers.ScaleLayer(raw_out, scales=init.Constant(0.5), name="scaled_output")
     out = layers.NonlinearityLayer(
         raw_out,
         nonlinearity=get_nonlinearity['linear'],
