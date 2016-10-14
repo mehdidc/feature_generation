@@ -7734,26 +7734,19 @@ def model101(nb_filters=64, w=32, h=32, c=1,
 
 
 def model102(w=32, h=32, c=1, n_steps=1, patch_size=4):
-    """
-    """
     l_in = layers.InputLayer((None, c, w, h), name="input")
-    hid = layers.Conv2DLayer(
-            l_in,
-            num_filters=64,
-            filter_size=(5, 5),
-            nonlinearity=rectify,
-            W=init.GlorotUniform(),
-            name="conv")
-    #hid = layers.DenseLayer(l_in, 256, nonlinearity=rectify, name="hid")
-    hid = layers.DenseLayer(hid, 128, nonlinearity=rectify, name="hid")
-    #hid = layers.DenseLayer(hid, n_steps * 2, nonlinearity=linear, name="hid")
-    #l_coord = layers.ReshapeLayer(hid, ([0], n_steps, 2), name="coord")
-    
-    #hid = Repeat(hid, n_steps)
-    hid = layers.DenseLayer(hid, 256*n_steps, nonlinearity=rectify, name="hid")
-    hid = layers.ReshapeLayer(hid, ([0], n_steps, 256), name="hid")
-    hid = layers.GRULayer(hid, 256)
-    l_coord = TensorDenseLayer(hid, 100, nonlinearity=linear, name="coord")
+    hid = l_in
+    hids = conv_fc(
+      hid, 
+      num_filters=[],
+      size_conv_filters=[],
+      pooling=False,
+      nb_fc_units=[40],
+      nonlin=rectify)
+    hid = hids[-1]
+    hid = Repeat(hid, n_steps)
+    hid = layers.GRULayer(hid, 40)
+    l_coord = TensorDenseLayer(hid, 12, nonlinearity=linear, name="coord")
     patches = np.ones((1, c, patch_size, patch_size))
     patches = patches.astype(np.float32)
     l_brush = GenericBrushLayer(
@@ -7762,47 +7755,43 @@ def model102(w=32, h=32, c=1, n_steps=1, patch_size=4):
         n_steps=n_steps,
         patches=patches,
         col='rgb' if c == 3 else 'grayscale',
-        return_seq=False,
-        reduce_func=reduce_funcs['mask'],
+        return_seq=True,
+        reduce_func=reduce_funcs['sum'],
         to_proba_func=proba_funcs['softmax'],
         normalize_func=normalize_funcs['sigmoid'],
         x_sigma=0.5,
         y_sigma=0.5,
-        x_stride=[0.25, 1],
-        y_stride=[0.25, 1],
+        x_stride=[0.5, 1],
+        y_stride=[0.5, 1],
         patch_index=0,
-        color=np.ones((18, 3)).astype(np.float32),
-        x_min=-8,
-        x_max=24,
-        y_min=-8,
-        y_max=24,
+        color=[1],
+        x_min=0,
+        x_max='width',
+        y_min=0,
+        y_max='height',
         h_left_pad=16,
         h_right_pad=16,
         w_left_pad=16,
         w_right_pad=16,
+        stride_normalize=True,
         color_min=0,
         color_max=1,
         name="brush",
         coords='continuous',
     )
-    l_raw_out = l_brush
-    l_out = l_raw_out
-    l_scaled_out = l_raw_out
-    l_biased_out = l_raw_out
-    #l_scaled_out = layers.ScaleLayer(
-    #    l_raw_out, scales=init.Constant(2.), name="scaled_output")
-    #l_biased_out = layers.BiasLayer(
-    #    l_scaled_out, b=init.Constant(-1), name="biased_output")
+    l_raw_out = layers.ExpressionLayer(l_brush, lambda x:x.sum(axis=1, keepdims=True), name="raw_out")
+    l_scaled_out = layers.ScaleLayer(
+        l_raw_out, scales=init.Constant(0.5), name="scaled_output")
     l_out = layers.NonlinearityLayer(
-        l_biased_out,
+        l_scaled_out,
         nonlinearity=get_nonlinearity['linear'],
         name="output")
-    all_layers = ([l_in] +
-                  [l_coord, l_brush, l_raw_out, l_biased_out, l_scaled_out,  l_out])
+    all_layers = ([l_in] + hids + 
+                  [l_coord, l_brush, l_raw_out, l_scaled_out,  l_out])
     return layers_from_list_to_dict(all_layers)
 
 def model103(w=32, h=32, c=1, patch_size=16, n_steps=2):
-    nb_recurrent_units = 10
+    nb_recurrent_units = 40
     nb_coords = 12
     output_shape = (None, c, h, w)
     patches = np.ones((1, c, patch_size, patch_size)).astype(np.float32)
@@ -7866,7 +7855,6 @@ def model103(w=32, h=32, c=1, patch_size=16, n_steps=2):
 
     def predict_output(oprev, hcur):
         return layers.get_output(hid_to_out, hcur)
-    
     repr_shape = in_to_repr.output_shape
     out_shape = hid_to_out.output_shape
     brush = FeedbackGRULayerClean(
@@ -7877,9 +7865,9 @@ def model103(w=32, h=32, c=1, patch_size=16, n_steps=2):
         repr_shape=repr_shape,
         out_shape=out_shape,
         n_steps=n_steps,
-        name='coord')
-    brush = layers.ReshapeLayer(brush, ([0], n_steps, c, h, w))
-    raw_out = layers.ExpressionLayer(brush, lambda x:x.sum(axis=1), name='raw_output', output_shape=(None, c, h, w))
+        name='brush')
+    raw_out = layers.ReshapeLayer(brush, ([0], n_steps, c, h, w))
+    raw_out = layers.ExpressionLayer(raw_out, lambda x:x.sum(axis=1), name='raw_output', output_shape=(None, c, h, w))
     scaled_out = layers.ScaleLayer(raw_out, scales=init.Constant(0.5), name="scaled_output")
     scaled_out= AddParams(scaled_out, [in_to_repr, hid_to_out], name="scaled_output")
     out = layers.NonlinearityLayer(
@@ -7887,7 +7875,7 @@ def model103(w=32, h=32, c=1, patch_size=16, n_steps=2):
         nonlinearity=get_nonlinearity['linear'],
         name="output")
     all_layers = ([in_] +
-                  hids + [raw_out, out])
+                  hids + [brush, raw_out, out])
     return layers_from_list_to_dict(all_layers)
 
 build_convnet_simple = model1
