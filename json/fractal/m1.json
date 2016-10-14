@@ -1,0 +1,23 @@
+{
+    "noise": "gaussian", 
+    "budget_hours": 6, 
+    "contractive_coef": null, 
+    "denoise": 0.1, 
+    "dataset": "loader",
+    "data_params": {
+        "name": "cifar",
+        "params": {"which": "train"},
+        "pipeline": [
+            {"name": "normalize", "params": {"value": 255}},
+            {"name": "crop", "params":{"method": "random", "mode": "symmetric", "shape": [16, 16]}}
+        ]
+    },
+    "model_name": "model56",
+    "model_params": {
+        "nb_hidden_units": 512, 
+        "nb_layers": 2, 
+        "use_wta_lifetime": false, 
+        "wta_lifetime_perc": null
+    }, 
+    "autoencoding_loss": "squared_error"
+}

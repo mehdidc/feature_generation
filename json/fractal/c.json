@@ -1,0 +1,23 @@
+{
+    "comment": "FC / 128x128",
+    "binarize_thresh": null, 
+    "noise": "salt_and_pepper", 
+    "budget_hours": 6, 
+    "contractive_coef": null, 
+    "denoise": 0.5, 
+    "dataset": "cropped_digits", 
+    "force_w": 64,
+    "force_h": 64,
+    "model_params": {
+        "nb_hidden_units": 3000, 
+        "nb_layers": 2, 
+        "use_wta_lifetime": false, 
+        "wta_lifetime_perc": null
+    }, 
+    "walkback": 3, 
+    "marginalized": false, 
+    "autoencoding_loss": "squared_error", 
+    "walkback_mode": "bengio_without_sampling", 
+    "contractive": false, 
+    "model_name": "model56"
+}

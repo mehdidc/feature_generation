@@ -100,26 +100,38 @@ colors = [
     [0, 0, 1],
     [1, 1 ,0],
     [0, 1, 1],
-    [1, 0, 1]
+    [1, 0, 1],
+    [1, 1, 1],
+    [0, 0, 0]
 ]
 colors = np.array(colors, dtype='float32') * 255
-def random_colorize(X, foreground=128, op='threshold', rng=np.random):
+
+def retrieve_col(col, rng=np.random):
+    if col == 'random':
+        col = colors[rng.randint(0, len(colors) - 1)]
+    elif col == 'random_unif':
+        col = np.random.randint(0, 255, size=3)
+    elif type(col) == int:
+        col = colors[col]
+    else:
+        assert len(col) == 3
+    col = np.array(col)
+    return col
+
+def random_colorize(X, fg_thresh=128, op='threshold', fg_color='random', bg_color='random', rng=np.random):
     if X.shape[2] == 1:
         if op == 'threshold':
-            foreground_mask = (X > foreground)
+            fg_mask = (X > fg_thresh)
         elif op == 'threshold_inv':
-            foreground_mask = (X <= foreground)
+            fg_mask = (X <= fg_thresh)
         else:
             raise Exception('Unknown op : {}'.format(op))
-        #col = np.random.uniform(size=3)
-        col = colors[rng.randint(0, len(colors) - 1)]
-        #foreground_color = colors[rng.randint(0, len(colors) - 1)]
-        foreground_color = colors[0]
-        #foreground_color = 255 - col
-        #foreground_color = np.random.uniform(size=3)
-        X_new = np.ones((X.shape[0], X.shape[1], 3)) * col[np.newaxis, np.newaxis, :]
-        X_new = X_new * (1 - foreground_mask) + foreground_mask * foreground_color
-        X = X_new
+        bg_color = retrieve_col(bg_color, rng=rng)
+        fg_color = retrieve_col(fg_color, rng=rng)
+        bg = np.ones((X.shape[0], X.shape[1], 3)) * bg_color[np.newaxis, np.newaxis, :]
+        X = bg * (1 - fg_mask) + fg_mask * fg_color
+    else:
+        raise Exception('image color channels should be {}, proposed in shape is {}'.format(1, X.shape))
     return X
 
 pipeline_crop = apply_to(crop, cols=['X'])
