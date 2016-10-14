@@ -7802,7 +7802,7 @@ def model102(w=32, h=32, c=1, n_steps=1, patch_size=4):
 
 def model103(w=32, h=32, c=1, patch_size=16, n_steps=2):
 
-    nb_recurrent_units = 64
+    nb_recurrent_units = 256
     nb_coords = 12
 
     output_shape = (None, c, h, w)
@@ -7814,7 +7814,7 @@ def model103(w=32, h=32, c=1, patch_size=16, n_steps=2):
       num_filters=[],
       size_conv_filters=[],
       pooling=False,
-      nb_fc_units=[128],
+      nb_fc_units=[1000],
       nonlin=rectify)
     hid = hids[-1]
     in_to_repr = hid
@@ -7858,8 +7858,8 @@ def model103(w=32, h=32, c=1, patch_size=16, n_steps=2):
 
     def predict_input(xprev, hprev, oprev):
         oprev_ = oprev.reshape((oprev.shape[0], c, h, w))
-        return xprev - oprev_ 
-    
+        return xprev
+
     def predict_repr(x):
         return layers.get_output(in_to_repr, x)
 
