@@ -7946,7 +7946,7 @@ def model104(w=32, h=32, c=1, n_steps=1, patch_size=4, stride=[0.5, 1], nb_color
                   [l_coord, l_brush, l_raw_out, l_scaled_out,  l_out])
     return layers_from_list_to_dict(all_layers)
 
-def model105(w=32, h=32, c=1, n_steps=1, patch_size=4, stride=[0.5, 1], nb_colors=6, nb_fc_units=[40], proba_func='softmax'):
+def model105(w=32, h=32, c=1, n_steps=1, patch_size=4, stride=[0.5, 1], nb_colors=6, nb_fc_units=[40], proba_func='softmax', nb_recurrent_units=40):
     l_in = layers.InputLayer((None, c, w, h), name="input")
     hid = l_in
     hids = conv_fc(
@@ -7958,7 +7958,7 @@ def model105(w=32, h=32, c=1, n_steps=1, patch_size=4, stride=[0.5, 1], nb_color
       nonlin=rectify)
     hid = hids[-1]
     hid = Repeat(hid, n_steps)
-    hid = layers.GRULayer(hid, 40)
+    hid = layers.GRULayer(hid, nb_recurrent_units)
     l_coord = TensorDenseLayer(hid, 14, nonlinearity=linear, name="coord")
     patches = np.ones((1, c, patch_size, patch_size))
     patches = patches.astype(np.float32)

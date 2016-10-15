@@ -31,7 +31,8 @@ from tools.gen.genstats import genstats
 from lightjob.cli import load_db
 from lightjob.db import SUCCESS, RUNNING, AVAILABLE, ERROR, PENDING
 
-from helpers import vae_loss_binary, vae_loss_real
+from helpers import vae_loss_binary, vae_loss_real, grad_noise
+from functools import partial
 
 sys.setrecursionlimit(10000)
 
@@ -196,22 +197,17 @@ def build_capsule_(layers, data, nbl, nbc,
                    compile_="all",
                    **train_params):
     import matplotlib.pyplot as plt
-
+    from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
+    from theano.tensor.shared_randomstreams import RandomStreams as RandomStreamsCpu
 
     batch_size = train_params.get("batch_size", 128)
     denoise = train_params.get("denoise", None)
     walkback = train_params.get("walkback", 1)
     autoencoding_loss = train_params.get("autoencoding_loss", "squared_error")
 
-    if denoise is not None:
-        from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
-        from theano.tensor.shared_randomstreams import RandomStreams as RandomStreamsCpu
-        s =  np.random.randint(0, 999999)
-        theano_rng = RandomStreams(seed=s)
-        theano_rng_cpu = RandomStreamsCpu(seed=s)
-    else:
-        theano_rng = None
-        theano_rng_cpu = None
+    s =  np.random.randint(0, 999999)
+    theano_rng = RandomStreams(seed=s)
+    theano_rng_cpu = RandomStreamsCpu(seed=s)
 
     if report_event is None:
         def report_event(s):
@@ -494,6 +490,16 @@ def build_capsule_(layers, data, nbl, nbc,
         params["beta1"] = optim_params["beta1"]
         params["beta2"] = optim_params["beta2"]
         params["epsilon"] = optim_params["epsilon"]
+
+    if 'grad_noise' in optim_params:
+        gn = optim_params.get('grad_noise')
+        n = gn.get('n', 1)
+        gamma = gn.get('gamma', 0.55)
+        algo_ = algo
+        def algo_with_grad_noise(loss_or_grads, params, **kw):
+            return grad_noise(algo_, loss_or_grads, params, rng=theano_rng, n=n, gamma=gamma, **kw)
+        algo = algo_with_grad_noise
+
     optim = (algo, params)
     batch_optimizer = make_batch_optimizer(
         update_status,
@@ -689,6 +695,7 @@ def build_capsule_(layers, data, nbl, nbc,
     else:
         raise Exception('Unknown mode : {}'.format(mode))
     def transform_grads(x):
+
         return x
     # put all together
     capsule = Capsule(
@@ -712,7 +719,6 @@ def build_capsule_(layers, data, nbl, nbc,
                 dummyvars.update({"y": dummy})
             capsule._build(dummyvars)
         elif mode == "minibatch":
-
             if train_params.get('subsample'):
                 X = data.X
                 subsample = train_params.get('subsample')

@@ -1057,9 +1057,8 @@ class DataFutureWrapper(object):
 def floatX(X):
     return np.array(X, dtype=theano.config.floatX)
 
-
-def grad_noise(loss_or_grads, params, algo, rng=None, n=1, gamma=0.55):
-    updates = algo(loss_or_grads, params)
+def grad_noise(algo, loss_or_grads, params, rng=None, n=1, gamma=0.55, **kw):
+    updates = algo(loss_or_grads, params, **kw)
     t_prev = theano.shared(lasagne.utils.floatX(0.))
     t = t_prev + 1
     std = n / (t ** gamma)
