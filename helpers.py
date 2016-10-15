@@ -606,9 +606,13 @@ class GenericBrushLayer(lasagne.layers.Layer):
             assert shape[1] == self.nb_col_channels
             self.ph, self.pw = shape[2:]
             self.patches_ = theano.shared(self.patches)
+
         if isinstance(self.color, np.ndarray):
             assert self.color.shape[1] == self.nb_col_channels
             self.colors_ = self.add_param(self.color, self.color.shape, name="colors")
+        elif isinstance(self.color, theano.compile.SharedVariable):
+            assert self.color.get_value().shape[1] == self.nb_col_channels
+            self.colors_ = self.add_param(self.color, self.color.get_value().shape, name="colors")
         self.eps = eps
         self._nb_input_features = incoming.output_shape[2]
         self.assign_ = {}
@@ -724,9 +728,12 @@ class GenericBrushLayer(lasagne.layers.Layer):
             pointer += nb_patches
         else:
             patch_index = self.patch_index
-
-        if isinstance(self.color, np.ndarray):
-            nb = self.color.shape[0]
+        if isinstance(self.color, np.ndarray) or isinstance(self.color, theano.compile.SharedVariable):
+            if isinstance(self.color, theano.compile.SharedVariable):
+                shape = self.color.get_value().shape
+            else:
+                shape = self.color.shape
+            nb = shape[0]
             colors_pr = X[:, pointer:pointer + nb]#(nb_examples, nb_colors)
             colors_pr = self.to_proba_func(colors_pr) # (nb_examples, nb_colors)
             colors_mix = colors_pr.dimshuffle(0, 1, 'x') * self.colors_.dimshuffle('x', 0, 1) #(nb_examples, nb_colors, 1) * (1, nb_colors, nb_col_channels) = (nb_examples, nb_colors, nb_col_channels)
@@ -832,7 +839,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
             o = o[:, patch_index]
             # -> shape (nb_examples, c, h, w)
 
-        if isinstance(self.color, np.ndarray):
+        if isinstance(self.color, np.ndarray) or isinstance(self.color, theano.compile.SharedVariable):
             o = o * colors.dimshuffle(0, 1, 'x', 'x')
         elif self.color == 'predicted':
             o = o * colors.dimshuffle(0, 1, 'x', 'x')
@@ -1061,11 +1068,32 @@ def grad_noise(algo, loss_or_grads, params, rng=None, n=1, gamma=0.55, **kw):
     updates = algo(loss_or_grads, params, **kw)
     t_prev = theano.shared(lasagne.utils.floatX(0.))
     t = t_prev + 1
-    std = n / (t ** gamma)
+    std = T.sqrt(n / (t ** gamma))
     for p in params:
-        updates[p] = updates[p] + rng.normal(std=std)
+        updates[p] = updates[p] + rng.normal(size=p.shape, avg=0, std=std)
     updates[t_prev] = t
-    return upadtes
+    return updates
+
+def sample_multinomial(X, rng):
+    # X is a matrix of (N, m) where N is the number of examples and m numbers representing probabilities(they should sum to 1 for each example).
+    # samples from each multinomial distrib defined for each example, and returns a one hot vector containing the selected feature.
+    r = rng.uniform(size=(X.shape[0], 1))
+    r = T.extra_ops.repeat(r, X.shape[1], axis=1)
+    zero_col = T.zeros((X.shape[0], 1))
+    X = T.concatenate((zero_col, X), axis=1)
+    X = T.extra_ops.cumsum(X, axis=1)
+    x = X[:, 0:-1]
+    x_next = X[:, 1:]
+    in_interval = (r >= x) * (r < x_next)
+    return in_interval
 
 if __name__ == '__main__':
-    test_generic_batch_layer()
+    from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
+    #test_generic_batch_layer()
+    rng = RandomStreams(1)
+    x = T.matrix()
+    fn = theano.function([x], sample_multinomial(x, rng))
+    e = floatX(np.zeros((10000, 2)))
+    e[:, 0] = 0.3
+    e[:, 1] = 0.7
+    print(fn(e).mean(axis=0))

@@ -113,8 +113,6 @@ def retrieve_col(col, rng=np.random):
         col = np.random.randint(0, 255, size=3)
     elif type(col) == int:
         col = colors[col]
-    else:
-        assert len(col) == 3
     col = np.array(col)
     return col
 
@@ -170,21 +168,22 @@ def pipeline_load_dataset(iterator, name, *args, **kwargs):
     module = getattr(datakit, name)
     return module.load_as_iterator(*args, **kwargs)
 
-def pipeline_load_toy(iterator, nb=100, w=28, h=28, ph=(1, 5), pw=(1, 5), nb_patches=1, rng=np.random):
+def pipeline_load_toy(iterator, nb=100, w=28, h=28, ph=(1, 5), pw=(1, 5), nb_patches=1, rng=np.random, fg_color=None, bg_color=None, colored=False):
+    nb_cols = 3 if colored else 1
+    if not bg_color:
+        bg_color = [0] * nb_cols
+    if not fg_color:
+        fg_color = [255] * nb_cols
     def fn():
         for _ in range(nb):
-            if hasattr(ph, '__len__'):
-                ph_ = rng.randint(*ph)
-            else:
-                ph_ = ph
-            if hasattr(pw, '__len__'):
-                pw_ = rng.randint(*pw)
-            else:
-                pw_ = pw
-            img = np.zeros((h + ph_, w + pw_, 1))
+            bg_color_ = retrieve_col(bg_color, rng=rng)
+            ph_ = rng.randint(*ph) if hasattr(ph, '__len__') else ph
+            pw_ = rng.randint(*pw) if hasattr(pw, '__len__') else pw
+            img = np.ones((h + ph_, w + pw_, nb_cols)) * bg_color_
             for _ in range(nb_patches):
                 x, y = rng.randint(ph_/2, w), rng.randint(pw_/2, h)
-                img[y:y+pw_, x:x+ph_] = 255
+                fg_color_ = retrieve_col(fg_color, rng=rng)
+                img[y:y+pw_, x:x+ph_] = fg_color_
             img = img[0:h, 0:w, :]
             yield {'X': img}
     return fn()

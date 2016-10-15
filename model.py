@@ -12,6 +12,7 @@ from helpers import Repeat
 from helpers import BrushLayer, GenericBrushLayer, one_step_brush_layer
 from helpers import GaussianSampleLayer, ExpressionLayerMulti, axify
 from helpers import recurrent_accumulation
+from helpers import sample_multinomial
 import theano.tensor as T
 import numpy as np
 
@@ -53,6 +54,13 @@ def is_max(x):
     m = x.max(axis=1, keepdims=True)
     return softmax(x) * T.eq(x, m)
 
+def softmax_sample(rng):
+    def fn(x):
+        x = softmax(x)
+        x = sample_multinomial(x, rng)
+        return x
+    return x
+
 get_nonlinearity = dict(
     linear=linear,
     sigmoid=sigmoid,
@@ -86,7 +94,6 @@ proba_funcs = {
     'softmax': T.nnet.softmax,
     'sparsemax': sparsemax,
     'is_max': is_max,
-    'normalize': lambda x:rectify(x) / (rectify(x).sum(axis=1, keepdims=True) + 1e-10)
 }
 
 recurrent_models = {
@@ -7794,9 +7801,8 @@ def model102(w=32, h=32, c=1, n_steps=1, patch_size=4, stride=[0.5, 1]):
                   [l_coord, l_brush, l_raw_out, l_scaled_out,  l_out])
     return layers_from_list_to_dict(all_layers)
 
-def model103(w=32, h=32, c=1, patch_size=16, n_steps=2, nb_colors=None):
-    nb_recurrent_units = 40
-    nb_coords = 12
+def model103(w=32, h=32, c=1, stride=[0.25, 1], patch_size=16, n_steps=2, nb_colors=None, nb_recurrent_units=40, nb_fc_units=[40], proba_func='softmax'):
+    nb_coords = 14
     output_shape = (None, c, h, w)
     patches = np.ones((1, c, patch_size, patch_size)).astype(np.float32)
     in_ = layers.InputLayer((None, c, w, h), name="input")
@@ -7806,7 +7812,7 @@ def model103(w=32, h=32, c=1, patch_size=16, n_steps=2, nb_colors=None):
       num_filters=[],
       size_conv_filters=[],
       pooling=False,
-      nb_fc_units=[40],
+      nb_fc_units=nb_fc_units,
       nonlin=rectify)
     hid = hids[-1]
     in_to_repr = hid
@@ -7817,6 +7823,7 @@ def model103(w=32, h=32, c=1, patch_size=16, n_steps=2, nb_colors=None):
         color = [1] * c
     else:
         color = np.ones((nb_colors, c)).astype(np.float32)
+        color = theano.shared(color)
     brush = GenericBrushLayer(
         coord,
         w, h,
@@ -7825,12 +7832,12 @@ def model103(w=32, h=32, c=1, patch_size=16, n_steps=2, nb_colors=None):
         col='rgb' if c == 3 else 'grayscale',
         return_seq=False,
         reduce_func=reduce_funcs['sum'],
-        to_proba_func=proba_funcs['softmax'],
-        normalize_func=normalize_funcs['sigmoid'],
+        to_proba_func=proba_funcs[proba_func],
+        normalize_func={'coords': sigmoid, 'color': linear},
         x_sigma=0.5,
         y_sigma=0.5,
-        x_stride=[0.5, 1],
-        y_stride=[0.5, 1],
+        x_stride=stride,
+        y_stride=stride,
         patch_index=0,
         color=color,
         x_min=0,
@@ -7848,13 +7855,12 @@ def model103(w=32, h=32, c=1, patch_size=16, n_steps=2, nb_colors=None):
         coords='continuous',
     )
     hid_to_out = layers.ReshapeLayer(brush, ([0], c*h*w))
-    
     hid_to_in = layers.DenseLayer(hidden_state, w*h, nonlinearity=sigmoid)
     hid_to_in = layers.ReshapeLayer(hid_to_in, ([0], w, h))
 
     def predict_input(xprev, hprev, oprev):
         oprev_ = oprev.reshape((oprev.shape[0], c, h, w))
-        return xprev - oprev_
+        return (xprev - oprev_)
 
     def predict_repr(x):
         return layers.get_output(in_to_repr, x)
@@ -7874,14 +7880,15 @@ def model103(w=32, h=32, c=1, patch_size=16, n_steps=2, nb_colors=None):
         name='brush')
     raw_out = layers.ReshapeLayer(brush, ([0], n_steps, c, h, w))
     raw_out = layers.ExpressionLayer(raw_out, lambda x:x.sum(axis=1), name='raw_output', output_shape=(None, c, h, w))
-    scaled_out = layers.ScaleLayer(raw_out, scales=init.Constant(0.5), name="scaled_output")
-    scaled_out= AddParams(scaled_out, [in_to_repr, hid_to_out], name="scaled_output")
+    scaled_out = layers.ScaleLayer(raw_out, scales=init.Constant(1. / n_steps), name="scaled_output")
+    biased_out = layers.BiasLayer(scaled_out, b=init.Constant(0.), name="biased_output")
+    out = AddParams(biased_out, [in_to_repr, hid_to_out], name="scaled_output")
     out = layers.NonlinearityLayer(
-        scaled_out,
+        out,
         nonlinearity=get_nonlinearity['linear'],
         name="output")
     all_layers = ([in_] +
-                  hids + [brush, raw_out, out])
+                  hids + [brush, raw_out, scaled_out, biased_out, out])
     return layers_from_list_to_dict(all_layers)
 
 def model104(w=32, h=32, c=1, n_steps=1, patch_size=4, stride=[0.5, 1], nb_colors=6, nb_fc_units=[40], proba_func='softmax'):
@@ -7946,13 +7953,21 @@ def model104(w=32, h=32, c=1, n_steps=1, patch_size=4, stride=[0.5, 1], nb_color
                   [l_coord, l_brush, l_raw_out, l_scaled_out,  l_out])
     return layers_from_list_to_dict(all_layers)
 
-def model105(w=32, h=32, c=1, n_steps=1, patch_size=4, stride=[0.5, 1], nb_colors=6, nb_fc_units=[40], proba_func='softmax', nb_recurrent_units=40):
+def model105(w=32, h=32, c=1, 
+             n_steps=1, 
+             patch_size=4, stride=[0.5, 1], 
+             nb_colors=6, 
+             nb_fc_units=[40], 
+             proba_func='softmax', 
+             num_filters=[],
+             size_conv_filters=[],
+             nb_recurrent_units=40):
     l_in = layers.InputLayer((None, c, w, h), name="input")
     hid = l_in
     hids = conv_fc(
       hid, 
-      num_filters=[],
-      size_conv_filters=[],
+      num_filters=num_filters,
+      size_conv_filters=size_conv_filters,
       pooling=False,
       nb_fc_units=nb_fc_units,
       nonlin=rectify)
