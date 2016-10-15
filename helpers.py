@@ -566,8 +566,9 @@ class GenericBrushLayer(lasagne.layers.Layer):
 
         self.reduce_func = reduce_func
         if not isinstance(normalize_func, dict):
-            normalize_func = defaultdict(lambda:normalize_func)
-        self.normalize_func = normalize_func
+            self.normalize_func = defaultdict(lambda:normalize_func)
+        else:
+            self.normalize_func = normalize_func
         self.to_proba_func = to_proba_func
         self.x_sigma = x_sigma
         self.y_sigma = y_sigma
@@ -676,7 +677,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
         elif type(self.y_stride) == list:
             ys = (np.array(self.y_stride).astype(np.float32))
             ys_pr = X[:, pointer:pointer + len(ys)]
-            ys_pr = self.to_proba_func(ys_pr) * ys
+            ys_pr = self.to_proba_func(ys_pr)
             sy = T.dot(ys_pr, ys)
             self.assign_['y_stride'] = (pointer, pointer + len(ys))
             pointer += len(ys)
