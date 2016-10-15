@@ -6,6 +6,7 @@ from lasagnekit.easy import iterate_minibatches
 import lasagne
 from layers import FeedbackGRULayer, TensorDenseLayer
 from utils.sparsemax_theano import sparsemax
+from collections import defaultdict
 
 def norm(x):
     return (x - x.min()) / (x.max() - x.min() + T.eq(x.max(), x.min()) + 1e-12)
@@ -491,13 +492,20 @@ class GenericBrushLayer(lasagne.layers.Layer):
         h : height of resulting image
         patches : (nb_patches, color, ph, pw)
         col : 'grayscale'/'rgb' or give the nb of channels as an int
-        n_steps : int
-        return_seq : True returns the seq (nb_examples, n_steps, c, h, w)
-                    False returns (nb_examples, -1, c, h, w)
+        n_steps : int, nb of time steps
+        return_seq : if True returns the seq (nb_examples, n_steps, c, h, w)
+                     if False returns (nb_examples, -1, c, h, w)
         reduce_func : function used to update the output, takes prev
                       output as first argument and new output
                       as second one.
-        normalize_func : function used to normalize between 0 and 1
+        normalize_func : if a function, it is used to normalize between 0 and 1 for :
+                            - coordinates
+                            - stride if stride=='predicted' (for x and y)
+                            - sigma if sigma=='predicted' (for x and y)
+                            - color if it is ndarray
+                            - color if color=='predicted'. 
+                         if a dict, then specify functions separately:
+                            {'coords': ..., 'stride': ..., 'sigma': ..., 'color': }
         x_sigma : if 'predicted' taken from input else use the provided
                   value
         y_sigma : if 'predicted' taken from input else use the provided
@@ -541,7 +549,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
                     [0 1 0], what we can do is to predict the color [1 0 0] for the first and the color [-1 1 0] for the second so that the red
                     component is cancelled.
         color_max : max val of color
-        stride_normalize : if True multiply Fx by stride_x and Fy by stride_y, this is useful when adding canvas
+        stride_normalize : if True multiply Fx by stride_x and Fy by stride_y, this is useful when summing canvas
                            which has different strides, stride_nornalize makes canvas of different stride on the same scale.
         """
         super(GenericBrushLayer, self).__init__(incoming, **kwargs)
@@ -557,6 +565,8 @@ class GenericBrushLayer(lasagne.layers.Layer):
         self.return_seq = return_seq
 
         self.reduce_func = reduce_func
+        if not isinstance(normalize_func, dict):
+            normalize_func = defaultdict(lambda:normalize_func)
         self.normalize_func = normalize_func
         self.to_proba_func = to_proba_func
         self.x_sigma = x_sigma
@@ -595,7 +605,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
             assert shape[1] == self.nb_col_channels
             self.ph, self.pw = shape[2:]
             self.patches_ = theano.shared(self.patches)
-        if type(self.color) == np.ndarray:
+        if isinstance(self.color, np.ndarray):
             assert self.color.shape[1] == self.nb_col_channels
             self.colors_ = self.add_param(self.color, self.color.shape, name="colors")
         self.eps = eps
@@ -619,8 +629,8 @@ class GenericBrushLayer(lasagne.layers.Layer):
         pointer = 0
         if self.coords == 'continuous':
             gx, gy = X[:, 0], X[:, 1]
-            gx = self.normalize_func(gx) * (self.x_max - self.x_min) + self.x_min
-            gy = self.normalize_func(gy) * (self.y_max - self.y_min) + self.y_min
+            gx = self.normalize_func['coords'](gx) * (self.x_max - self.x_min) + self.x_min
+            gy = self.normalize_func['coords'](gy) * (self.y_max - self.y_min) + self.y_min
             self.assign_['gx'] = 0
             self.assign_['gy'] = 1
             pointer += 2
@@ -645,7 +655,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
             raise Exception('invalid value : {} for coords'.format(self.coords))
         if self.x_stride == 'predicted':
             sx = X[:, pointer]
-            sx = self.normalize_func(sx)
+            sx = self.normalize_func['stride'](sx)
             self.assign_['x_stride'] = pointer
             pointer += 1
         elif type(self.x_stride) == list:
@@ -660,7 +670,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
 
         if self.y_stride == 'predicted':
             sy = X[:, pointer]
-            sy = self.normalize_func(sy)
+            sy = self.normalize_func['stride'](sy)
             self.assign_['y_stride'] = pointer
             pointer += 1
         elif type(self.y_stride) == list:
@@ -676,7 +686,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
         if self.x_sigma == 'predicted':
             log_x_sigma = X[:, pointer]
             x_sigma = T.exp(log_x_sigma)
-            x_sigma = self.normalize_func(log_x_sigma) * pw
+            x_sigma = self.normalize_func['sigma'](log_x_sigma) * pw
             self.assign_['x_sigma'] = pointer
             pointer += 1
         elif type(self.x_sigma) == list:
@@ -693,7 +703,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
         if self.y_sigma == 'predicted':
             log_y_sigma = X[:, pointer]
             y_sigma = T.exp(log_y_sigma)
-            y_sigma = self.normalize_func(log_y_sigma) * ph
+            y_sigma = self.normalize_func['sigma'](log_y_sigma) * ph
             self.assign_['y_sigma'] = pointer
             pointer += 1
         elif type(self.y_sigma) == list:
@@ -714,18 +724,18 @@ class GenericBrushLayer(lasagne.layers.Layer):
         else:
             patch_index = self.patch_index
 
-        if type(self.color) == np.ndarray:
+        if isinstance(self.color, np.ndarray):
             nb = self.color.shape[0]
             colors_pr = X[:, pointer:pointer + nb]#(nb_examples, nb_colors)
             colors_pr = self.to_proba_func(colors_pr) # (nb_examples, nb_colors)
             colors_mix = colors_pr.dimshuffle(0, 1, 'x') * self.colors_.dimshuffle('x', 0, 1) #(nb_examples, nb_colors, 1) * (1, nb_colors, nb_col_channels) = (nb_examples, nb_colors, nb_col_channels)
             colors = colors_mix.sum(axis=1) #(nb_examples, nb_col_channels)
-            colors = self.normalize_func(colors) * (self.color_max - self.color_min) + self.color_min
+            colors = self.normalize_func['color'](colors) * (self.color_max - self.color_min) + self.color_min
             self.assign_['color'] = (pointer, pointer + nb)
             pointer += nb
         elif self.color == 'predicted':
             colors = X[:, pointer:pointer + self.nb_col_channels]
-            colors = self.normalize_func(colors) * (self.color_max - self.color_min) + self.color_min
+            colors = self.normalize_func['color'](colors) * (self.color_max - self.color_min) + self.color_min
             self.assign_['color'] = (pointer, pointer + self.nb_col_channels)
             pointer += self.nb_col_channels
         elif self.color == 'patches':
@@ -821,7 +831,7 @@ class GenericBrushLayer(lasagne.layers.Layer):
             o = o[:, patch_index]
             # -> shape (nb_examples, c, h, w)
 
-        if type(self.color) == np.ndarray:
+        if isinstance(self.color, np.ndarray):
             o = o * colors.dimshuffle(0, 1, 'x', 'x')
         elif self.color == 'predicted':
             o = o * colors.dimshuffle(0, 1, 'x', 'x')
