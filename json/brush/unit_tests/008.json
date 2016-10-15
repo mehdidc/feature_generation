@@ -4,7 +4,7 @@
 "dataset": "loader",
 "data_params":{
     "pipeline": [
-        {"name": "toy", "params": {"nb": 200000, "w": 16, "h": 16, "pw": 4, "ph": 4, "nb_patches": 2, "colored": true, "bg_color": [0, 0, 0], "fg_color": "random"}},
+        {"name": "toy", "params": {"nb": 500000, "w": 16, "h": 16, "pw": 4, "ph": 4, "nb_patches": 2, "colored": true, "bg_color": [0, 0, 0], "fg_color": "random"}},
         {"name": "shuffle", "params": {}},
         {"name": "normalize_shape", "params": {}},
         {"name": "force_rgb", "params": {}},
@@ -20,13 +20,11 @@
     "stride": [0.25, 1],
     "nb_fc_units": [40],
     "nb_recurrent_units": 40,
-    "num_filters": [32, 32],
-    "size_conv_filters": [5, 5],
     "proba_func": "softmax"
 },
 "optimization": {
-    "algo": "adadelta",
-    "learning_rate": 0.1,
+    "algo": "adam",
+    "learning_rate": 1e-4,
     "max_nb_epochs": 9999999999,
     "patience_nb_epochs": 500
 },
