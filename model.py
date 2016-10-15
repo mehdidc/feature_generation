@@ -51,7 +51,7 @@ def is_max_seq(x):
 
 def is_max(x):
     m = x.max(axis=1, keepdims=True)
-    return softmax(x) * T.eq(x, m)
+    return T.eq(x, m)
 
 get_nonlinearity = dict(
     linear=linear,
