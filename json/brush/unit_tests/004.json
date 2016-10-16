@@ -1,5 +1,5 @@
 {
-"comment": "1  patch of random color (chosen discretely among 8 colors) with size 4x4 on an image of size 16x16 - color - with softmax",
+"comment": "1 patch of random color (chosen discretely among 8 colors) with size 4x4 on an image of size 16x16 - color - with softmax",
 "budget_hours": 10,
 "dataset": "loader",
 "data_params":{

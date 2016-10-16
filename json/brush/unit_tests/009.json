@@ -1,10 +1,10 @@
 {
-"comment": "1 patch of random color (chosen discretely among 8 colors)with a colored background on an image of size 16x16 - color - with softmax",
+"comment": "1 patch of random color (chosen discretely among 8 colors) with a colored background (fixed color) on an image of size 16x16 - color - with softmax",
 "budget_hours": 10,
 "dataset": "loader",
 "data_params":{
     "pipeline": [
-        {"name": "toy", "params": {"nb": 200000, "w": 16, "h": 16, "pw": 4, "ph": 4, "nb_patches": 2, "colored": true, "bg_color": [0, 0, 0], "fg_color": "random"}},
+        {"name": "toy", "params": {"nb": 200000, "w": 16, "h": 16, "pw": 4, "ph": 4, "nb_patches": 2, "colored": true, "bg_color": [255, 0, 0], "fg_color": "random"}},
         {"name": "shuffle", "params": {}},
         {"name": "normalize_shape", "params": {}},
         {"name": "force_rgb", "params": {}},
@@ -12,12 +12,16 @@
         {"name": "order", "params": {"order": "th"}}
     ]
 },
-"model_name": "model106",
+"model_name": "model105",
 "model_params": {   
     "n_steps": 2,
     "patch_size": 16,
     "nb_colors": 8,
     "stride": [0.25, 1],
+    "nb_fc_units": [100],
+    "nb_recurrent_units": 160,
+    "size_conv_filters": [7],
+    "num_filters": [32],
     "proba_func": "softmax"
 },
 "optimization": {

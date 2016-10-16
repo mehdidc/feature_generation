@@ -230,7 +230,6 @@ def get_scores_bandit(inputs, outputs, new_inputs=None, algo='thompson'):
     preprocess = lambda x:frozendict(flatten_dict(x))
     inputs = map(preprocess, inputs)
     new_inputs = map(preprocess, new_inputs)
-
     #reg = GaussianProcessRegressor(normalize_y=True)
     #reg = LinearRegression()
     reg = RandomForestRegressor() 

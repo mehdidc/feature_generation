@@ -16,7 +16,6 @@ from hp import get_hypers, get_scores_bandit
 db = load_db()
 budget_hours = 10  # default budget hours
 
-
 def build_cmd(launcher="scripts/launch_gpu",
               model_name="model8",
               dataset="digits",
@@ -2923,6 +2922,42 @@ def jobset67():
     params["data_params"]= {
         "pipeline": [
             {"name": "toy", "params": {"nb": 200000, "w": 16, "h": 16, "pw": 4, "ph": 4, "nb_patches": 2, "colored": True, "bg_color": [0, 0, 0], "fg_color": "random"}},
+            {"name": "shuffle", "params": {}},
+            {"name": "normalize_shape", "params": {}},
+            {"name": "force_rgb", "params": {}},
+            {"name": "divide_by", "params": {"value": 255}},
+            {"name": "order", "params": {"order": "th"}}
+        ]
+     }
+    nb_fc_layers = rng.choice((0, 1, 2))
+    nb_fc_units = [rng.randint(1, 10) * 20 for _ in range(nb_fc_layers)]
+    nb_recurrent_units = rng.randint(5, 20) * 10
+    nb_conv_layers = rng.choice((0, 1, 2))
+    nb_filters = [rng.choice((8, 16, 32)) for _ in range(nb_conv_layers)]
+    size_conv_filters = [rng.choice((3, 5, 7)) for _ in range(nb_conv_layers)]
+    params["model_params"] = {
+        "n_steps": 2,
+        "patch_size": 16,
+        "nb_colors": 8,
+        "stride": [0.25, 1],
+        "nb_fc_units": nb_fc_units,
+        "nb_recurrent_units": nb_recurrent_units,
+        "num_filters": nb_filters,
+        "size_conv_filters": size_conv_filters,
+        "proba_func": "softmax"
+    }
+    return params
+
+def jobset68():
+    #hyperopt for unit test 009 of brush stroke
+    rng = np.random
+    params = {}
+    params["model_name"] = 'model105'
+    params["dataset"] = 'loader'
+    params["budget_hours"] = 1
+    params["data_params"]= {
+        "pipeline": [
+            {"name": "toy", "params": {"nb": 200000, "w": 16, "h": 16, "pw": 4, "ph": 4, "nb_patches": 1, "colored": True, "bg_color": [255, 0, 0], "fg_color": "random"}},
             {"name": "shuffle", "params": {}},
             {"name": "normalize_shape", "params": {}},
             {"name": "force_rgb", "params": {}},
