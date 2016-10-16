@@ -93,7 +93,7 @@ def build_params(model_params,
     )
     return params
 
-
+rng = np.random
 def jobset1():
     """
     Exploring params of conv autoenc
@@ -159,10 +159,7 @@ def jobset1():
         p['model_name'] = 'model55'
         p['dataset'] = 'digits'
         p['budget_hours'] = budget_hours
-        cmd = build_cmd(model_name="model55", dataset="digits",
-                        budget_hours=budget_hours, params=p)
-        nb += job_write(p, cmd, where="jobset1")
-    return nb
+    return rng.choice(all_params)
 
 
 def jobset2():
@@ -208,16 +205,13 @@ def jobset2():
         for binarize_thresh in (None, 0.5)
     )
     all_params = list(all_params)
-    print(len(all_params))
     nb = 0
+    rng = np.random
     for p in all_params:
         p['model_name'] = 'model56'
         p['dataset'] = 'digits'
         p['budget_hours'] = budget_hours
-        cmd = build_cmd(model_name="model56", dataset="digits",
-                        params=p, budget_hours=budget_hours)
-        nb += job_write(p, cmd, where="jobset2")
-    return nb
+    return rng.choice(all_params)
 
 
 def jobset3():
@@ -260,10 +254,7 @@ def jobset3():
         p['model_name'] = 'model57'
         p['dataset'] = 'digits'
         p['budget_hours'] = budget_hours
-        cmd = build_cmd(model_name="model57", dataset="digits",
-                        params=p, budget_hours=budget_hours)
-        nb += job_write(p, cmd, where="jobset3")
-    return nb
+    return rng.choice(all_params)
 
 
 def jobset4():
@@ -306,11 +297,7 @@ def jobset4():
         p['model_name'] = 'model57'
         p['dataset'] = 'digits'
         p['budget_hours'] = budget_hours
-        cmd = build_cmd(model_name="model57", dataset="digits",
-                        params=p, budget_hours=budget_hours)
-        nb += job_write(p, cmd, where="jobset4")
-        print(p)
-    return nb
+    return rng.choice(all_params)
 
 
 def jobset5():
@@ -357,18 +344,12 @@ def jobset5():
         for binarize_thresh in (None,)
     )
     all_params = list(all_params)
-    print(len(all_params))
     nb = 0
     for p in all_params:
         p['model_name'] = 'model57'
         p['dataset'] = 'digits'
         p['budget_hours'] = budget_hours
-        cmd = build_cmd(model_name="model57", dataset="digits",
-                        params=p, budget_hours=budget_hours)
-        nb += job_write(p, cmd, where="jobset5")
-        print(p)
-    return nb
-
+    return rng.choice(all_params)
 
 def jobset6():
     """
@@ -410,12 +391,7 @@ def jobset6():
         p['model_name'] = 'model57'
         p['dataset'] = 'digits'
         p['budget_hours'] = budget_hours
-        cmd = build_cmd(model_name="model57", dataset="digits",
-                        params=p, budget_hours=budget_hours)
-        nb += job_write(p, cmd, where="jobset6")
-        print(p)
-    return nb
-
+    return rng.choice(all_params)
 
 def jobset7():
     """
@@ -460,12 +436,7 @@ def jobset7():
         p['model_name'] = 'model57'
         p['dataset'] = 'digits'
         p['budget_hours'] = 3
-        cmd = build_cmd(model_name="model57", dataset="digits",
-                        params=p, budget_hours=3)
-        nb += job_write(p, cmd, where="jobset7")
-        print(p)
-    return nb
-
+    return rng.choice(all_params)
 
 def jobset8():
     """
@@ -511,11 +482,7 @@ def jobset8():
         p['dataset'] = 'digits'
         p['budget_hours'] = 48
         p['optimization'] = dict(max_nb_epochs=72180)
-        cmd = build_cmd(model_name="model57", dataset="digits",
-                        params=p, budget_hours=6)
-        nb += job_write(p, cmd, where="jobset8")
-        print(p)
-    return nb
+    return rng.choice(all_params)
 
 
 def jobset9():
@@ -561,12 +528,7 @@ def jobset9():
         p['dataset'] = 'digits'
         p['budget_hours'] = 3
         p['optimization'] = dict(max_nb_epochs=72180)
-        cmd = build_cmd(model_name="model57", dataset="digits",
-                        params=p, budget_hours=p['budget_hours'])
-        nb += job_write(p, cmd, where="jobset9")
-        print(p)
-    return nb
-
+    return rng.choice(all_params)
 
 def jobset10():
     """
@@ -611,12 +573,7 @@ def jobset10():
         p['dataset'] = 'digits'
         p['budget_hours'] = 7
         p['optimization'] = dict(max_nb_epochs=72180)
-        cmd = build_cmd(model_name="model57", dataset="digits",
-                        params=p, budget_hours=p['budget_hours'])
-        nb += job_write(p, cmd, where="jobset10")
-        print(p)
-    return nb
-
+    return rng.choice(all_params)
 
 def jobset11():
     """
@@ -661,11 +618,7 @@ def jobset11():
         p['dataset'] = 'digits'
         p['budget_hours'] = 7
         p['optimization'] = dict(max_nb_epochs=72180)
-        cmd = build_cmd(model_name="model57", dataset="digits",
-                        params=p, budget_hours=p['budget_hours'])
-        nb += job_write(p, cmd, where="jobset11")
-        print(p)
-    return nb
+    return rng.choice(all_params)
 
 
 def jobset12():
@@ -711,11 +664,7 @@ def jobset12():
         p['dataset'] = 'digits'
         p['budget_hours'] = 7
         p['optimization'] = dict(max_nb_epochs=72180)
-        cmd = build_cmd(model_name="model57", dataset="digits",
-                        params=p, budget_hours=p['budget_hours'])
-        nb += job_write(p, cmd, where="jobset12")
-        print(p)
-    return nb
+    return rng.choice(all_params)
 
 
 def jobset13():
@@ -761,12 +710,7 @@ def jobset13():
         p['dataset'] = 'digits'
         p['budget_hours'] = 7
         p['optimization'] = dict(max_nb_epochs=72180)
-        cmd = build_cmd(model_name="model57", dataset="digits",
-                        params=p, budget_hours=p['budget_hours'])
-        nb += job_write(p, cmd, where="jobset13")
-        print(p)
-    return nb
-
+    return rng.choice(all_params)
 
 def jobset14():
     """
@@ -834,11 +778,7 @@ def jobset14():
         p['model_name'] = 'model59'
         p['dataset'] = 'digits'
         p['budget_hours'] = budget_hours
-        cmd = build_cmd(model_name="model59", dataset="digits",
-                        budget_hours=budget_hours, params=p)
-        nb += job_write(p, cmd, where="jobset14")
-    return nb
-
+    return rng.choice(all_params)
 
 def jobset15():
     """
@@ -876,18 +816,12 @@ def jobset15():
         for binarize_thresh in (None,)
     )
     all_params = list(all_params)
-    print(len(all_params))
     nb = 0
     for p in all_params:
         p['model_name'] = 'model57'
         p['dataset'] = 'digits'
         p['budget_hours'] = 10
-        #p['optimization'] = dict(max_nb_epochs=72180)
-        cmd = build_cmd(model_name="model57", dataset="digits",
-                        params=p, budget_hours=p['budget_hours'])
-        nb += job_write(p, cmd, where="jobset15")
-        print(p)
-    return nb
+    return rng.choice(all_params)
 
 
 def jobset16():
@@ -932,13 +866,7 @@ def jobset16():
         p['model_name'] = 'model57'
         p['dataset'] = 'digits'
         p['budget_hours'] = 10
-        #p['optimization'] = dict(max_nb_epochs=72180)
-        cmd = build_cmd(model_name="model57", dataset="digits",
-                        params=p, budget_hours=p['budget_hours'])
-        nb += job_write(p, cmd, where="jobset16")
-        print(p)
-    return nb
-
+    return rng.choice(all_params)
 
 def jobset17():
     """
@@ -981,11 +909,7 @@ def jobset17():
         p['model_name'] = 'model57'
         p['dataset'] = 'digits'
         p['budget_hours'] = budget_hours
-        cmd = build_cmd(model_name="model57", dataset="digits",
-                        params=p, budget_hours=budget_hours)
-        nb += job_write(p, cmd, where="jobset17")
-        print(json.dumps(p, indent=4))
-    return nb
+    return rng.choice(all_params)
 
 
 def jobset19():
@@ -1030,11 +954,7 @@ def jobset19():
         p['model_name'] = 'model56'
         p['dataset'] = 'digits'
         p['budget_hours'] = budget_hours
-        cmd = build_cmd(model_name="model56", dataset="digits",
-                        params=p, budget_hours=budget_hours)
-        nb += job_write(p, cmd, where="jobset19")
-        print(json.dumps(p, indent=4))
-    return nb
+    return rng.choice(all_params)
 
 
 def jobset20():
@@ -1083,11 +1003,7 @@ def jobset20():
         p['model_name'] = model_name
         p['dataset'] = dataset
         p['budget_hours'] = budget_hours
-        cmd = build_cmd(model_name=model_name, dataset=dataset,
-                        params=p, budget_hours=budget_hours)
-        nb += job_write(p, cmd, where=jobset_name)
-        print(json.dumps(p, indent=4))
-    return nb
+    return rng.choice(all_params)
 
 
 def jobset21():
@@ -1145,11 +1061,7 @@ def jobset21():
         p['model_name'] = model_name
         p['dataset'] = dataset
         p['budget_hours'] = budget_hours
-        cmd = build_cmd(model_name=model_name, dataset=dataset,
-                        params=p, budget_hours=budget_hours)
-        nb += job_write(p, cmd, where=jobset_name)
-        print(json.dumps(p, indent=4))
-    return nb
+    return rng.choice(all_params)
 
 
 def jobset22():
@@ -1199,12 +1111,7 @@ def jobset22():
         p['dataset'] = dataset
         p['budget_hours'] = budget_hours
         p['optimization'] = dict(max_nb_epochs=72180)
-        cmd = build_cmd(model_name=model_name, dataset=dataset,
-                        params=p, budget_hours=budget_hours)
-        nb += job_write(p, cmd, where=jobset_name)
-        print(json.dumps(p, indent=4))
-    return nb
-
+    return rng.choice(all_params)
 
 def jobset23():
     """
@@ -1257,12 +1164,7 @@ def jobset23():
         p['mode'] = 'minibatch'
         p['budget_hours'] = budget_hours
         p['optimization'] = dict(max_nb_epochs=1000)
-        cmd = build_cmd(model_name="model57", dataset="fonts", params=p,
-                        budget_hours=budget_hours, force_w=28, force_h=28)
-        nb += job_write(p, cmd, where="jobset23")
-        print(p)
-    return nb
-
+    return rng.choice(all_params)
 
 def jobset24():
     """
@@ -1306,7 +1208,6 @@ def jobset24():
         for binarize_thresh in (None,)
     )
     all_params = list(all_params)
-    print(len(all_params))
     nb = 0
     budget_hours = 6
     model_name = 'model55'
@@ -1316,11 +1217,7 @@ def jobset24():
         p['model_name'] = model_name
         p['dataset'] = dataset
         p['budget_hours'] = budget_hours
-        cmd = build_cmd(model_name=model_name, dataset=dataset,
-                        params=p, budget_hours=budget_hours)
-        nb += job_write(p, cmd, where=jobset_name)
-        print(json.dumps(p, indent=4))
-    return nb
+    return rng.choice(all_params)
 
 
 def jobset25():
@@ -1368,7 +1265,6 @@ def jobset25():
         for binarize_thresh in (None,)
     )
     all_params = list(all_params)
-    print(len(all_params))
     nb = 0
     budget_hours = 6
     model_name = 'model55'
@@ -1380,11 +1276,7 @@ def jobset25():
         p['budget_hours'] = budget_hours
         p['force_w'] = 28
         p['force_h'] = 28
-        cmd = build_cmd(model_name=model_name, dataset=dataset,
-                        params=p, budget_hours=budget_hours)
-        nb += job_write(p, cmd, where=jobset_name)
-        print(json.dumps(p, indent=4))
-    return nb
+    return rng.choice(all_params)
 
 
 def jobset26():
@@ -1427,7 +1319,6 @@ def jobset26():
         for binarize_thresh in (None,)
     )
     all_params = list(all_params)
-    print(len(all_params))
     nb = 0
     budget_hours = 6
     for p in all_params:
@@ -1436,12 +1327,7 @@ def jobset26():
         p['force_w'] = 28
         p['force_h'] = 28
         p['budget_hours'] = budget_hours
-        cmd = build_cmd(model_name="model57", dataset="chinese_icdar",
-                        params=p, budget_hours=budget_hours, force_w=28, force_h=28)
-        nb += job_write(p, cmd, where="jobset26")
-        print(p)
-    return nb
-
+    return rng.choice(all_params)
 
 def jobset27():
     """
@@ -1489,11 +1375,7 @@ def jobset27():
         p['model_name'] = model_name
         p['dataset'] = dataset
         p['budget_hours'] = budget_hours
-        cmd = build_cmd(model_name=model_name, dataset=dataset,
-                        params=p, budget_hours=budget_hours)
-        nb += job_write(p, cmd, where=jobset_name)
-        print(json.dumps(p, indent=4))
-    return nb
+    return rng.choice(all_params)
 
 
 def jobset28():
@@ -1542,11 +1424,7 @@ def jobset28():
         p['model_name'] = model_name
         p['dataset'] = dataset
         p['budget_hours'] = budget_hours
-        cmd = build_cmd(model_name=model_name, dataset=dataset,
-                        params=p, budget_hours=budget_hours)
-        nb += job_write(p, cmd, where=jobset_name)
-        print(json.dumps(p, indent=4))
-    return nb
+    return rng.choice(all_params)
 
 
 def jobset29():
@@ -1596,12 +1474,7 @@ def jobset29():
         p['dataset'] = dataset
         p['budget_hours'] = budget_hours
         p['optimization'] = dict(algo='adam', initial_lr=0.01)
-        cmd = build_cmd(model_name=model_name, dataset=dataset,
-                        params=p, budget_hours=budget_hours)
-        nb += job_write(p, cmd, where=jobset_name)
-        print(json.dumps(p, indent=4))
-    return nb
-
+    return rng.choice(all_params)
 
 def jobset30():
     """
@@ -1646,11 +1519,7 @@ def jobset30():
         p['model_name'] = 'model56'
         p['dataset'] = 'digits'
         p['budget_hours'] = budget_hours
-        cmd = build_cmd(model_name="model56", dataset="digits",
-                        params=p, budget_hours=budget_hours)
-        nb += job_write(p, cmd, where="jobset30")
-        print(json.dumps(p, indent=4))
-    return nb
+    return rng.choice(all_params)
 
 
 def jobset31():
@@ -1700,11 +1569,7 @@ def jobset31():
         p['dataset'] = dataset
         p['budget_hours'] = budget_hours
         p['optimization'] = dict(algo='adam', initial_lr=0.001)
-        cmd = build_cmd(model_name=model_name, dataset=dataset,
-                        params=p, budget_hours=budget_hours)
-        nb += job_write(p, cmd, where=jobset_name)
-        print(json.dumps(p, indent=4))
-    return nb
+    return rng.choice(all_params)
 
 
 def jobset32():
@@ -1777,18 +1642,14 @@ def jobset32():
         p['force_h'] = 28
         p['mode'] = 'minibatch'
         p['budget_hours'] = budget_hours
-        cmd = build_cmd(model_name="model55", dataset="fonts", params=p,
-                        budget_hours=budget_hours, force_w=28, force_h=28)
-        nb += job_write(p, cmd, where="jobset32")
-        print(p)
-
-    return nb
+    return rng.choice(all_params)
 
 
 def jobset33():
     """
     jobset21 but with more training time
     """
+    rng = np.random
     nb_filters_per_layer = {
         3: [[2**x, 2**(x + 1), 2**(x + 2)] for x in range(3, 9)],
         4: [[2**x, 2**(x + 1), 2**(x + 1), 2**(x + 2)] for x in range(3, 9)],
@@ -1840,11 +1701,7 @@ def jobset33():
         p['model_name'] = model_name
         p['dataset'] = dataset
         p['budget_hours'] = budget_hours
-        cmd = build_cmd(model_name=model_name, dataset=dataset,
-                        params=p, budget_hours=budget_hours)
-        nb += job_write(p, cmd, where=jobset_name)
-        print(json.dumps(p, indent=4))
-    return nb
+    return rng.choice(all_params)
 
 # hyperopt loop for model64
 
@@ -1935,13 +1792,7 @@ def jobset34():
     model_name = params_next['model_name']
     dataset = params_next['dataset']
     jobset_name = "jobset34"
-    cmd = build_cmd(model_name=model_name,
-                    dataset=dataset,
-                    params=params_next,
-                    budget_hours=budget_hours)
-    nb = job_write(params_next, cmd, where=jobset_name)
-    return nb
-
+    return params_next
 
 def jobset35():
     # vertebrate convnet hyperopt search
@@ -1976,18 +1827,10 @@ def jobset35():
     model_name = 'model73'
     dataset = 'digits'
     jobset_name = "jobset35"
-
     params['model_name'] = model_name
     params['dataset'] = 'digits'
     params['budget_hours'] = budget_hours
-
-    cmd = build_cmd(model_name=model_name,
-                    dataset=dataset,
-                    params=params,
-                    budget_hours=budget_hours)
-    nb = job_write(params, cmd, where=jobset_name)
-    return nb
-
+    return params
 
 def jobset36():
     # Continuous brush stroke hyper-search
@@ -2022,14 +1865,7 @@ def jobset36():
     params['model_name'] = model_name
     params['dataset'] = 'digits'
     params['budget_hours'] = budget_hours
-
-    cmd = build_cmd(model_name=model_name,
-                    dataset=dataset,
-                    params=params,
-                    budget_hours=budget_hours)
-    nb = job_write(params, cmd, where=jobset_name)
-    return b
-
+    return params
 
 def jobset37():
     import math
@@ -2100,16 +1936,7 @@ def jobset37():
         space_skopt,
         rstate=rng)
     params_next = from_skopt(hp_next)
-    budget_hours = params_next['budget_hours']
-    model_name = params_next['model_name']
-    dataset = params_next['dataset']
-    jobset_name = "jobset37"
-    cmd = build_cmd(model_name=model_name,
-                    dataset=dataset,
-                    params=params_next,
-                    budget_hours=budget_hours)
-    nb = job_write(params_next, cmd, where=jobset_name)
-    return nb
+    return params_next
 
 
 def jobset_recurrent_brush_stroke(jobset_name, model_name, update=lambda p:p):
@@ -2147,29 +1974,17 @@ def jobset_recurrent_brush_stroke(jobset_name, model_name, update=lambda p:p):
     model_name = model_name
     dataset = 'digits'
     jobset_name = jobset_name
-
     params['model_name'] = model_name
     params['dataset'] = dataset
     params['budget_hours'] = budget_hours
-
     params = update(params)
-    dataset = params['dataset']
-
-    cmd = build_cmd(model_name=model_name,
-                    dataset=dataset,
-                    params=params,
-                    budget_hours=budget_hours)
-    nb = job_write(params, cmd, where=jobset_name)
-    return nb
-
+    return params
 
 def jobset38():
     return jobset_recurrent_brush_stroke('jobset38', 'model77')
 
-
 def jobset39():
     return jobset_recurrent_brush_stroke('jobset39', 'model78')
-
 
 def jobset40():
     # model81 with no stride
@@ -2335,8 +2150,6 @@ def jobset49():
 
     return jobset_recurrent_brush_stroke('jobset49', 'model83', update=update)
 
-
-
 def jobset50():
     #hyperopt of chairs
     def update(params):
@@ -2364,7 +2177,6 @@ def jobset50():
         return params
 
     return jobset_recurrent_brush_stroke('jobset50', 'model83', update=update)
-
 
 def jobset51():
     # hyperopt of chairs
@@ -2505,13 +2317,7 @@ def jobset54():
     params['model_name'] = model_name
     params['dataset'] = dataset
     params['budget_hours'] = budget_hours
-
-    cmd = build_cmd(model_name=model_name,
-                    dataset=dataset,
-                    params=params,
-                    budget_hours=budget_hours)
-    nb = job_write(params, cmd, where=jobset_name)
-    return nb
+    return params
 
 def jobset55():
     # vertebrate convnet hyperopt search
@@ -2552,13 +2358,7 @@ def jobset55():
     params['model_name'] = model_name
     params['dataset'] = dataset
     params['budget_hours'] = budget_hours
-
-    cmd = build_cmd(model_name=model_name,
-                    dataset=dataset,
-                    params=params,
-                    budget_hours=budget_hours)
-    nb = job_write(params, cmd, where=jobset_name)
-    return nb
+    return params
 
 def jobset56():
     # hyperopting DeepProgram
@@ -2595,13 +2395,7 @@ def jobset56():
     params['model_name'] = model_name
     params['dataset'] = dataset
     params['budget_hours'] = budget_hours
-
-    cmd = build_cmd(model_name=model_name,
-                    dataset=dataset,
-                    params=params,
-                    budget_hours=budget_hours)
-    nb = job_write(params, cmd, where=jobset_name)
-    return nb
+    return params
 
 def jobset57():
     # hyperoptng sketchy dataset
@@ -2873,12 +2667,7 @@ def jobset62():
     params['model_name'] = model_name
     params['dataset'] = dataset
     params['budget_hours'] = budget_hours
-    cmd = build_cmd(model_name=model_name,
-                    dataset=dataset,
-                    params=params,
-                    budget_hours=budget_hours)
-    nb = job_write(params, cmd, where=jobset_name)
-    return nb
+    return params
 
 def jobset63():
     # hyperopt the new enhance module on chairs
@@ -3124,7 +2913,7 @@ def jobset66():
     return jobset_recurrent_brush_stroke('jobset66', 'model88', update=update)
 
 
-def jobset67_sample():
+def jobset67():
     #hyperopt for unit test 008 of brush stroke
     rng = np.random
     params = {}
@@ -3165,24 +2954,38 @@ def jobset67_sample():
 @click.option('--nb', default=1, help='nb of repetitions', required=False)
 @click.option('--optimize/--no-optimize', default=False, help='whether the next sample is sampled directly from the prior or optimized', required=False)
 @click.option('--nb-samples', default=100, help='nb samples to sample in order to select the next hypers if you want to optimize', required=False)
-def insert(where, nb, optimize, nb_samples):
+@click.option('--dry/--no-dry', default=False, help='dont insert', required=False)
+def insert(where, nb, optimize, nb_samples, dry):
     g = globals()
-    if where in g:
-        sample_and_insert = g[globals]
-    elif where + '_sample' in g:
-        sample = g[where + '_sample']
-        jobset = where.split('_')[0]
-        if optimize:
-            target = 'stats.training.avg_loss_train_fix'
-            inputs, outputs = get_hypers(where=where, y_col=target, state=SUCCESS)
-            def sample_and_insert():
-                new_inputs = [sample() for _ in range(nb_samples)]
-                scores = get_scores_bandit(inputs, outputs, new_inputs=new_inputs, algo='thompson')
-                new_input = new_inputs[np.argmin(scores)]
-                print('expected {} for the selected job : {}'.format(target, np.min(scores)))
+    sample = g[where]
+    jobset = where.split('_')[0]
+    if optimize:
+        target = 'stats.training.avg_loss_train_fix'
+        inputs, outputs = get_hypers(where=where, y_col=target, state=SUCCESS)
+        # filter examples with nan outputs
+        isnt_nan = map(lambda o:not np.isnan(o), outputs)
+        inputs = [inputs[i] for i in range(len(inputs)) if isnt_nan[i]]
+        outputs = [outputs[i] for i in range(len(outputs)) if isnt_nan[i]]
+        def sample_and_insert():
+            new_inputs = [sample() for _ in range(nb_samples)]
+            scores = get_scores_bandit(inputs, outputs, new_inputs=new_inputs, algo='thompson')
+            new_input = new_inputs[np.argmin(scores)]
+            if db.job_exists_by_summary(summarize(new_input)):
+                existing = '(exists)'
+            else:
+                existing = '(new)'
+            print('expected {} for the selected job : {}, id:{}{}'.format(target, np.min(scores), summarize(new_input), existing))
+            if dry:
+                return 0
+            else:
                 return job_write_from_params(new_input, jobset=where)
-        else:
-            sample_and_insert = lambda: job_write_from_params(sample(), jobset=where)
+    else:
+        def sample_and_insert():
+            params = sample()
+            if dry:
+                return 0
+            else:
+                return job_write_from_params(params, jobset=where)
     total = 0
     for _ in range(nb):
         total += sample_and_insert()
