@@ -189,16 +189,20 @@ def get_next_skopt(inputs, outputs, space, rstate=None):
     res = gp_minimize(func, space, n_calls=1, n_random_starts=0, x0=inputs, y0=outputs, random_state=rstate)
     return func.x
 
-def get_scores_thompson(inputs, outputs, new_inputs=None):
+def get_scores_bandit(inputs, outputs, new_inputs=None, algo='thompson'):
     from sklearn.pipeline import make_pipeline
     from sklearn.gaussian_process import GaussianProcessRegressor
     from sklearn.preprocessing import Imputer
-    from hp_toolkit.bandit import Thompson
+    from hp_toolkit.bandit import Thompson, UCB
+    from hp_toolkit.helpers import Pipeline
     preprocess = lambda x:frozendict(flatten_dict(x))
     inputs = map(preprocess, inputs)
     new_inputs = map(preprocess, new_inputs)
-    gp = make_pipeline(DictVectorizer(), Imputer(), GaussianProcessRegressor())
-    bdt = Thompson(gp)
+    gp = Pipeline(DictVectorizer(), Imputer(), GaussianProcessRegressor(normalize_y=True))
+    if algo == 'thompson':
+        bdt = Thompson(gp)
+    elif algo == 'ucb':
+        bdt = UCB(gp)
     bdt.update(inputs, outputs)
     return bdt.get_action_scores(new_inputs)
 

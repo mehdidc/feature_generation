@@ -11,7 +11,7 @@ import random
 import click
 
 from lightjob.cli import load_db
-from hp import get_hypers, get_scores_thompson
+from hp import get_hypers, get_scores_bandit
 
 db = load_db()
 budget_hours = 10  # default budget hours
@@ -3173,11 +3173,13 @@ def insert(where, nb, optimize, nb_samples):
         sample = g[where + '_sample']
         jobset = where.split('_')[0]
         if optimize:
-            inputs, outputs = get_hypers(where=where, state=SUCCESS)
+            target = 'stats.training.avg_loss_train_fix'
+            inputs, outputs = get_hypers(where=where, y_col=target, state=SUCCESS)
             def sample_and_insert():
                 new_inputs = [sample() for _ in range(nb_samples)]
-                scores = get_scores_thompson(inputs, outputs, new_inputs=new_inputs)
+                scores = get_scores_bandit(inputs, outputs, new_inputs=new_inputs, algo='thompson')
                 new_input = new_inputs[np.argmin(scores)]
+                print('expected {} for the selected job : {}'.format(target, np.min(scores)))
                 return job_write_from_params(new_input, jobset=where)
         else:
             sample_and_insert = lambda: job_write_from_params(sample(), jobset=where)
