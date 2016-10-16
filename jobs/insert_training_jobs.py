@@ -11,6 +11,7 @@ import random
 import click
 
 from lightjob.cli import load_db
+from hp import get_hypers, get_scores_thompson
 
 db = load_db()
 budget_hours = 10  # default budget hours
@@ -57,7 +58,7 @@ def build_cmd(launcher="scripts/launch_gpu",
 def job_write(params, cmd, where="", dry=False):
     if dry:
         return 0
-    print(json.dumps(params, indent=4))
+    print(json.dumps(params, indent=2))
     return db.safe_add_job(params, type='training', cmd=cmd, where=where)
 
 def build_cmd_from_params(params):
@@ -3123,7 +3124,7 @@ def jobset66():
     return jobset_recurrent_brush_stroke('jobset66', 'model88', update=update)
 
 
-def jobset67():
+def jobset67_sample():
     #hyperopt for unit test 008 of brush stroke
     rng = np.random
     params = {}
@@ -3157,16 +3158,32 @@ def jobset67():
         "size_conv_filters": size_conv_filters,
         "proba_func": "softmax"
     }
-    return job_write_from_params(params, 'jobset67')
+    return params
 
 @click.command()
 @click.option('--where', default='', help='jobset name', required=False)
 @click.option('--nb', default=1, help='nb of repetitions', required=False)
-def insert(where, nb):
-    where = globals()[where]
+@click.option('--optimize/--no-optimize', default=False, help='whether the next sample is sampled directly from the prior or optimized', required=False)
+@click.option('--nb-samples', default=100, help='nb samples to sample in order to select the next hypers if you want to optimize', required=False)
+def insert(where, nb, optimize, nb_samples):
+    g = globals()
+    if where in g:
+        sample_and_insert = g[globals]
+    elif where + '_sample' in g:
+        sample = g[where + '_sample']
+        jobset = where.split('_')[0]
+        if optimize:
+            inputs, outputs = get_hypers(where=where, state=SUCCESS)
+            def sample_and_insert():
+                new_inputs = [sample() for _ in range(nb_samples)]
+                scores = get_scores_thompson(inputs, outputs, new_inputs=new_inputs)
+                new_input = new_inputs[np.argmin(scores)]
+                return job_write_from_params(new_input, jobset=where)
+        else:
+            sample_and_insert = lambda: job_write_from_params(sample(), jobset=where)
     total = 0
     for _ in range(nb):
-        total += where()
+        total += sample_and_insert()
     print("Total number of jobs added : {}".format(total))
 
 if __name__ == '__main__':

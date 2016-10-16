@@ -7,9 +7,19 @@ import numpy as np
 from collections import OrderedDict
 from skopt import gp_minimize, forest_minimize
 
+from hp_toolkit.helpers import DictVectorizer, flatten_dict
+from hp_toolkit.bandit import Thompson
+
+from frozendict import frozendict
+
+def deep_frozendict(x):
+    if isinstance(x, Mapping):
+        return frozendict({k: deep_frozendict(v) for k, v in x.items()})
+    else:
+        return x
+
 def linearize_dict(d):
     return linearize_('', d, [])
-
 
 def linearize_(k, v, path):
     if not isinstance(v, dict):
@@ -179,13 +189,29 @@ def get_next_skopt(inputs, outputs, space, rstate=None):
     res = gp_minimize(func, space, n_calls=1, n_random_starts=0, x0=inputs, y0=outputs, random_state=rstate)
     return func.x
 
-if __name__ == '__main__':
-    from skopt import dummy_minimize, gp_minimize
-    space = [
-        Choice( [Constant(None),  Categorical(['a', 'b']) ] )
-    ]
-    def func(x):
+def get_scores_thompson(inputs, outputs, new_inputs=None):
+    from sklearn.pipeline import make_pipeline
+    from sklearn.gaussian_process import GaussianProcessRegressor
+    from sklearn.preprocessing import Imputer
+    from hp_toolkit.bandit import Thompson
+    preprocess = lambda x:frozendict(flatten_dict(x))
+    inputs = map(preprocess, inputs)
+    new_inputs = map(preprocess, new_inputs)
+    gp = make_pipeline(DictVectorizer(), Imputer(), GaussianProcessRegressor())
+    bdt = Thompson(gp)
+    bdt.update(inputs, outputs)
+    return bdt.get_action_scores(new_inputs)
 
-        return x[0]
-    res = gp_minimize(func, space)
-    print(res)
+def get_hypers(y_col='stats.training.avg_loss_train_fix', **kw):
+    from lightjob.cli import load_db
+    db = load_db()
+    jobs = db.jobs_with(**kw)
+    inputs = [j['content'] for j in jobs]
+    outputs = [db.get_value(j, y_col) for j in jobs]
+    return inputs, outputs
+
+if __name__ == '__main__':
+    from lightjob.db import SUCCESS
+    X, y = get_hypers(where='jobset67', state=SUCCESS)
+    scores = get_scores_thompson(X, y, new_inputs=X)
+    print(scores)
