@@ -4,7 +4,7 @@
 "dataset": "loader",
 "data_params":{
     "pipeline": [
-        {"name": "toy", "params": {"nb": 200000, "w": 16, "h": 16, "pw": 4, "ph": 4, "nb_patches": 2, "colored": true, "bg_color": [255, 0, 0], "fg_color": "random"}},
+        {"name": "toy", "params": {"nb": 200000, "w": 16, "h": 16, "pw": 4, "ph": 4, "nb_patches": 1, "colored": true, "bg_color": [255, 0, 0], "fg_color": "random"}},
         {"name": "shuffle", "params": {}},
         {"name": "normalize_shape", "params": {}},
         {"name": "force_rgb", "params": {}},
