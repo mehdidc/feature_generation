@@ -54,6 +54,11 @@ def is_max(x):
     m = x.max(axis=1, keepdims=True)
     return softmax(x) * T.eq(x, m)
 
+def sparse_softmax(x):
+    m = x.max(axis=1, keepdims=True)
+    return softmax(x) * T.eq(x, m)
+
+
 def softmax_sample(rng):
     def fn(x):
         x = softmax(x)
@@ -94,6 +99,7 @@ proba_funcs = {
     'softmax': T.nnet.softmax,
     'sparsemax': sparsemax,
     'is_max': is_max,
+    'sparse_softmax': sparse_softmax
 }
 
 recurrent_models = {

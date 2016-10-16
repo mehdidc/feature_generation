@@ -1,5 +1,5 @@
 {
-"comment": "1 patch of random color (chosen discretely among 8 colors) with a colored background (fixed color) on an image of size 16x16 - color - with softmax",
+"comment": "1 patch of random color (chosen discretely among 8 colors) with a colored background (fixed color) on an image of size 16x16 - color - with softmax - origin:c2b988bc643b59db2d516d77c0ed31d4",
 "budget_hours": 10,
 "dataset": "loader",
 "data_params":{
@@ -18,15 +18,15 @@
     "patch_size": 16,
     "nb_colors": 8,
     "stride": [0.25, 1],
-    "nb_fc_units": [100],
-    "nb_recurrent_units": 160,
-    "size_conv_filters": [7],
+    "nb_fc_units": [60],
+    "nb_recurrent_units": 50,
+    "size_conv_filters": [3],
     "num_filters": [32],
     "proba_func": "softmax"
 },
 "optimization": {
     "algo": "adadelta",
-    "learning_rate": 0.01,
+    "learning_rate": 0.1,
     "max_nb_epochs": 9999999999,
     "patience_nb_epochs": 500
 },

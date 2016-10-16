@@ -3002,6 +3002,66 @@ def jobset69():
         ]
      }
     nb_fc_layers = rng.choice((0, 1, 2))
+    nb_fc_units = [rng.randint(1, 10) * 50 for _ in range(nb_fc_layers)]
+    nb_recurrent_units = rng.randint(5, 50) * 10
+    nb_conv_layers = rng.choice((0, 1, 2))
+    nb_filters = [rng.choice((8, 16, 32, 64)) for _ in range(nb_conv_layers)]
+    size_conv_filters = [rng.choice((3, 5, 7)) for _ in range(nb_conv_layers)]
+    params["model_params"] = {
+        "n_steps": 2,
+        "patch_size": 16,
+        "nb_colors": 8,
+        "stride": [0.25, 1],
+        "nb_fc_units": nb_fc_units,
+        "nb_recurrent_units": nb_recurrent_units,
+        "num_filters": nb_filters,
+        "size_conv_filters": size_conv_filters,
+        "proba_func": "softmax"
+    }
+    return params
+
+def jobset70():
+    # study dependency on nb of examples
+    rng = np.random
+    nb = rng.choice((5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 15000, 20000, 50000, 100000, 200000))
+    params = {}
+    params["model_name"] = 'model102'
+    params["dataset"] = 'loader'
+    params["budget_hours"] = 0.5
+    params["data_params"]= {
+        "pipeline": [
+            {"name": "toy", "params": {"nb": nb, "w": 16, "h": 16, "pw": 4, "ph": 4, "nb_patches": 2}},
+            {"name": "shuffle", "params": {}},
+            {"name": "normalize_shape", "params": {}},
+            {"name": "divide_by", "params": {"value": 255}},
+            {"name": "order", "params": {"order": "th"}}
+        ]
+     }
+    params["model_params"] = {
+        "n_steps": 2,
+        "patch_size": 8,
+        "stride": [0.5, 1]
+    }
+    return params
+
+def jobset71():
+    #hyperopt for unit test 006 of brush stroke
+    rng = np.random
+    params = {}
+    params["model_name"] = 'model105'
+    params["dataset"] = 'loader'
+    params["budget_hours"] = 2
+    params["data_params"]= {
+        "pipeline": [
+            {"name": "toy", "params": {"nb": 200000, "w": 16, "h": 16, "pw": 4, "ph": 4, "nb_patches": 1, "colored": True, "bg_color": "random", "fg_color": "random"}},
+            {"name": "shuffle", "params": {}},
+            {"name": "normalize_shape", "params": {}},
+            {"name": "force_rgb", "params": {}},
+            {"name": "divide_by", "params": {"value": 255}},
+            {"name": "order", "params": {"order": "th"}}
+        ]
+     }
+    nb_fc_layers = rng.choice((0, 1, 2))
     nb_fc_units = [rng.randint(1, 10) * 20 for _ in range(nb_fc_layers)]
     nb_recurrent_units = rng.randint(5, 20) * 10
     nb_conv_layers = rng.choice((0, 1, 2))
@@ -3016,7 +3076,7 @@ def jobset69():
         "nb_recurrent_units": nb_recurrent_units,
         "num_filters": nb_filters,
         "size_conv_filters": size_conv_filters,
-        "proba_func": "softmax"
+        "proba_func": "sparse_softmax"
     }
     return params
 

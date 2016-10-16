@@ -18,9 +18,9 @@
     "patch_size": 16,
     "nb_colors": 8,
     "stride": [0.25, 1],
-    "nb_fc_units": [100],
-    "nb_recurrent_units": 160,
-    "size_conv_filters": [7],
+    "nb_fc_units": [60],
+    "nb_recurrent_units": 50,
+    "size_conv_filters": [3],
     "num_filters": [32],
     "proba_func": "softmax"
 },
