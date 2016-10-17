@@ -3081,7 +3081,7 @@ def jobset71():
     return params
 
 def jobset72():
-    #hyperopt for unit test 006 of brush stroke with sparse_softmax
+    #hyperopt for unit test 006 (but for 2 time steps instead of one) of brush stroke with sparse_softmax
     rng = np.random
     params = {}
     params["model_name"] = 'model105'
@@ -3117,6 +3117,46 @@ def jobset72():
         "proba_func": "sparse_softmax"
     }
     return params
+
+def jobset73():
+    #hyperopt for unit test 006 (for one time steps this time) of brush stroke with sparse_softmax
+    rng = np.random
+    params = {}
+    params["model_name"] = 'model105'
+    params["dataset"] = 'loader'
+    params["budget_hours"] = 2
+    params["data_params"]= {
+        "pipeline": [
+            {"name": "toy", "params": {"nb": 200000, "w": 16, "h": 16, "pw": 4, "ph": 4, "nb_patches": 1}},
+            {"name": "shuffle", "params": {}},
+            {"name": "normalize_shape", "params": {}},
+            {"name": "random_colorize", "params":{"op": "threshold", "fg_color": "random", "bg_color": [0,0,0]}},
+            {"name": "force_rgb", "params": {}},
+            {"name": "divide_by", "params": {"value": 255}},
+            {"name": "order", "params": {"order": "th"}}
+        ]
+
+     }
+    nb_fc_layers = rng.choice((0, 1, 2))
+    nb_fc_units = [rng.randint(1, 10) * 20 for _ in range(nb_fc_layers)]
+    nb_recurrent_units = rng.randint(5, 20) * 10
+    nb_conv_layers = rng.choice((0, 1, 2))
+    nb_filters = [rng.choice((8, 16, 32)) for _ in range(nb_conv_layers)]
+    size_conv_filters = [rng.choice((3, 5, 7)) for _ in range(nb_conv_layers)]
+    params["model_params"] = {
+        "n_steps": 1,
+        "patch_size": 16,
+        "nb_colors": 8,
+        "stride": [0.25, 1],
+        "nb_fc_units": nb_fc_units,
+        "nb_recurrent_units": nb_recurrent_units,
+        "num_filters": nb_filters,
+        "size_conv_filters": size_conv_filters,
+        "proba_func": "sparse_softmax"
+    }
+    return params
+
+
 
 
 @click.command()
