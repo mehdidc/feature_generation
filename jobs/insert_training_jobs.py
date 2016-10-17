@@ -3156,9 +3156,6 @@ def jobset73():
     }
     return params
 
-
-
-
 @click.command()
 @click.option('--where', default='', help='jobset name', required=False)
 @click.option('--nb', default=1, help='nb of repetitions', required=False)

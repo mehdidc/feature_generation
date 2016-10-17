@@ -413,7 +413,8 @@ def load_data(dataset="digits",
         if transformation == 'resize':
             X_rescaled = np.empty((len(X), w, h))
             for i in range(len(X)):
-                X_rescaled[i] = resize(X[i], (w, h), preserve_range=True)[:, :, 0]
+                print(X.shape, X_rescaled.shape, w, h)
+                X_rescaled[i] = resize(X[i], (w, h), preserve_range=True)
             X = X_rescaled
             X = X.astype(np.float32)
             data = Manual(X=X)
