@@ -44,16 +44,18 @@ def iterate_minibatches(nb_inputs, batchsize, shuffle=False):
             excerpt = slice(start_idx, start_idx + batchsize)
         yield excerpt
 
-def load_model(filename, **kw):
+def load_model(filename, data_params=None, **kw):
     dataset = 'digits'
     force_w = None
     force_h = None
     params = None
     layers, params = load_(filename)
-    data_params = {}
+    if not data_params:
+        data_params = {}
     if params:
         dataset = params.get('dataset', 'digits')
-        data_params = params.get('data_params', {})
+        data_params_ = params.get('data_params', {})
+        data_params.update(data_params_)
         force_w = params.get('force_w')
         force_h = params.get('force_h')
     model, data, layers, w, h, c = load_filename(
