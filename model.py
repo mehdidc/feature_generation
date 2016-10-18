@@ -7747,6 +7747,7 @@ def model101(nb_filters=64, w=32, h=32, c=1,
 
 
 def model102(w=32, h=32, c=1, n_steps=1, patch_size=4, stride=[0.5, 1]):
+    # simple brush model for unit testing
     l_in = layers.InputLayer((None, c, w, h), name="input")
     hid = l_in
     hids = conv_fc(
@@ -7807,7 +7808,8 @@ def model102(w=32, h=32, c=1, n_steps=1, patch_size=4, stride=[0.5, 1]):
                   [l_coord, l_brush, l_raw_out, l_scaled_out,  l_out])
     return layers_from_list_to_dict(all_layers)
 
-def model103(w=32, h=32, c=1, stride=[0.25, 1], patch_size=16, n_steps=2, nb_colors=None, nb_recurrent_units=40, nb_fc_units=[40], proba_func='softmax'):
+def model103(w=32, h=32, c=1, stride=[0.25, 1], patch_size=16, n_steps=2, nb_colors=None, nb_recurrent_units=40, nb_fc_units=[40], num_filters=[], size_conv_filters=[], proba_func='softmax'):
+    # another simple brush model for unit testing, but with feedback
     nb_coords = 14
     output_shape = (None, c, h, w)
     patches = np.ones((1, c, patch_size, patch_size)).astype(np.float32)
@@ -7815,8 +7817,8 @@ def model103(w=32, h=32, c=1, stride=[0.25, 1], patch_size=16, n_steps=2, nb_col
     hid = in_
     hids = conv_fc(
       hid, 
-      num_filters=[],
-      size_conv_filters=[],
+      num_filters=num_filters,
+      size_conv_filters=size_conv_filters,
       pooling=False,
       nb_fc_units=nb_fc_units,
       nonlin=rectify)
@@ -7968,6 +7970,8 @@ def model105(w=32, h=32, c=1,
              num_filters=[],
              size_conv_filters=[],
              nb_recurrent_units=40):
+    if type(nb_recurrent_units) == int:
+        nb_recurrent_units = [nb_recurrent_units]
     l_in = layers.InputLayer((None, c, w, h), name="input")
     hid = l_in
     hids = conv_fc(
@@ -7979,7 +7983,8 @@ def model105(w=32, h=32, c=1,
       nonlin=rectify)
     hid = hids[-1]
     hid = Repeat(hid, n_steps)
-    hid = layers.GRULayer(hid, nb_recurrent_units)
+    for n in nb_recurrent_units:
+        hid = layers.GRULayer(hid, n)
     l_coord = TensorDenseLayer(hid, 14, nonlinearity=linear, name="coord")
     patches = np.ones((1, c, patch_size, patch_size))
     patches = patches.astype(np.float32)
