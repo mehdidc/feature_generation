@@ -3062,8 +3062,8 @@ def jobset71():
         ]
      }
     nb_fc_layers = rng.choice((0, 1, 2))
-    nb_fc_units = [rng.randint(1, 10) * 20 for _ in range(nb_fc_layers)]
-    nb_recurrent_units = rng.randint(5, 20) * 10
+    nb_fc_units = [rng.randint(1, 10) * 100 for _ in range(nb_fc_layers)]
+    nb_recurrent_units = rng.randint(5, 20) * 40
     nb_conv_layers = rng.choice((0, 1, 2))
     nb_filters = [rng.choice((8, 16, 32)) for _ in range(nb_conv_layers)]
     size_conv_filters = [rng.choice((3, 5, 7)) for _ in range(nb_conv_layers)]
