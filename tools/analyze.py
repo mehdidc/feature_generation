@@ -11,6 +11,11 @@ import logging
 from helpers import mkdir_path
 import time
 
+import joblib
+
+from lasagnekit.easy import iterate_minibatches
+
+
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(stream=sys.stdout)
 logger.addHandler(handler)
@@ -369,11 +374,102 @@ def clusterfinder(capsule, data, layers, w, h, c, folder, **params):
         #    plt.scatter(code_2d[categories==-cl, 0], code_2d[categories==-cl, 1], c='')
 
     return ret
+
+
+def iterative_refinement(capsule, data, layers, w, h, c, folder, **params):
+    p = params
+    batch_size = p['batch_size']
+    N = p['nb_samples']
+    nb_iter = p['nb_iter']
+    do_sample = p['do_sample']
+    do_binarize = p['do_binarize']
+    do_gaussian_noise = p['do_gaussian_noise']
+
+    do_noise = p['do_noise']
+    noise_pr = p.get('noise_pr', .1)
+    gaussian_noise_std = p.get('gaussian_noise_std', 0.003)
+    thresh = p.get('thresh', 'moving')
+    init_by_external = False
+    
+    whitepx_ratio = p.get('whitepx_ratio')
+    if not whitepx_ratio and thresh == 'moving':
+        nb_white = 0
+        nb_total = 0
+        thresh = params.get('up_binarize_data_threshold', 0.5)
+        data.load()
+        for i in range(N / data.X.shape[0] + data.X.shape[0]):
+            xcur = data.X.flatten()
+            nb_white += np.sum(xcur > thresh)
+            nb_total += len(xcur)
+            data.load()
+        whitepx_ratio = float(nb_white) / nb_total
+        print('white ratio : {}'.format(whitepx_ratio))
+
+    imgs = np.empty((N, nb_iter + 1, c, w, h))
+    imgs = imgs.astype(np.float32)
+    imgs[:, 0] = np.random.uniform(size=(N, c, w, h))
+    stats = {'score': [], 'diversity': [], 'duration': []}
+    for i in (range(1, nb_iter + 1)):
+        print('iteration {}'.format(i))
+        t = time.time()
+        sprev = imgs[:, i - 1]
+        s = sprev
+        if do_noise:
+            s = (np.random.uniform(size=s.shape) <= (1 - noise_pr)) * s
+            s = s.astype(np.float32)
+        if do_gaussian_noise:
+            nz = np.random.normal(0, gaussian_noise_std, size=s.shape).astype(np.float32)
+            s += nz
+        # MAIN THING
+        s = minibatcher(s, capsule.reconstruct, size=batch_size)
+        ####
+        if do_sample:
+            s = np.random.binomial(n=1, p=s, size=s.shape).astype('float32')
+        if do_binarize:
+            if thresh == 'moving':
+                vals = s.flatten()
+                vals = vals[np.argsort(vals)]
+                thresh_ = vals[-int(whitepx_ratio * len(vals)) - 1]
+            else:
+                thresh_ = thresh
+            s = s > thresh_
+        imgs[:, i] = s
+        delta_time = time.time() - t
+        score = float(np.abs(s - sprev).sum())
+        diversity = float(prop_uniques(s))
+        stats['score'].append(score)
+        stats['diversity'].append(diversity)
+        stats['duration'].append(delta_time)
+        print('score:{score} diversity:{diversity} duration:{duration}'.format(
+              score=stats['score'][-1], 
+              diversity=stats['diversity'][-1],
+              duration=stats['duration'][-1]
+        ))
+        if score == 0:
+            print('end')
+            imgs = imgs[:, 0:i+1]
+            break
+    mkdir_path(folder)
+    joblib.dump(imgs, folder + '/images.npz', compress=9)
+    return stats
+
+def minibatcher(X, f, size=128):
+    res = []
+    for sl in iterate_minibatches(X.shape[0], size):
+        r = f(X[sl])
+        res.append(r)
+    return np.concatenate(res, axis=0)
+
+def minibatcher2d(X, Y, f, size=128):
+    assert X.shape[0] == Y.shape[0]
+    res = []
+    for sl in iterate_minibatches(X.shape[0], size):
+        r = f(X[sl], Y[sl])
+        res.append(r)
+    return np.concatenate(res, axis=0)
+
 def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
-
     from skimage.io import imsave
-
-    print(params)
     op_params = params.get("op_params", [{"nb": 100}])
     op_names = params.get("op_names", ["mutation"])
     flatten  = params.get("flatten", False)
@@ -479,21 +575,6 @@ def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
             imsave(filename, img)
         else:
             pass #next time
-    from lasagnekit.easy import iterate_minibatches
-    def minibatcher(X, f, size=128):
-        res = []
-        for sl in iterate_minibatches(X.shape[0], size):
-            r = f(X[sl])
-            res.append(r)
-        return np.concatenate(res, axis=0)
-
-    def minibatcher2d(X, Y, f, size=128):
-        assert X.shape[0] == Y.shape[0]
-        res = []
-        for sl in iterate_minibatches(X.shape[0], size):
-            r = f(X[sl], Y[sl])
-            res.append(r)
-        return np.concatenate(res, axis=0)
 
     def get_reconstruction_error(X, Y):
         return ((X - Y) ** 2).sum(axis=(1, 2, 3))
@@ -2117,3 +2198,11 @@ def viz_data(capsule, data, layers, w, h, c,
         filename = "{}/{}.png".format(folder, idx)
         logger.info("saving {}...".format(filename))
         imsave(filename, sample)
+
+def prop_uniques(x):
+    x = x.reshape((x.shape[0], -1))
+    x = map(hash_array, x)
+    return len(set(x)) / float(len(x))
+
+def hash_array(x):
+    return hash(tuple(x))

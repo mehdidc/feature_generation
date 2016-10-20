@@ -3195,7 +3195,7 @@ def jobset74():
 def jobset75():
     # like jobset34 (vertebrate) but with spatial_k small
     rng = random
-    nb_layers = rng.randint(1, 7)
+    nb_layers = rng.randint(1, 5)
     nb_filters = [2 ** rng.randint(5, 9) for _ in range(nb_layers)]
     model_params = OrderedDict(
         nb_layers=nb_layers,

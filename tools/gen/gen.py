@@ -55,13 +55,15 @@ def stats(model, where, n_jobs, stats, force, type):
 def load_jobs(model_name, where, type_="generation"):
     db = load_db()
     jobs = []
+    if type_ == 'generation':
+        ref_jobs = set(map(lambda j:j['summary'], db.jobs_with(where=where)))
     for j in db.jobs_with(state=SUCCESS, type=type_):
         j = dict(j)
         if type_ == "generation":
             s = j['content']['model_summary']
-            ref_job = db.get_job_by_summary(s)
-        else:
-            ref_job = j
+            if s not in ref_jobs:
+                continue
+        ref_job = db.get_job_by_summary(j['content']['model_summary'])
         model_details = ref_job['content']
         j['ref_job'] = dict(ref_job)
         if where is not None and ref_job['where'] != where:

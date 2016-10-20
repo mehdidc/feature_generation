@@ -19,6 +19,8 @@ import logging
 import intdim_mle
 import manifold
 
+import joblib
+
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(stream=sys.stdout)
 logger.addHandler(handler)
@@ -146,6 +148,12 @@ def compute_stats(job, force=False, filter_stats=None):
     if should_compute('training', stats):
         logger.info('compute training stats')
         stats['training'] = compute_training_stats(folder, ref_job)
+    if should_compute('out_of_the_box_classification', stats):
+        models = ['tools/models/mnist/m1']
+        stat = {}
+        for m in models:
+            stat[m] = compute_out_of_the_box_classification(folder, m)
+        stats['out_of_the_box_classification'] = stat
     logger.info('Finished on {}, stats : {}'.format(s, stats))
     return stats
 
@@ -157,13 +165,22 @@ def construct_data(job_folder, hash_matrix, transform=lambda x:x):
     filenames = [filenames[ind] for ind in indices]
     if len(filenames) == 0:
         return None
-
     X = []
     for im in get_images(filenames):
         X.append([transform(im)])
     X = np.concatenate(X, axis=0)
     X = X.reshape((X.shape[0], -1))
     return X
+
+def compute_out_of_the_box_classification(folder, model_folder):
+    from keras.models import model_from_json
+    data = joblib.load(os.path.join(folder, 'images.npz'))
+    data = data[:, -1] # last time step images
+    model = model_from_json(open(os.path.join(model_folder, 'model.json')).read())
+    model.load_weights(os.path.join(model_folder, 'model.h5'))
+    pred = model.predict(data)
+    pred = pred.tolist()
+    return pred
 
 def compute_training_stats(folder, ref_job):
     from tasks import load_

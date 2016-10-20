@@ -229,3 +229,5 @@ def build_encoders(layers, nb_parallel=None):
         encoder = build_encode_func(layers, lay=lay)
         encoders.append(encoder)
     return encoders
+
+

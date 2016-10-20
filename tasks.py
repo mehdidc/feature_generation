@@ -830,6 +830,8 @@ def check(filename="out.pkl",
             np.random.seed(state)
             p["seed"] = state
             ret = func(capsule, data, layers, w, h, c, folder, **p)
+            if type(ret) == dict and update_db:
+                db.job_update(job_summary, {'stats': ret})
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_traceback,
@@ -841,13 +843,11 @@ def check(filename="out.pkl",
                 return None
             else:
                 return None
-
     if update_db:
         db = load_db()
         db.modify_state_of(job_summary, SUCCESS)
         db.close()
     return ret
-
 
 def save_(layers, builder, kw_builder, filename, info=None):
     if info is None:
