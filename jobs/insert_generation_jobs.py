@@ -22,9 +22,14 @@ def insert(where, nb, mode, budget):
     if mode == 'standard':
         up_binarize = 0.5
         batch_size = 1024
-    elif mode == 'moving':
+    elif mode == 'fast':
         up_binarize = 'moving'
         batch_size = 256
+        initial_size = 1000
+    elif mode == 'faster':
+        up_binarize = 'moving'
+        batch_size = 256
+        initial_size = 256
     else:
         raise Exception('bad mode')
     params = dict(
@@ -32,7 +37,7 @@ def insert(where, nb, mode, budget):
         op_names=[],
         nb_iterations=100,
         initial='random',
-        initial_size=10000,
+        initial_size=initial_size,
         layer_name='input',
         reconstruct=True,
         up_binarize=up_binarize,

@@ -82,7 +82,9 @@ def filter_jobs(where=None, type=None, ref_where=None, state=None, dontcare=None
     else:
         ref_jobs = set()
     def accepted(job):
-        if ref_where:
+        if ref_where :
+            if 'model_summary' not in job['content']:
+                return False
             s = job['content']['model_summary']
             return s in ref_jobs
         return True
