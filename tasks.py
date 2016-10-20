@@ -25,7 +25,6 @@ from helpers import salt_and_pepper, zero_masking, bernoulli_sample, minibatcher
 from data import load_data
 from model import *  # for dill
 from skimage.io import imsave
-import logging
 from tools.gen.genstats import genstats
 
 from lightjob.cli import load_db
@@ -36,7 +35,7 @@ from functools import partial
 
 sys.setrecursionlimit(10000)
 
-
+import logging
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(stream=sys.stdout)
 logger.addHandler(handler)

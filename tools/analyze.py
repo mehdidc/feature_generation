@@ -9,6 +9,7 @@ import os
 from skimage.filters import threshold_otsu, rank
 import logging
 from helpers import mkdir_path
+import time
 
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(stream=sys.stdout)
@@ -439,11 +440,12 @@ def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
         nb_white = 0
         nb_total = 0
         thresh = params.get('up_binarize_data_threshold', 0.5)
+        data.load()
         for i in range(initial_size / data.X.shape[0] + data.X.shape[0]):
-            data.load()
             xcur = data.X.flatten()
             nb_white += np.sum(xcur > thresh)
             nb_total += len(xcur)
+            data.load()
         whitepx_ratio = float(nb_white) / nb_total
         print('white ratio : {}'.format(whitepx_ratio))
     else:
@@ -452,6 +454,7 @@ def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
     down_binarize = params.get("down_binarize")
     nb_iterations = params.get("nb_iterations", 1)
     batch_size = params.get("batch_size", 1024)
+    print(batch_size)
     evals = []
 
     rec_error = None
@@ -464,7 +467,6 @@ def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
             if params.get("sort", True) is True:
                 sorting = np.argsort(rec_error)
                 px_ = px_[sorting]
-            print(px_.shape)
             nb_samples = px_.shape[0]
             size = int(np.sqrt(nb_samples))
             img = tile_raster_images(
@@ -509,8 +511,8 @@ def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
         return x
 
     for i in range(nb_iterations + 1):
+        t = time.time()
         logger.info("Iteration {}".format(i))
-
         px_rec = minibatcher(px, capsule.reconstruct, size=batch_size)
         if up_binarize:
             px_rec = do_up_binarize(px_rec)
@@ -551,6 +553,8 @@ def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
         if up_binarize:
             new_px = do_up_binarize(new_px)
         px = new_px
+
+        print('duration : '.format(time.time() - t))
 
     # save the resuling images
     px_ = px[:, 0, :, :]

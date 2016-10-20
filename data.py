@@ -17,7 +17,7 @@ def load_data(dataset="digits",
         from functools import partial
         from helpers import floatX
         kw_loader = kw
-        iterator = loader(kw_loader)
+        iterator = loader(kw_loader['pipeline'])
         iterator = minibatch(iterator, batch_size=batch_size)
         iterator = expand_dict(iterator)
         iterator = imap(partial(dict_apply, fn=floatX, cols=['X']), iterator)

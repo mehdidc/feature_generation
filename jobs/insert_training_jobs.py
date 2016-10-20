@@ -3192,6 +3192,48 @@ def jobset74():
     }
     return params
 
+def jobset75():
+    # like jobset34 (vertebrate) but with spatial_k small
+    rng = random
+    nb_layers = rng.randint(1, 7)
+    nb_filters = [2 ** rng.randint(5, 9) for _ in range(nb_layers)]
+    model_params = OrderedDict(
+        nb_layers=nb_layers,
+        nb_filters=nb_filters,
+        filter_size=rng.choice((3, 5)),
+        use_channel=rng.choice((True, False)),
+        use_spatial=True,
+        spatial_k=rng.randint(1, 2),
+        channel_stride=rng.choice((1, 2, 4)),
+        weight_sharing=rng.choice((True, False)),
+        merge_op=rng.choice(('sum', 'mul'))
+    )
+    params = OrderedDict(
+        model_params=model_params,
+        denoise=None,
+        noise=None,
+        walkback=1,
+        walkback_mode='bengio_without_sampling',
+        autoencoding_loss='squared_error',
+        mode='random',
+        contractive=False,
+        contractive_coef=None,
+        marginalized=False,
+        binarize_thresh=None
+    )
+    budget_hours = 4
+    model_name = 'model73'
+    dataset = 'digits'
+    jobset_name = "jobset35"
+    params['model_name'] = model_name
+    params['dataset'] = 'digits'
+    params['data_params'] = {
+        'train_classes': [0, 1, 2, 3, 4, 6, 7, 8, 9],
+        'test_classes': [5]
+    }
+    params['budget_hours'] = budget_hours
+    return params
+
 @click.command()
 @click.option('--where', default='', help='jobset name', required=False)
 @click.option('--nb', default=1, help='nb of repetitions', required=False)

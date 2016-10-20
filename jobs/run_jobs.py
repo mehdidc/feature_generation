@@ -49,7 +49,7 @@ if __name__ == "__main__":
             break
         if ref_where is not None and 'model_summary' in j['content']:
             jref = db.get_job_by_summary(j['content']['model_summary'])
-            if jref['where'] != ref_where:
+            if not jref or jref['where'] != ref_where:
                 #print('Skipping {} because its ref is not in {}'.format(j['summary'], ref_where))
                 continue
             else:
