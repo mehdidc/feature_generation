@@ -35,7 +35,7 @@ def genstats(jobs, db, force=False, n_jobs=-1, filter_stats=None):
 
 
 def update_stats(job, stats, db):
-    print(stats)
+    #print(stats)
     db.job_update(job["summary"], dict(stats=stats))
 
 
@@ -149,7 +149,7 @@ def compute_stats(job, force=False, filter_stats=None):
         logger.info('compute training stats')
         stats['training'] = compute_training_stats(folder, ref_job)
     if should_compute('out_of_the_box_classification', stats):
-        models = ['tools/models/mnist/m1']
+        models = ['tools/models/mnist/m1', 'tools/models/mnist/m2']
         stat = {}
         for m in models:
             stat[m] = compute_out_of_the_box_classification(folder, m)
@@ -179,8 +179,18 @@ def compute_out_of_the_box_classification(folder, model_folder):
     model = model_from_json(open(os.path.join(model_folder, 'model.json')).read())
     model.load_weights(os.path.join(model_folder, 'model.h5'))
     pred = model.predict(data)
+    score = compute_objectness(pred)
     pred = pred.tolist()
-    return pred
+    return {'predictions': pred, 'objectness': score}
+
+def compute_objectness(v):
+    v = np.array(v)
+    marginal = v.mean(axis=0)
+    score = ((v*(np.log(v / marginal))))
+    score = score.sum(axis=1).mean()
+    score = np.exp(score)
+    score = float(score)
+    return score
 
 def compute_training_stats(folder, ref_job):
     from tasks import load_

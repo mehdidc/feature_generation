@@ -3233,14 +3233,56 @@ def jobset75():
     params['budget_hours'] = budget_hours
     return params
 
+def jobset76():
+    # like jobset34 (vertebrate) but with spatial_k small
+    rng = random
+    nb_layers = rng.randint(1, 5)
+    nb_filters = [2 ** rng.randint(5, 9) for _ in range(nb_layers)]
+    model_params = OrderedDict(
+        nb_layers=nb_layers,
+        nb_filters=nb_filters,
+        filter_size=rng.choice((3, 5)),
+        use_channel=rng.choice((True, False)),
+        use_spatial=True,
+        spatial_k=rng.randint(1, 2),
+        channel_stride=rng.choice((1, 2, 4)),
+        weight_sharing=rng.choice((True, False)),
+        merge_op=rng.choice(('sum', 'mul'))
+    )
+    params = OrderedDict(
+        model_params=model_params,
+        denoise=None,
+        noise=None,
+        walkback=1,
+        walkback_mode='bengio_without_sampling',
+        autoencoding_loss='squared_error',
+        mode='random',
+        contractive=False,
+        contractive_coef=None,
+        marginalized=False,
+        binarize_thresh=None
+    )
+    budget_hours = 6
+    model_name = 'model73'
+    jobset_name = "jobset35"
+    params['model_name'] = model_name
+    params['dataset'] = 'digits'
+    params['data_params'] = {
+        'train_classes': [0, 3, 6, 8, 9],
+        'test_classes': [1, 2, 4, 5, 7]
+    }
+    params['budget_hours'] = budget_hours
+    return params
+
 @click.command()
 @click.option('--where', default='', help='jobset name', required=False)
 @click.option('--nb', default=1, help='nb of repetitions', required=False)
 @click.option('--optimize/--no-optimize', default=False, help='whether the next sample is sampled directly from the prior or optimized', required=False)
+@click.option('--minimize/--maximize', default=True, help='whether the next sample is sampled directly from the prior or optimized', required=False)
 @click.option('--nb-samples', default=100, help='nb samples to sample in order to select the next hypers if you want to optimize', required=False)
 @click.option('--dry/--no-dry', default=False, help='dont insert', required=False)
 @click.option('--target', default='stats.training.avg_loss_train_fix', required=False)
-def insert(where, nb, optimize, nb_samples, dry, target):
+def insert(where, nb, optimize, minimize, nb_samples, dry, target):
     g = globals()
     sample = g[where]
     jobset = where.split('_')[0]
@@ -3253,7 +3295,7 @@ def insert(where, nb, optimize, nb_samples, dry, target):
         def sample_and_insert():
             new_inputs = [sample() for _ in range(nb_samples)]
             scores = get_scores_bandit(inputs, outputs, new_inputs=new_inputs, algo='thompson')
-            new_input = new_inputs[np.argmin(scores)]
+            new_input = new_inputs[np.argmin(scores) if minimize else np.argmax(scores)]
             if db.job_exists_by_summary(summarize(new_input)):
                 existing = '(exists)'
             else:

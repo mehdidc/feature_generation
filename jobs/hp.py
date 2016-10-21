@@ -265,19 +265,8 @@ def get_col(jobs, col, db):
         ref_jobs = db.jobs_with(type='generation')
         ref_jobs = {j['content']['model_summary']:j for j in ref_jobs if j['content']['model_summary'] in S}
         jobs = map(lambda s:ref_jobs[s], S)
-    if col == 'out_of_the_box_top5_mean':
-        def func(j):
-            vals = j['stats']['out_of_the_box_classification']
-            for v in vals.values():
-                v = np.array(v)[:, 1]
-                v = v[np.argsort(v)]
-                v = v[::-1]
-                v = (v[0:5])
-            return np.mean(v)
-    else:
-        func = partial(db.get_value, field=col)
+    func = partial(db.get_value, field=col)
     outputs = map(func, jobs)
-    print(outputs)
     return outputs
 
 if __name__ == '__main__':
