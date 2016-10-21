@@ -61,12 +61,12 @@ def load_jobs(model_name, where, type_="generation"):
         j = dict(j)
         if type_ == "generation":
             s = j['content']['model_summary']
-            if s not in ref_jobs:
+            if where and s not in ref_jobs:
                 continue
         ref_job = db.get_job_by_summary(j['content']['model_summary'])
         model_details = ref_job['content']
         j['ref_job'] = dict(ref_job)
-        if where is not None and ref_job['where'] != where:
+        if where and ref_job['where'] != where:
             continue
         if model_name and model_details['model_name'] != model_name:
             continue
