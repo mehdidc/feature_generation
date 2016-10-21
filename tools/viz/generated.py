@@ -36,7 +36,6 @@ if __name__ == '__main__':
         data = joblib.load(img_filename)
         data = np.array(data)
         data = data[:, -1]
-        print(data.min(), data.max())
         data = np.clip(data, 0, 1)
         img = disp_grid(data, border=1, bordercolor=(0.3, 0, .0), normalize=False)
         if per_jobset is False:

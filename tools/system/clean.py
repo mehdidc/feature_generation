@@ -1,7 +1,7 @@
 
 if __name__ == '__main__':
     from lightjob.cli import load_db
-    from lightjob.db import SUCCESS
+    from lightjob.db import SUCCESS, RUNNING, PENDING
     import shutil
     import os
     from joblib import dump
@@ -18,18 +18,33 @@ if __name__ == '__main__':
             shutil.rmtree(path)
         else:
             os.remove(path)
-    for j in tqdm(db.jobs_with(state=SUCCESS, type="training")):
+
+    all_folders = set()
+    folders = []
+    for j in tqdm(db.jobs_with(type="training")):
         j = dict(j)
-        # training job
         folder = 'jobs/results/{}'.format(j['summary'])
+        folders.append(folder)
+        if j['state'] == RUNNING or j['state'] == PENDING:
+            continue
+        if j['state'] != SUCCESS:
+            rm(os.path.join(folder))
+            continue
+        # training job
         rm(os.path.join(folder, 'features'))
         rm(os.path.join(folder, 'recons'))
         rm(os.path.join(folder, 'out'))
-
-    for j in tqdm(db.jobs_with(state=SUCCESS, type="generation")):
+    
+    for j in tqdm(db.jobs_with(type="generation")):
         j = dict(j)
-        # generation job of the training job
         folder = 'jobs/results/{}'.format(j['summary'])
+        folders.append(folder)
+        if j['state'] == RUNNING or j['state'] == PENDING:
+            continue
+        if j['state'] != SUCCESS:
+            rm(os.path.join(folder))
+            continue
+        # generation job of the training job
         rm(os.path.join(folder, 'iterations'))
         samples = glob.glob(os.path.join(folder, 'final/*.png'))
         samples = filter(lambda s:s.startswith('0'), samples)
@@ -40,3 +55,18 @@ if __name__ == '__main__':
             samples = np.array(samples)
             dump(samples, filename, compress=9)
             rm(os.path.join(folder, 'final'))
+    all_folders |= set(folders)
+
+    remain_folders = set(glob.glob('jobs/results/*')) 
+    remain_folders -= all_folders
+    for f in remain_folders:
+        if not os.path.isdir(f):
+            pass
+        s = f.split('/')[-1]
+        if s == 'iccc':
+            print(s)
+            continue
+        if db.job_exists_by_summary(s):
+            print(db.get_state_of(s))
+        else:
+            rm(f)
