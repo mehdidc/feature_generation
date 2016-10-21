@@ -10,6 +10,17 @@ from skimage.io import imread
 import numpy as np
 
 from datakit.image import pipeline_load as loader
+from datakit.image import operators
+
+import h5py
+
+def pipeline_load_hdf5(iterator, filename, cols=['X']):
+    hf = h5py.File(filename)
+    X = hf['X']
+    return X
+
+operators['load_hdf5'] = pipeline_load_hdf5
+loader = partial(loader, operators=operators)
 
 if __name__ == '__main__':
     from datakit.helpers import minibatch, expand_dict, dict_apply
