@@ -3223,7 +3223,6 @@ def jobset75():
     )
     budget_hours = 4
     model_name = 'model73'
-    dataset = 'digits'
     jobset_name = "jobset35"
     params['model_name'] = model_name
     params['dataset'] = 'digits'
@@ -3240,12 +3239,12 @@ def jobset75():
 @click.option('--optimize/--no-optimize', default=False, help='whether the next sample is sampled directly from the prior or optimized', required=False)
 @click.option('--nb-samples', default=100, help='nb samples to sample in order to select the next hypers if you want to optimize', required=False)
 @click.option('--dry/--no-dry', default=False, help='dont insert', required=False)
-def insert(where, nb, optimize, nb_samples, dry):
+@click.option('--target', default='stats.training.avg_loss_train_fix', required=False)
+def insert(where, nb, optimize, nb_samples, dry, target):
     g = globals()
     sample = g[where]
     jobset = where.split('_')[0]
     if optimize:
-        target = 'stats.training.avg_loss_train_fix'
         inputs, outputs = get_hypers(where=where, y_col=target, state=SUCCESS)
         # filter examples with nan outputs
         isnt_nan = map(lambda o:not np.isnan(o), outputs)

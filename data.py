@@ -142,6 +142,7 @@ def load_data(dataset="digits",
                 included[data.y == cl] = True
             data.X = data.X[included]
             data.y = data.y[included]
+            print(data.y)
 
         w, h = data.img_dim
         if mode == 'random':
@@ -155,13 +156,13 @@ def load_data(dataset="digits",
         if include_test:
             data.test = MNIST(which='test')
             data.test.load()
-
             if 'test_classes' in kw:
                 included = np.zeros((len(data.test.X),)).astype(np.bool)
                 for cl in kw['test_classes']:
                     included[data.test.y == cl] = True
                 data.test.X = data.test.X[included]
                 data.test.y = data.test.y[included]
+                print(data.test.y)
 
     elif dataset == "rescaled_digits":
         from lasagnekit.datasets.mnist import MNIST

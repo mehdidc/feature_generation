@@ -17,6 +17,8 @@ import json
 from skimage.io import imread, imsave
 from skimage.transform import resize
 
+from lightjob.cli import load_db
+from lightjob.db import SUCCESS
 
 def minibatcher(fn, batchsize=1000):
   """
@@ -231,3 +233,27 @@ def build_encoders(layers, nb_parallel=None):
     return encoders
 
 
+def find_training_job(generation_job_summary, db=None):
+    if not db: db = load_db()
+    s = db.get_job_by_summary(generation_job_summary)['content']['model_summary']
+    return db.get_job_by_summary(s)
+
+def find_generation_job(training_job_summary, db=None):
+    if not db: db = load_db()
+    jobs = db.jobs_with(state=SUCCESS, type='generation')
+    for j in jobs:
+        if j['content']['model_summary'] == training_job_summary:
+            return j
+    return None
+
+def to_generation(jobs, db=None):
+    if not db: db = load_db()
+    S = set(j['summary'] for j in jobs)
+    jobs = db.jobs_with(state=SUCCESS, type='generation')
+    to_generation = {j['content']['model_summary']: j for j in jobs if j['content']['model_summary'] in S}
+    jobs = map(lambda s:to_generation[s], S)
+    return jobs
+
+def to_training(jobs):
+    if not db: db = load_db()
+    return [db.get_job_by_summary(j['content']['model_summary']) for j in jobs]

@@ -11,7 +11,7 @@ from hp_toolkit.helpers import flatten_dict, DictFlattener
 from hp_toolkit.bandit import Thompson
 
 from frozendict import frozendict
-
+from functools import partial
 def deep_frozendict(x):
     if isinstance(x, Mapping):
         return frozendict({k: deep_frozendict(v) for k, v in x.items()})
@@ -255,8 +255,30 @@ def get_hypers(y_col='stats.training.avg_loss_train_fix', **kw):
     db = load_db()
     jobs = db.jobs_with(**kw)
     inputs = [j['content'] for j in jobs]
-    outputs = [db.get_value(j, y_col) for j in jobs]
+    outputs = get_col(jobs, y_col, db=db) 
     return inputs, outputs
+
+def get_col(jobs, col, db):
+    if col.startswith('g#'):
+        col = col[2:]
+        S = set(j['summary'] for j in jobs)
+        ref_jobs = db.jobs_with(type='generation')
+        ref_jobs = {j['content']['model_summary']:j for j in ref_jobs if j['content']['model_summary'] in S}
+        jobs = map(lambda s:ref_jobs[s], S)
+    if col == 'out_of_the_box_top5_mean':
+        def func(j):
+            vals = j['stats']['out_of_the_box_classification']
+            for v in vals.values():
+                v = np.array(v)[:, 1]
+                v = v[np.argsort(v)]
+                v = v[::-1]
+                v = (v[0:5])
+            return np.mean(v)
+    else:
+        func = partial(db.get_value, field=col)
+    outputs = map(func, jobs)
+    print(outputs)
+    return outputs
 
 if __name__ == '__main__':
     from lightjob.db import SUCCESS
