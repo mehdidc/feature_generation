@@ -91,7 +91,7 @@ def filter_jobs(where=None, type=None, ref_where=None, state=None, dontcare=None
     jobs = db.jobs_with(**kw)
     jobs = filter(accepted, jobs)
     def get_key(j):
-        if 'life' in j and j['life'] is not None:
+        if 'life' in j and j['life']:
             l = j['life'][-1]['dt']
             l = pd.to_datetime(l, infer_datetime_format=True)
             return l
