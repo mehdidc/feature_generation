@@ -9,7 +9,7 @@ import joblib
 import numpy as np
 import sys
 sys.path.append(os.path.dirname(__file__) + '/../..')
-from tools.common import disp_grid
+from tools.common import disp_grid, to_training
 from helpers import mkdir_path
 
 if __name__ == '__main__':
@@ -35,11 +35,18 @@ if __name__ == '__main__':
         img_filename = 'jobs/results/{}/images.npz'.format(id_)
         data = joblib.load(img_filename)
         data = np.array(data)
-        data = data[:, -1]
+        if len(data.shape) == 5:
+            # (10000, 101, 1, 28, 28)
+            data = data[:, -1]
+        elif len(data.shape) == 3:
+            # (10000, 28, 28)
+            data = data[:, None]
+        print(data.shape)
         data = np.clip(data, 0, 1)
         img = disp_grid(data, border=1, bordercolor=(0.3, 0, .0), normalize=False)
         if per_jobset is False:
             imsave('exported_data/figs/generated/{}.png'.format(id_), img)
         else:
-            mkdir_path('exported_data/figs/generated/{}'.format(where))
-            imsave('exported_data/figs/generated/{}/{}.png'.format(where, id_), img)
+            where_ = db.get_job_by_summary(ref_id_)['where']
+            mkdir_path('exported_data/figs/generated/{}'.format(where_))
+            imsave('exported_data/figs/generated/{}/{}.png'.format(where_, id_), img)
