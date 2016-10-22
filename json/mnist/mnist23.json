@@ -1,0 +1,20 @@
+{
+    "binarize_thresh": null,
+    "noise": "zero_masking",
+    "denoise": null,
+    "model_params": {
+        "nb_filters": [64, 128, 256]
+    },
+    "walkback": 1,
+    "marginalized": false,
+    "autoencoding_loss": "squared_error",
+    "walkback_mode": "bengio_without_sampling",
+    "contractive": false,
+    "model_name": "model66",
+    "mode": "random",
+    "dataset": "digits",
+    "optimization": {
+        "algo": "adadelta",
+        "initial_lr": 0.1
+    }
+}

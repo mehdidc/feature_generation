@@ -1,0 +1,16 @@
+{
+    "model_name": "model80",
+    "model_params": {
+        "nb_filters": [128, 128, 128]
+    },
+    "dataset": "digits",
+    "data_params": {
+    },
+    "mode": "random",
+    "budget_hours": 24,
+    "optimization": {
+        "algo": "adadelta",
+        "initial_lr": 0.1
+    },
+    "report_rec_error": false
+}

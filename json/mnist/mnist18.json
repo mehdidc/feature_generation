@@ -1,0 +1,23 @@
+{
+ "autoencoding_loss":"squared_error",
+ "binarize_thresh": 0.5,
+ "budget_hours": 10,
+ "contractive": False,
+ "contractive_coef": 0,
+ "dataset":"digits",
+ "denoise": None,
+ "marginalized": False,
+ "model_name":"model55",
+ "model_params": {
+        "filter_size": 5,
+         "nb_filters": [64, 128, 256],
+         "nb_filters_mul": 1,
+         "nb_layers": 3,
+         "use_wta_channel": True,
+         "use_wta_spatial": True,
+         "wta_channel_stride": 4
+  },
+ "noise":"zero_masking",
+ "walkback": 1,
+ "walkback_jump": False
+}

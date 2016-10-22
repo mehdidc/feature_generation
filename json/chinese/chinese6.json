@@ -1,0 +1,25 @@
+{
+    "binarize_thresh": null,
+    "noise": "zero_masking",
+    "denoise": null,
+    "model_params": {
+        "use_batch_norm": true,
+        "nb_filters": [128, 256, 512],
+        "filter_size": 7,
+        "down": 8,
+        "block_size": 1
+    },
+    "walkback": 1,
+    "marginalized": false,
+    "autoencoding_loss": "squared_error",
+    "walkback_mode": "bengio_without_sampling",
+    "contractive": false,
+    "model_name": "model65",
+    "mode": "random",
+    "dataset": "chinese_icdar_big",
+    "batch_size": 32,
+    "optimization": {
+        "algo": "adam",
+        "initial_lr": 0.001
+    }
+}

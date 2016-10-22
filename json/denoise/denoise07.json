@@ -1,0 +1,5 @@
+{
+    "denoise": 0.7,
+    "noise": "zero_masking",
+    "walkback": 1 
+}

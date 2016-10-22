@@ -1,0 +1,20 @@
+{
+    "binarize_thresh": null,
+    "noise": "zero_masking",
+    "denoise": null,
+    "model_params": {
+        "nb_filters": [128, 256, 512]
+    },
+    "walkback": 1,
+    "marginalized": false,
+    "autoencoding_loss": "squared_error",
+    "walkback_mode": "bengio_without_sampling",
+    "contractive": false,
+    "model_name": "model70",
+    "mode": "random",
+    "dataset": "fonts",
+    "optimization": {
+        "algo": "adadelta",
+        "initial_lr": 0.1
+    }
+}

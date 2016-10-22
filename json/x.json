@@ -1,0 +1,48 @@
+{
+  "binarize_thresh": null, 
+  "noise": null, 
+  "data_params": {
+    "train_classes": [
+      0, 
+      1, 
+      2, 
+      3, 
+      4, 
+      6, 
+      7, 
+      8, 
+      9
+    ], 
+    "test_classes": [
+      5
+    ]
+  }, 
+  "budget_hours": 4, 
+  "contractive_coef": null, 
+  "denoise": null, 
+  "dataset": "digits", 
+  "model_params": {
+    "use_channel": true, 
+    "weight_sharing": false, 
+    "merge_op": "mul", 
+    "channel_stride": 4, 
+    "nb_filters": [
+      512, 
+      512, 
+      64, 
+      128, 
+      32
+    ], 
+    "spatial_k": 2, 
+    "filter_size": 3, 
+    "use_spatial": true, 
+    "nb_layers": 5
+  }, 
+  "walkback": 1, 
+  "marginalized": false, 
+  "mode": "random", 
+  "walkback_mode": "bengio_without_sampling", 
+  "contractive": false, 
+  "model_name": "model73", 
+  "autoencoding_loss": "squared_error"
+}

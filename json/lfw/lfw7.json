@@ -1,0 +1,22 @@
+{
+    "binarize_thresh": null,
+    "noise": "zero_masking",
+    "denoise": null,
+    "model_params": {
+        "nb_filters": [256, 512, 1024]
+    },
+    "walkback": 1,
+    "marginalized": false,
+    "autoencoding_loss": "squared_error",
+    "walkback_mode": "bengio_without_sampling",
+    "contractive": false,
+    "model_name": "model71",
+    "mode": "random",
+    "dataset": "lfw",
+    "optimization": {
+        "algo": "adadelta",
+        "initial_lr": 0.1
+    },
+    "force_w": 64,
+    "force_h": 64
+}

@@ -1,0 +1,22 @@
+{
+    "binarize_thresh": null,
+    "noise": "zero_masking",
+    "denoise": null,
+    "model_params": {
+        "nb_hidden_units": 1000,
+        "use_wta_sparse": true,
+        "wta_sparse_perc": 0.4
+    },
+    "walkback": 1,
+    "marginalized": false,
+    "autoencoding_loss": "squared_error",
+    "walkback_mode": "bengio_without_sampling",
+    "contractive": false,
+    "model_name": "model64",
+    "mode": "random",
+    "dataset": "digits",
+    "optimization": {
+        "algo": "adadelta",
+        "initial_lr": 0.1
+    }
+}

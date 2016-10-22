@@ -1,0 +1,30 @@
+{
+ "autoencoding_loss": "squared_error",
+ "binarize_thresh": 0.5,
+ "budget_hours": 10,
+ "contractive": false,
+ "contractive_coef": 0,
+ "dataset": "fonts",
+ "force_w": 28,
+ "force_h": 28,
+ "denoise": null,
+ "marginalized": false,
+ "model_name":"model55",
+ "model_params": {
+        "filter_size": 5,
+         "nb_filters": [64, 128, 256],
+         "nb_filters_mul": 1,
+         "nb_layers": 3,
+         "use_wta_channel": true,
+         "use_wta_spatial": true,
+         "wta_channel_stride": 4
+ },
+ "noise":"zero_masking",
+ "walkback": 1,
+ "walkback_jump": false,
+  "optimization": {
+      "algo": "adadelta",
+      "initial_lr": 0.1
+  },
+  "mode": "random"
+}

@@ -1,0 +1,12 @@
+{
+"op_names": ["salt_and_pepper"],
+"op_params": [{"p": 0.9}], 
+"layer_name": "input",
+"initial_source": "random",
+"initial_size": 1,
+"flatten":true, 
+"filter": false,
+"out": "out/out.png",
+"nb_iterations": 1000,
+"reconstruct": true
+}

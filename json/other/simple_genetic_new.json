@@ -1,0 +1,14 @@
+{ 
+ "sort": true, 
+ "op_names": [], 
+ "op_params": [], 
+ "initial": "random", 
+ "initial_size": 10000, 
+ "up_binarize": 0.5, 
+ "nb_iterations": 100, 
+ "seed": 2, 
+ "layer_name": "input", 
+ "tol": 0, 
+ "reconstruct": true, 
+ "down_binarize": null
+}

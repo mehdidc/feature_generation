@@ -1,0 +1,25 @@
+{
+    "binarize_thresh": null,
+    "noise": "zero_masking",
+    "denoise": null,
+    "data_params":{
+       "image_collection_mode": "all"
+    },
+    "model_params": {
+        "nb_filters": [256, 512, 1024]
+    },
+    "walkback": 1,
+    "marginalized": false,
+    "autoencoding_loss": "squared_error",
+    "walkback_mode": "bengio_without_sampling",
+    "contractive": false,
+    "model_name": "model70",
+    "mode": "random",
+    "dataset": "aloi",
+    "optimization": {
+        "algo": "adam",
+        "initial_lr": 0.001
+    },
+    "force_w": 64,
+    "force_h": 64
+}

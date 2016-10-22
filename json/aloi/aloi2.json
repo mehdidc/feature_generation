@@ -1,0 +1,22 @@
+{
+    "binarize_thresh": null,
+    "noise": "zero_masking",
+    "denoise": null,
+    "model_params": {
+        "nb_filters": [800, 800, 800]
+    },
+    "walkback": 1,
+    "marginalized": false,
+    "autoencoding_loss": "squared_error",
+    "walkback_mode": "bengio_without_sampling",
+    "contractive": false,
+    "model_name": "model68",
+    "mode": "random",
+    "dataset": "aloi",
+    "optimization": {
+        "algo": "adam",
+        "initial_lr": 0.01
+    },
+    "force_w": 28,
+    "force_h": 28
+}

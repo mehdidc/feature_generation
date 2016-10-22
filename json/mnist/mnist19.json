@@ -1,0 +1,25 @@
+{
+    "binarize_thresh": null,
+    "noise": "zero_masking",
+    "denoise": null,
+    "model_params": {
+        "nb_hidden_units": 800,
+        "use_wta_lifetime": false,
+        "tied": true 
+    },
+    "walkback": 1,
+    "marginalized": false,
+    "autoencoding_loss": "squared_error",
+    "walkback_mode": "bengio_without_sampling",
+    "contractive": false,
+    "model_name": "model57",
+    "mode": "minibatch",
+    "dataset": "digits",
+    "optimization": {
+        "algo": "adam",
+        "initial_lr": 0.01,
+        "max_nb_epochs": 10000
+    },
+    "sparse_mean": {"hid": 0.05},
+    "sparse_coef": 100
+}
