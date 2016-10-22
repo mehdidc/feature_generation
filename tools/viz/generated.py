@@ -19,6 +19,7 @@ def generate_one(j, per_jobset=True):
     id_ = j['summary']
     ref_id_ = j['content']['model_summary']
     img_filename = 'jobs/results/{}/images.npz'.format(id_)
+    print(img_filename)
     data = joblib.load(img_filename)
     data = np.array(data)
     if len(data.shape) == 5:

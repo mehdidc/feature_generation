@@ -16,6 +16,7 @@ from skimage.io import imread, imsave
 from skimage.transform import resize
 
 from lightjob.cli import load_db
+from lightjob.utils import dict_format as default_dict_format
 from lightjob.db import SUCCESS
 
 def minibatcher(fn, batchsize=1000):
@@ -256,3 +257,9 @@ def to_generation(jobs, db=None):
 def to_training(jobs):
     if not db: db = load_db()
     return [db.get_job_by_summary(j['content']['model_summary']) for j in jobs]
+
+def dict_format(j, field):
+    if field.startswith('g#'):
+        field = field[2:]
+        j = find_generation_job(j['summary'])
+    return default_dict_format(j, field)

@@ -35,9 +35,7 @@ def genstats(jobs, db, force=False, n_jobs=-1, filter_stats=None):
 
 
 def update_stats(job, stats, db):
-    #print(stats)
     db.job_update(job["summary"], dict(stats=stats))
-
 
 def compute_stats(job, force=False, filter_stats=None):
     j = job
@@ -50,7 +48,6 @@ def compute_stats(job, force=False, filter_stats=None):
         hash_matrix = None
         x = None
         logger.warning('No hash matrix out there, you are probably using a trainong job type')
-
     stats = j.get("stats", {})
     if stats is None:
         stats = {}
@@ -154,7 +151,7 @@ def compute_stats(job, force=False, filter_stats=None):
         for m in models:
             stat[m] = compute_out_of_the_box_classification(folder, m)
         stats['out_of_the_box_classification'] = stat
-    logger.info('Finished on {}, stats : {}'.format(s, stats))
+    logger.info('Finished on {}'.format(j['summary']))
     return stats
 
 

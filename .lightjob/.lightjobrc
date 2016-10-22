@@ -1,3 +1,4 @@
 {
-    "backend": "Dataset"
+    "backend": "Dataset",
+    "dict_format": "tools.common.dict_format"
 }
