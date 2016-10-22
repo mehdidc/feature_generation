@@ -2,11 +2,26 @@ import theano.tensor as T
 import numpy as np
 import theano
 import os
-from lasagnekit.easy import iterate_minibatches
 import lasagne
 from layers import FeedbackGRULayer, TensorDenseLayer
 from utils.sparsemax_theano import sparsemax
 from collections import defaultdict
+
+def get_stat(name, stats):
+    return [stat[name] for stat in stats]
+
+def iterate_minibatches(nb_inputs, batchsize, shuffle=False):
+    if shuffle:
+        indices = np.arange(nb_inputs)
+        np.random.shuffle(indices)
+    for start_idx in range(0, max(nb_inputs, nb_inputs - batchsize + 1), batchsize):
+        if shuffle:
+            excerpt = indices[start_idx:start_idx + batchsize]
+        else:
+            excerpt = slice(start_idx, start_idx + batchsize)
+        yield excerpt
+
+
 
 def norm(x):
     return (x - x.min()) / (x.max() - x.min() + T.eq(x.max(), x.min()) + 1e-12)
@@ -182,43 +197,6 @@ class MultiSubSampled(object):
             self.output_dim = self.dataset.output_dim
 
 
-class Deconv2DLayer(lasagne.layers.Layer):
-
-    def __init__(self, incoming, num_filters, filter_size, stride=1, pad=0,
-                 W=lasagne.init.Orthogonal(),
-                 nonlinearity=lasagne.nonlinearities.rectify, **kwargs):
-        super(Deconv2DLayer, self).__init__(incoming, **kwargs)
-        self.num_filters = num_filters
-        self.filter_size = lasagne.utils.as_tuple(filter_size, 2, int)
-        self.stride = lasagne.utils.as_tuple(stride, 2, int)
-        self.pad = lasagne.utils.as_tuple(pad, 2, int)
-        self.W = self.add_param(W,
-                (self.input_shape[1], num_filters) + self.filter_size,
-                name='W')
-        self.b = self.add_param(lasagne.init.Constant(0),
-                (num_filters,),
-                name='b')
-        if nonlinearity is None:
-            nonlinearity = lasagne.nonlinearities.identity
-        self.nonlinearity = nonlinearity
-
-    def get_output_shape_for(self, input_shape):
-        shape = tuple(i*s - 2*p + f - 1
-                for i, s, p, f in zip(input_shape[2:],
-                                      self.stride,
-                                      self.pad,
-                                      self.filter_size))
-        return (input_shape[0], self.num_filters) + shape
-
-    def get_output_for(self, input, **kwargs):
-        op = T.nnet.abstract_conv.AbstractConv2d_gradInputs(
-            imshp=self.output_shape,
-            kshp=(self.input_shape[1], self.num_filters) + self.filter_size,
-            subsample=self.stride, border_mode=self.pad)
-        conved = op(self.W, input, self.output_shape[2:])
-        if self.b is not None:
-            conved += self.b.dimshuffle('x', 0, 'x', 'x')
-        return self.nonlinearity(conved)
 
 
 class BrushLayer(lasagne.layers.Layer):
@@ -883,7 +861,7 @@ def one_step_brush_layer(*args, **kwargs):
 
 def test_generic_batch_layer():
     from lasagne import layers
-    from lasagnekit.misc.plot_weights import dispims_color
+    from tools.plot_weights import dispims_color
     from skimage.io import imsave
     n_steps = 10
     nb_features = 10

@@ -13,13 +13,15 @@ import model
 import theano
 from datetime import datetime
 from lasagne import updates
+
 from lasagnekit.easy import (
     make_batch_optimizer, InputOutputMapping,
     build_batch_iterator)
-from lasagne import layers as L
 from lasagnekit.nnet.capsule import Capsule, make_function
-from lasagnekit.misc.plot_weights import dispims_color, tile_raster_images
-from lasagnekit.easy import get_stat, iterate_minibatches
+
+from lasagne import layers as L
+from tools.plot_weights import dispims_color, tile_raster_images
+from helpers import iterate_minibatches
 import numpy as np
 from helpers import salt_and_pepper, zero_masking, bernoulli_sample, minibatcher
 from data import load_data

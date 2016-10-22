@@ -7,6 +7,8 @@ from lasagne import init
 from lasagne.utils import unroll_scan
 from lasagne import layers
 from lasagne.layers import MergeLayer, Layer, Gate
+import lasagne
+
 class FeedbackGRULayer(MergeLayer):
     def __init__(self, incoming, num_units,
                  resetgate=Gate(W_cell=None),
@@ -526,6 +528,79 @@ class AddParams(layers.Layer):
     def get_params(self, **tags):
         params = [p for l in self.layers for p in layers.get_all_params(l, **tags)]
         return params
+
+class Deconv2DLayer(layers.Conv2DLayer):
+    def __init__(self, incoming, **kwargs):
+        super(Deconv2DLayer, self).__init__(incoming, **kwargs)
+
+    def get_output_shape_for(self, input_shape):
+        pad = self.pad if isinstance(self.pad, tuple) else (self.pad,) * self.n
+        batchsize = input_shape[0]
+        return ((batchsize, self.num_filters) +
+                tuple(inv_conv_output_length(input, filter, stride, p)
+                      for input, filter, stride, p
+                      in zip(input_shape[2:], self.filter_size,
+                             self.stride, pad)))
+
+    #def get_W_shape(self):
+    #    shape = super(Deconv2DLayer, self).get_W_shape()
+    #    return (shape[1], shape[0]) + shape[2:]
+
+    def convolve(self, input, **kwargs):
+        shape = self.get_output_shape_for(input.shape)
+        fake_output = T.alloc(0., *shape)
+        border_mode = 'half' if self.pad == 'same' else self.pad
+        
+        w_shape = self.get_W_shape()
+        w_shape = (w_shape[1], w_shape[0]) + w_shape[2:]
+        shape = self.get_output_shape_for(self.input_layer.output_shape)
+        W = self.W.transpose((1, 0, 2, 3))
+
+        conved = self.convolution(fake_output, W,
+                                  shape, w_shape,
+                                  subsample=self.stride,
+                                  border_mode=border_mode,
+                                  filter_flip=self.flip_filters)
+        return theano.grad(None, wrt=fake_output, known_grads={conved: input})
+
+class Deconv2DLayer_v2(lasagne.layers.Layer):
+
+    def __init__(self, incoming, num_filters, filter_size, stride=1, pad=0,
+                 W=lasagne.init.Orthogonal(),
+                 nonlinearity=lasagne.nonlinearities.rectify, **kwargs):
+        super(Deconv2DLayer, self).__init__(incoming, **kwargs)
+        self.num_filters = num_filters
+        self.filter_size = lasagne.utils.as_tuple(filter_size, 2, int)
+        self.stride = lasagne.utils.as_tuple(stride, 2, int)
+        self.pad = lasagne.utils.as_tuple(pad, 2, int)
+        self.W = self.add_param(W,
+                (self.input_shape[1], num_filters) + self.filter_size,
+                name='W')
+        self.b = self.add_param(lasagne.init.Constant(0),
+                (num_filters,),
+                name='b')
+        if nonlinearity is None:
+            nonlinearity = lasagne.nonlinearities.identity
+        self.nonlinearity = nonlinearity
+
+    def get_output_shape_for(self, input_shape):
+        shape = tuple(i*s - 2*p + f - 1
+                for i, s, p, f in zip(input_shape[2:],
+                                      self.stride,
+                                      self.pad,
+                                      self.filter_size))
+        return (input_shape[0], self.num_filters) + shape
+
+    def get_output_for(self, input, **kwargs):
+        op = T.nnet.abstract_conv.AbstractConv2d_gradInputs(
+            imshp=self.output_shape,
+            kshp=(self.input_shape[1], self.num_filters) + self.filter_size,
+            subsample=self.stride, border_mode=self.pad)
+        conved = op(self.W, input, self.output_shape[2:])
+        if self.b is not None:
+            conved += self.b.dimshuffle('x', 0, 'x', 'x')
+        return self.nonlinearity(conved)
+
 
 if __name__ == '__main__':
     from lasagne.layers import *

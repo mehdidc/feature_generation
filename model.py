@@ -1,11 +1,10 @@
 from lasagne import layers, init
-from lasagnekit.easy import layers_from_list_to_dict
 from lasagne.nonlinearities import (
         linear, sigmoid, rectify, very_leaky_rectify, softmax, tanh)
-from lasagnekit.layers import Deconv2DLayer
+from layers import Deconv2DLayer
 from helpers import FeedbackGRULayer, TensorDenseLayer
 from layers import FeedbackGRULayerClean, AddParams
-from helpers import Deconv2DLayer as deconv2d
+from layers import Deconv2DLayer_v2 as deconv2d
 from helpers import correct_over_op, over_op, sum_op, max_op, thresh_op, normalized_over_op, mask_op, mask_smooth_op, sub_op, normalized_sum_op
 from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse, norm_maxmin, max_k_spatial
 from helpers import Repeat
@@ -29,6 +28,13 @@ import theano
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
 from utils.sparsemax_theano import sparsemax
+
+def layers_from_list_to_dict(layers_list):
+    names = OrderedDict()
+    for layer in layers_list:
+        assert layer.name is not None
+        names[layer.name] = layer
+    return names
 
 def sparsemax_seq(x):
     x = T.cast(x, theano.config.floatX)
@@ -8061,7 +8067,7 @@ if __name__ == '__main__':
     import theano
     import theano.tensor as T
     import lasagne
-    from lasagnekit.misc.draw_net import  draw_to_file
+    #from tools.draw_net import  draw_to_file
 
     doc = """
     Usage: model.py MODEL
@@ -8071,7 +8077,7 @@ if __name__ == '__main__':
     model = globals()[model]
     w, h, c = 28, 28, 1
     all_layers = model(w=w, h=h, c=c)
-    draw_to_file(lasagne.layers.get_all_layers(all_layers['output']), 'out.svg')
+    #draw_to_file(lasagne.layers.get_all_layers(all_layers['output']), 'out.svg')
     for layer in all_layers.items():
         print(layer)
     x = T.tensor4()
