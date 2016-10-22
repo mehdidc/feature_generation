@@ -251,7 +251,7 @@ def to_generation(jobs, db=None):
     S = set(j['summary'] for j in jobs)
     jobs = db.jobs_with(state=SUCCESS, type='generation')
     to_generation = {j['content']['model_summary']: j for j in jobs if j['content']['model_summary'] in S}
-    jobs = map(lambda s:to_generation[s], S)
+    jobs = map(lambda s:to_generation.get(s), S)
     return jobs
 
 def to_training(jobs):
