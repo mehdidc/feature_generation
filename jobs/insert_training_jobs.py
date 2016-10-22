@@ -2,11 +2,9 @@ import json
 from collections import OrderedDict
 from lightjob.utils import summarize
 from lightjob.db import SUCCESS
-from hp import get_next_skopt, Categorical
 
 import numpy as np
 import random
-
 
 import click
 
@@ -3294,7 +3292,7 @@ def insert(where, nb, optimize, minimize, nb_samples, dry, target):
         outputs = [outputs[i] for i in range(len(outputs)) if isnt_nan[i]]
         def sample_and_insert():
             new_inputs = [sample() for _ in range(nb_samples)]
-            scores = get_scores_bandit(inputs, outputs, new_inputs=new_inputs, algo='thompson')
+            scores = get_scores_bandit(inputs, outputs, new_inputs=new_inputs, algo='ei')
             new_input = new_inputs[np.argmin(scores) if minimize else np.argmax(scores)]
             if db.job_exists_by_summary(summarize(new_input)):
                 existing = '(exists)'

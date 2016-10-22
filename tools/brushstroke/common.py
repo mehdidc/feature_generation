@@ -232,7 +232,6 @@ def build_encoders(layers, nb_parallel=None):
         encoders.append(encoder)
     return encoders
 
-
 def find_training_job(generation_job_summary, db=None):
     if not db: db = load_db()
     s = db.get_job_by_summary(generation_job_summary)['content']['model_summary']
