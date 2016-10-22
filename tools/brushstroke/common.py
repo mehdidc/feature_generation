@@ -1,15 +1,13 @@
 import sys
 import os
 sys.path.append(os.getcwd())
-from tasks import load_
-from tasks import check as load_filename
 from tools.system.imgtovideo import imgs_to_video
 from data import load_data
 import numpy as np
 import theano
 import theano.tensor as T
 from lasagne import layers as L
-from lasagnekit.misc.plot_weights import dispims_color, tile_raster_images
+from tools.plot_weights import dispims_color, tile_raster_images
 import pandas as pd
 from tqdm import tqdm
 import base64
@@ -47,6 +45,8 @@ def iterate_minibatches(nb_inputs, batchsize, shuffle=False):
         yield excerpt
 
 def load_model(filename, data_params=None, **kw):
+    from tasks import load_
+    from tasks import check as load_filename
     dataset = 'digits'
     force_w = None
     force_h = None

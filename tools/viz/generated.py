@@ -13,6 +13,7 @@ from tools.common import disp_grid, to_training
 from helpers import mkdir_path
 from joblib import Parallel, delayed
 import click
+db = load_db()
 
 def generate_one(j, per_jobset=True):
     id_ = j['summary']
@@ -28,7 +29,6 @@ def generate_one(j, per_jobset=True):
         data = data[:, None]
     if len(data) == 0:
         return
-    print(data.shape)
     data = np.clip(data, 0, 1)
     img = disp_grid(data, border=1, bordercolor=(0.3, 0, .0), normalize=False)
     if per_jobset is False:
@@ -37,20 +37,20 @@ def generate_one(j, per_jobset=True):
         where_ = db.get_job_by_summary(ref_id_)['where']
         mkdir_path('exported_data/figs/generated/{}'.format(where_))
         imsave('exported_data/figs/generated/{}/{}.png'.format(where_, id_), img)
+    print('completed {}'.format(id_))
 
 @click.command()
 @click.option('--where', default=None)
-@click.option('--per-jobset/--no-per-jobset', default=False)
+@click.option('--per-jobset/--no-per-jobset', default=True)
 def generate(where, per_jobset):
     kw = {}
-    db = load_db()
     J = db.jobs_with(state='success', type='generation')
     if where:
         ref_jobs = set(map(lambda j:j['summary'], db.jobs_with(where=where)))
         print(ref_jobs)
         J = filter(lambda j:j['content']['model_summary'] in ref_jobs, J)
     print('Nb of jobs : {}'.format(len(J)))
-    Parallel(n_jobs=20)(delayed(generate_one)(j, per_jobset=per_jobset) for j in J)
+    Parallel(n_jobs=1)(delayed(generate_one)(j, per_jobset=per_jobset) for j in J)
 
 if __name__ == '__main__':
     generate()

@@ -3277,10 +3277,12 @@ def jobset76():
 @click.option('--nb', default=1, help='nb of repetitions', required=False)
 @click.option('--optimize/--no-optimize', default=False, help='whether the next sample is sampled directly from the prior or optimized', required=False)
 @click.option('--minimize/--maximize', default=True, help='whether the next sample is sampled directly from the prior or optimized', required=False)
+@click.option('--algo', default='simple', help='optimization algorithm', required=False)
 @click.option('--nb-samples', default=100, help='nb samples to sample in order to select the next hypers if you want to optimize', required=False)
 @click.option('--dry/--no-dry', default=False, help='dont insert', required=False)
 @click.option('--target', default='stats.training.avg_loss_train_fix', required=False)
-def insert(where, nb, optimize, minimize, nb_samples, dry, target):
+def insert(where, nb, optimize, minimize, algo, nb_samples, dry, target):
+    maximize = not minimize
     g = globals()
     sample = g[where]
     jobset = where.split('_')[0]
@@ -3290,9 +3292,16 @@ def insert(where, nb, optimize, minimize, nb_samples, dry, target):
         isnt_nan = map(lambda o:not np.isnan(o), outputs)
         inputs = [inputs[i] for i in range(len(inputs)) if isnt_nan[i]]
         outputs = [outputs[i] for i in range(len(outputs)) if isnt_nan[i]]
-        def sample_and_insert():
+        def sample_and_insert(inputs=inputs, outputs=outputs):
             new_inputs = [sample() for _ in range(nb_samples)]
-            scores = get_scores_bandit(inputs, outputs, new_inputs=new_inputs, algo='ei')
+            if algo == 'ei' and maximize:
+                # if maximize and algo is ei
+                # then invert the outputs because
+                # ei is outputting high scores for high improvements towards the min of the function
+                # so we invert so that ei outputs high scores for high improvements towards the max
+                # then we take the max score (because maximise is True)
+                outputs = map(lambda o:-o, outputs)
+            scores = get_scores_bandit(inputs, outputs, new_inputs=new_inputs, algo=algo)
             new_input = new_inputs[np.argmin(scores) if minimize else np.argmax(scores)]
             if db.job_exists_by_summary(summarize(new_input)):
                 existing = '(exists)'

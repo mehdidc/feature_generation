@@ -5,20 +5,18 @@ from collections import Iterable, Mapping
 from hyperopt import hp, Trials
 from hyperopt import fmin, tpe, rand
 from hyperopt.pyll.stochastic import sample
-from skopt.space import Categorical, Dimension
 import numpy as np
 from collections import OrderedDict
-from skopt import gp_minimize, forest_minimize
 
 from hp_toolkit.helpers import flatten_dict, DictFlattener
 from hp_toolkit.bandit import Thompson
 
-from frozendict import frozendict
 from functools import partial
 
 import forestci as fci
 
 from tools.common import to_generation, to_training
+from frozendict import frozendict
 
 #http://code.activestate.com/recipes/577555-object-wrapper-class/
 class Wrapper(object):
@@ -65,6 +63,13 @@ class BayesianRandomForest(object):
             return mu, std
         else:
             return mu
+    
+    def sample_y(self, X, random_state=None):
+        rng = np.random.RandomState(random_state)
+        mu = self.rf_model.predict(X)
+        inbag = fci.calc_inbag(self.X_train.shape[0], self.rf_model)
+        var = fci.random_forest_error(self.rf_model, inbag, self.X_train, X)
+        return rng.multivariate_normal(mu, np.diag(var))
 
 def get_scores_bandit(inputs, outputs, new_inputs=None, algo='thompson'):
     from sklearn.pipeline import make_pipeline
@@ -72,7 +77,7 @@ def get_scores_bandit(inputs, outputs, new_inputs=None, algo='thompson'):
     from sklearn.gaussian_process import GaussianProcessRegressor
     from sklearn.linear_model import LinearRegression
     from sklearn.preprocessing import Imputer
-    from hp_toolkit.bandit import Thompson, UCB, BayesianOptimization, expected_improvement
+    from hp_toolkit.bandit import Thompson, UCB, BayesianOptimization, expected_improvement, Simple
     from hp_toolkit.helpers import Pipeline
     from sklearn.feature_extraction import DictVectorizer
     from sklearn.metrics import r2_score
@@ -83,21 +88,18 @@ def get_scores_bandit(inputs, outputs, new_inputs=None, algo='thompson'):
     new_inputs = map(preprocess, new_inputs)
     #reg = GaussianProcessRegressor(normalize_y=True)
     #reg = LinearRegression()
-    #reg = RandomForestRegressor() 
-    reg = BayesianRandomForest(RandomForestRegressor())
-    class WrapEstimator(Wrapper):
-        def fit(self, X, y):
-            return self._wrapped_obj.fit(X, y)
-        def predict(self, X, *args, **kwargs):
-            return self._wrapped_obj.predict(X, *args, **kwargs)
-    reg = WrapEstimator(reg)
+    reg = RandomForestRegressor() 
+    #reg = BayesianRandomForest(RandomForestRegressor())
+    #class WrapEstimator(Wrapper):
+    #    def fit(self, X, y):
+    #        return self._wrapped_obj.fit(X, y)
+    #    def predict(self, X, *args, **kwargs):
+    #        return self._wrapped_obj.predict(X, *args, **kwargs)
+    #reg = WrapEstimator(reg)
     model = Pipeline(DictVectorizer(sparse=False), Imputer(), reg)
-    if algo == 'thompson':
-        bandit = Thompson(model)
-    elif algo == 'ucb':
-        bandit = UCB(model)
-    elif algo == 'ei':
-        bandit = BayesianOptimization(model, criterion=expected_improvement)
+    algos = {'thompson': Thompson, 'simple': Simple, 'ucb': UCB, 'ei': partial(BayesianOptimization, criterion=expected_improvement)}
+    cls = algos[algo]
+    bandit = cls(model)
     bandit.update(inputs, outputs)
     score = r2_score(outputs, bandit.model.predict(inputs))
     print('r2 score : {}'.format(score))
@@ -122,5 +124,5 @@ def get_col(jobs, col, db):
 if __name__ == '__main__':
     from lightjob.db import SUCCESS
     X, y = get_hypers(where='jobset67', state=SUCCESS)
-    scores = get_scores_thompson(X, y, new_inputs=X)
+    scores = get_scores_bandit(X, y, new_inputs=X, algo='ei')
     print(scores)
