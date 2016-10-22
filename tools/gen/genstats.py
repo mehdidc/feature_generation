@@ -175,11 +175,16 @@ def construct_data(job_folder, hash_matrix, transform=lambda x:x):
 def compute_out_of_the_box_classification(folder, model_folder):
     from keras.models import model_from_json
     data = joblib.load(os.path.join(folder, 'images.npz'))
-    if len(data.shape) == 4:
+    if len(data.shape) == 5:
         data = data[:, -1] # last time step images
+    if len(data.shape) == 3:
+        data = data[:, np.newaxis]
     model = model_from_json(open(os.path.join(model_folder, 'model.json')).read())
     model.load_weights(os.path.join(model_folder, 'model.h5'))
-    pred = model.predict(data)
+    try:
+        pred = model.predict(data)
+    except Exception:
+        return {}
     score = compute_objectness(pred)
     pred = pred.tolist()
     return {'predictions': pred, 'objectness': score}
