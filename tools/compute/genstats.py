@@ -179,6 +179,7 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder):
     model = model_from_json(open(os.path.join(model_folder, 'model.json')).read())
     model.load_weights(os.path.join(model_folder, 'model.h5'))
     try:
+        data = data / float(data.max())
         pred = model.predict(data)
     except Exception as ex:
         print(ex)
@@ -190,6 +191,7 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder):
 def compute_objectness(v):
     v = np.array(v)
     marginal = v.mean(axis=0)
+    print(v.min(), v.max(), marginal.min(), marginal.max())
     score = ((v*(np.log(v / marginal))))
     score = score.sum(axis=1).mean()
     score = np.exp(score)
