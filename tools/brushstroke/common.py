@@ -71,7 +71,6 @@ def load_model(filename, data_params=None, **kw):
             **kw)
     return model, data, layers
 
-
 def resize_set(x, w, h, **kw):
     x_out = np.empty((x.shape[0], 1, w, h))
     for i in range(len(x)):
@@ -263,3 +262,10 @@ def dict_format(j, field):
         field = field[2:]
         j = find_generation_job(j['summary'])
     return default_dict_format(j, field)
+
+def preprocess_gen_data(data):
+    if len(data.shape) == 5:
+        data = data[:, -1] # last time step images
+    if len(data.shape) == 3:
+        data = data[:, np.newaxis]
+    return data

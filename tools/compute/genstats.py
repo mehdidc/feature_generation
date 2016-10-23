@@ -1,6 +1,7 @@
 import sys
 import os
 sys.path.append(os.path.dirname(__file__)+"/..")
+from common import preprocess_gen_data
 from sklearn.cluster import MeanShift
 import json
 from collections import defaultdict, OrderedDict
@@ -174,10 +175,7 @@ def construct_data(job_folder, hash_matrix, transform=lambda x:x):
 def compute_out_of_the_box_classification(folder, model_name, model_folder):
     from keras.models import model_from_json
     data = joblib.load(os.path.join(folder, 'images.npz'))
-    if len(data.shape) == 5:
-        data = data[:, -1] # last time step images
-    if len(data.shape) == 3:
-        data = data[:, np.newaxis]
+    data = preprocess_gen_data(data)
     model = model_from_json(open(os.path.join(model_folder, 'model.json')).read())
     model.load_weights(os.path.join(model_folder, 'model.h5'))
     try:
