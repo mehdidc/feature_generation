@@ -117,7 +117,7 @@ def get_col(jobs, col, db):
     if col.startswith('g#'):
         col = col[2:]
         jobs = to_generation(jobs, db=db)
-    func = partial(db.get_value, field=col)
+    func = partial(db.get_value, field=col, if_not_found=np.nan)
     outputs = map(func, jobs)
     return outputs
 

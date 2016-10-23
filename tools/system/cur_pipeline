@@ -1,6 +1,6 @@
 #!/bin/sh
 JOB=jobset76
-python jobs/insert_training_jobs.py --where=$JOB --nb=20 --dry --optimize --target='g#stats.out_of_the_box_classification.tools/models/mnist/m2.objectness' --maximize
+#python jobs/insert_training_jobs.py --where=$JOB --nb=20 --optimize --target='g#stats.out_of_the_box_classification.tools/models/mnist/m2.objectness' --maximize
 python jobs/run_jobs.py --where=$JOB --nb=20
 python jobs/insert_generation_jobs.py --where=$JOB --jobset=jobset_fast
 python jobs/run_jobs.py --type=generation --ref_where=$JOB --nb=20

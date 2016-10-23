@@ -29,6 +29,8 @@ from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
 from utils.sparsemax_theano import sparsemax
 
+from collections import OrderedDict
+
 def layers_from_list_to_dict(layers_list):
     names = OrderedDict()
     for layer in layers_list:
