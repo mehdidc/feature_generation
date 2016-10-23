@@ -3272,6 +3272,44 @@ def jobset76():
     params['budget_hours'] = budget_hours
     return params
 
+def jobset77():
+    # hyperopt of mnist
+    def update(params):
+        rng = random
+        sigma = rng.choice((0.5, 1, 'predicted'))
+        stride = 1
+        model_params = dict(
+            nonlin_out='sigmoid',
+            reduce_func=rng.choice(('sum', 'over', 'max')),
+            normalize_func='sigmoid',
+            x_sigma=sigma,
+            y_sigma=sigma,
+            x_stride=stride,
+            y_stride=stride,
+            patch_index=0,
+            color=rng.choice(([1], 'predicted')),
+            x_min=0,
+            x_max='width',
+            y_min=0,
+            y_max='height',
+            recurrent_model=rng.choice(('gru', 'lstm', 'rnn')),
+            eps=0,
+            n_steps=rng.randint(1, 80),
+            parallel=1,
+            parallel_share=False,
+            parallel_reduce_func='sum'
+        )
+        params['model_params'].update(model_params)
+        params['dataset'] = 'digits'
+        params['data_params'] = {
+            'train_classes': [0, 3, 6, 8, 9],
+            'test_classes': [1, 2, 4, 5, 7]
+        }
+        return params
+
+    return jobset_recurrent_brush_stroke('jobset77', 'model88', update=update)
+
+
 @click.command()
 @click.option('--where', default='', help='jobset name', required=False)
 @click.option('--nb', default=1, help='nb of repetitions', required=False)
