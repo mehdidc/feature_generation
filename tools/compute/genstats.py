@@ -47,7 +47,7 @@ def compute_stats(job, force=False, filter_stats=None):
     else:
         hash_matrix = None
         x = None
-        logger.warning('No hash matrix out there, you are probably using a trainong job type')
+        #logger.warning('No hash matrix out there, you are probably using a trainong job type')
     stats = j.get("stats", {})
     if stats is None:
         stats = {}

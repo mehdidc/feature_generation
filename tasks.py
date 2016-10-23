@@ -27,7 +27,7 @@ from helpers import salt_and_pepper, zero_masking, bernoulli_sample, minibatcher
 from data import load_data
 from model import *  # for dill
 from skimage.io import imsave
-from tools.gen.genstats import genstats
+from tools.compute.genstats import genstats
 
 from lightjob.cli import load_db
 from lightjob.db import SUCCESS, RUNNING, AVAILABLE, ERROR, PENDING
