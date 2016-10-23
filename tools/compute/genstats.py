@@ -18,7 +18,7 @@ import sys
 import logging
 import intdim_mle
 import manifold
-
+import time
 import joblib
 
 logger = logging.getLogger(__name__)
@@ -37,6 +37,7 @@ def update_stats(job, stats, db):
     db.job_update(job["summary"], dict(stats=stats))
 
 def compute_stats(job, force=False, filter_stats=None):
+    t = time.time()
     j = job
     folder = "jobs/results/{}".format(j['summary'])
     hash_matrix_filename = os.path.join(folder, "csv", "hashmatrix.npy")
@@ -151,7 +152,8 @@ def compute_stats(job, force=False, filter_stats=None):
         for model_name, model_folder in zip(names, models):
             stat[model_name] = compute_out_of_the_box_classification(folder, model_name, model_folder)
         stats['out_of_the_box_classification'] = stat
-    logger.info('Finished on {}'.format(j['summary']))
+    delta_t = time.time() - t
+    logger.info('Finished on {}, took {:.3f}'.format(j['summary'], delta_t))
     return stats
 
 
@@ -191,11 +193,11 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder):
 def compute_objectness(v):
     v = np.array(v)
     marginal = v.mean(axis=0)
-    print(v.min(), v.max(), marginal.min(), marginal.max())
     score = ((v*(np.log(v / marginal))))
     score = score.sum(axis=1).mean()
     score = np.exp(score)
     score = float(score)
+    # nan scores are scores where v.min() == v.max() (generated only zero images)
     return score
 
 def compute_training_stats(folder, ref_job):

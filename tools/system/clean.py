@@ -59,6 +59,7 @@ if __name__ == '__main__':
 
     remain_folders = set(glob.glob('jobs/results/*')) 
     remain_folders -= all_folders
+    """
     for f in remain_folders:
         if not os.path.isdir(f):
             pass
@@ -70,3 +71,4 @@ if __name__ == '__main__':
             print(db.get_state_of(s))
         else:
             rm(f)
+    """
