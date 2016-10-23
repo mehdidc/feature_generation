@@ -33,7 +33,6 @@ def genstats(jobs, db, force=False, n_jobs=-1, filter_stats=None):
     for j, s in zip(jobs, stats):
         update_stats(j, s, db)
 
-
 def update_stats(job, stats, db):
     db.job_update(job["summary"], dict(stats=stats))
 
@@ -146,10 +145,11 @@ def compute_stats(job, force=False, filter_stats=None):
         logger.info('compute training stats')
         stats['training'] = compute_training_stats(folder, ref_job)
     if should_compute('out_of_the_box_classification', stats):
+        names = ['m1', 'm2']
         models = ['tools/models/mnist/m1', 'tools/models/mnist/m2']
         stat = {}
-        for m in models:
-            stat[m] = compute_out_of_the_box_classification(folder, m)
+        for mode_name, model_folder in zip(names, models):
+            stat[m] = compute_out_of_the_box_classification(folder, model_name, model_folder)
         stats['out_of_the_box_classification'] = stat
     logger.info('Finished on {}'.format(j['summary']))
     return stats
@@ -169,7 +169,7 @@ def construct_data(job_folder, hash_matrix, transform=lambda x:x):
     X = X.reshape((X.shape[0], -1))
     return X
 
-def compute_out_of_the_box_classification(folder, model_folder):
+def compute_out_of_the_box_classification(folder, model_name, model_folder):
     from keras.models import model_from_json
     data = joblib.load(os.path.join(folder, 'images.npz'))
     if len(data.shape) == 5:
@@ -183,8 +183,8 @@ def compute_out_of_the_box_classification(folder, model_folder):
     except Exception:
         return {}
     score = compute_objectness(pred)
-    pred = pred.tolist()
-    return {'predictions': pred, 'objectness': score}
+    joblib.dump(pred, "{}/out_of_the_box_classification_{}.npz".format(folder, model_name), compress=9)
+    return {'objectness': score}
 
 def compute_objectness(v):
     v = np.array(v)

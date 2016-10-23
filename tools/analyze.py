@@ -377,6 +377,7 @@ def clusterfinder(capsule, data, layers, w, h, c, folder, **params):
 
 
 def iterative_refinement(capsule, data, layers, w, h, c, folder, **params):
+    import pandas as pd
     p = params
     batch_size = p['batch_size']
     N = p['nb_samples']
@@ -451,7 +452,7 @@ def iterative_refinement(capsule, data, layers, w, h, c, folder, **params):
             break
     mkdir_path(folder)
     joblib.dump(imgs, folder + '/images.npz', compress=9)
-    return stats
+    pd.DataFrame(stats).to_csv(folder + '/stats.csv')
 
 def minibatcher(X, f, size=128):
     res = []
