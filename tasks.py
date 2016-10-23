@@ -18,7 +18,7 @@ from lasagnekit.easy import (
     make_batch_optimizer, InputOutputMapping,
     build_batch_iterator)
 from lasagnekit.nnet.capsule import Capsule, make_function
-
+from helpers import get_stat
 from lasagne import layers as L
 from tools.plot_weights import dispims_color, tile_raster_images
 from helpers import iterate_minibatches
