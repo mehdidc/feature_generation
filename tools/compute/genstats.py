@@ -148,8 +148,8 @@ def compute_stats(job, force=False, filter_stats=None):
         names = ['m1', 'm2']
         models = ['tools/models/mnist/m1', 'tools/models/mnist/m2']
         stat = {}
-        for mode_name, model_folder in zip(names, models):
-            stat[m] = compute_out_of_the_box_classification(folder, model_name, model_folder)
+        for model_name, model_folder in zip(names, models):
+            stat[model_name] = compute_out_of_the_box_classification(folder, model_name, model_folder)
         stats['out_of_the_box_classification'] = stat
     logger.info('Finished on {}'.format(j['summary']))
     return stats
@@ -180,7 +180,8 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder):
     model.load_weights(os.path.join(model_folder, 'model.h5'))
     try:
         pred = model.predict(data)
-    except Exception:
+    except Exception as ex:
+        print(ex)
         return {}
     score = compute_objectness(pred)
     joblib.dump(pred, "{}/out_of_the_box_classification_{}.npz".format(folder, model_name), compress=9)
