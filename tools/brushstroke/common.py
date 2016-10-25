@@ -253,7 +253,7 @@ def to_generation(jobs, db=None):
     jobs = map(lambda s:to_generation.get(s), S)
     return jobs
 
-def to_training(jobs):
+def to_training(jobs, db=None):
     if not db: db = load_db()
     return [db.get_job_by_summary(j['content']['model_summary']) for j in jobs]
 

@@ -449,7 +449,7 @@ def build_capsule_(layers, data, nbl, nbc,
 
         if np.isnan(status['loss_train']):
             print('Nan detected, quit')
-            raise KeyboardInterrupt('Nan detected, quit')
+            raise Exception('Nan detected, quit')
         if (datetime.now() - begin).total_seconds() >= budget_sec:
             logger.info("Budget finished.quit.")
             raise KeyboardInterrupt("Budget finished.quit.")
