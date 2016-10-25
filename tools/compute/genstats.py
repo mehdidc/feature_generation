@@ -1,7 +1,7 @@
 import sys
 import os
 sys.path.append(os.path.dirname(__file__)+"/..")
-from common import preprocess_gen_data
+from common import preprocess_gen_data, compute_objectness
 from sklearn.cluster import MeanShift
 import json
 from collections import defaultdict, OrderedDict
@@ -187,16 +187,6 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder):
     score = compute_objectness(pred)
     joblib.dump(pred, "{}/out_of_the_box_classification_{}.npz".format(folder, model_name), compress=9)
     return {'objectness': score}
-
-def compute_objectness(v):
-    v = np.array(v)
-    marginal = v.mean(axis=0)
-    score = ((v*(np.log(v / marginal))))
-    score = score.sum(axis=1).mean()
-    score = np.exp(score)
-    score = float(score)
-    # nan scores are scores where v.min() == v.max() (generated only zero images)
-    return score
 
 def compute_training_stats(folder, ref_job):
     from tasks import load_
@@ -636,7 +626,6 @@ def neighcorr(im, corrdata=None, pad=3):
                 c = px * pxc
                 corrdata[i] += c
             i += 1
-
 
 def hash_matrix_to_int(hm):
     cnt = Counter(hm)
