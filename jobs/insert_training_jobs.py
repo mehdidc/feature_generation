@@ -3309,6 +3309,8 @@ def jobset77():
 
     return jobset_recurrent_brush_stroke('jobset77', 'model88', update=update)
 
+def jobset78():
+    # the big 'all-architectures' experiment.
 
 @click.command()
 @click.option('--where', default='', help='jobset name', required=False)

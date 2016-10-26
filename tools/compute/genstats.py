@@ -1,7 +1,7 @@
 import sys
 import os
 sys.path.append(os.path.dirname(__file__)+"/..")
-from common import preprocess_gen_data, compute_objectness
+from common import preprocess_gen_data, compute_objectness, softmax
 from sklearn.cluster import MeanShift
 import json
 from collections import defaultdict, OrderedDict
@@ -147,8 +147,16 @@ def compute_stats(job, force=False, filter_stats=None):
         logger.info('compute training stats')
         stats['training'] = compute_training_stats(folder, ref_job)
     if should_compute('out_of_the_box_classification', stats):
-        names = ['m1', 'm2']
-        models = ['tools/models/mnist/m1', 'tools/models/mnist/m2']
+        names = [
+            'mnist_classifier', 
+            '5_vs_fake_jobset75',
+            'm2' # another mnist classifier (the one wich worked better for jobset75)
+        ]
+        models = [
+            'tools/models/external/mnist_classifier', 
+            'tools/models/external/5_vs_fake_jobset75',
+            'tools/models/mnist/m2'
+        ]
         stat = {}
         for model_name, model_folder in zip(names, models):
             stat[model_name] = compute_out_of_the_box_classification(folder, model_name, model_folder)
@@ -173,20 +181,47 @@ def construct_data(job_folder, hash_matrix, transform=lambda x:x):
     return X
 
 def compute_out_of_the_box_classification(folder, model_name, model_folder):
-    from keras.models import model_from_json
-    data = joblib.load(os.path.join(folder, 'images.npz'))
-    data = preprocess_gen_data(data)
-    model = model_from_json(open(os.path.join(model_folder, 'model.json')).read())
-    model.load_weights(os.path.join(model_folder, 'model.h5'))
-    try:
-        data = data / float(data.max())
-        pred = model.predict(data)
-    except Exception as ex:
-        print(ex)
-        return {}
-    score = compute_objectness(pred)
-    joblib.dump(pred, "{}/out_of_the_box_classification_{}.npz".format(folder, model_name), compress=9)
-    return {'objectness': score}
+    preds_filename = "{}/out_of_the_box_classification_{}.npz".format(folder, model_name)
+    if not os.path.exists(preds_filename) or True:
+        from keras.models import model_from_json
+        data = joblib.load(os.path.join(folder, 'images.npz'))
+        data = preprocess_gen_data(data)
+        js = open(os.path.join(model_folder, 'model.json')).read()
+        #js = js.replace('softmax', 'linear')
+        model = model_from_json(js)
+        try:
+            model.load_weights(os.path.join(model_folder, 'model.pkl'))
+        except Exception:
+            model.load_weights(os.path.join(model_folder, 'model.h5'))
+        try:
+            data = data / float(data.max())
+            pred = model.predict(data)
+        except Exception as ex:
+            print(ex)
+            return {}
+        joblib.dump(pred, preds_filename, compress=9)
+    else:
+        pred = joblib.load(preds_filename)
+    stats = {}
+    for act in ('softmax', 'linear'):
+        stat = {}
+        pred_ = pred
+        if act == 'softmax':
+            pass
+            #pred_ = softmax(pred_)
+        elif act == 'linear':
+            a, b = pred_.min(axis=0, keepdims=True), pred_.max(axis=0, keepdims=True)
+            eps = 1e-10
+            pred_ = (pred_ - a) / (b - a + eps)
+            pred_[pred_==0] = 1e-10
+        stat['objectness'] = compute_objectness(pred_)
+        pred_sorted = np.sort(pred_, axis=1)[:, ::-1]
+        for k in range(pred_sorted.shape[1]):
+            stat['top{k}_prediction'.format(k=k + 1)] = float(pred_sorted[:, k].mean())
+        stats[act] =  stat
+    for k, v in stats['softmax'].items():
+        stats[k] = v
+    return stats
 
 def compute_training_stats(folder, ref_job):
     from tasks import load_

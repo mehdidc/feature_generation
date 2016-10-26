@@ -287,3 +287,7 @@ def compute_objectness(v):
     score = float(score)
     # nan scores are scores where v.min() == v.max() (generated only zero images)
     return score
+
+def softmax(x):
+    e_x = np.exp(x - np.max(x, axis=1, keepdims=True))
+    return e_x / e_x.sum(axis=1, keepdims=True)
