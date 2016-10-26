@@ -3310,7 +3310,158 @@ def jobset77():
     return jobset_recurrent_brush_stroke('jobset77', 'model88', update=update)
 
 def jobset78():
-    # the big 'all-architectures' experiment.
+    rng = random
+    params = _sample_brush_stroke(rng)
+    params['dataset'] = 'digits'
+    params['budget_hours'] = 10
+    return params
+
+def jobset79():
+    rng = random
+    params = _sample_fc_sparse(rng)
+    params['dataset'] = 'digits'
+    params['budget_hours'] = 4
+    print(json.dumps(params, indent=4))
+    return params
+
+def jobset80():
+    rng = random
+    params = _sample_convsparse(rng)
+    params['dataset'] = 'digits'
+    params['budget_hours'] = 6
+    print(json.dumps(params, indent=4))
+    return params
+
+def _sample_brush_stroke(rng):
+    # quasi-copy of jobset75
+    nb_filters = _sample_nb_conv_filters(rng)
+    nb_layers = len(nb_filters)
+    model_params = OrderedDict(
+        nb_layers=nb_layers,
+        nb_filters=nb_filters,
+        filter_size=rng.choice((3, 5)),
+        use_channel=rng.choice((True, False)),
+        use_spatial=True,
+        spatial_k=rng.randint(1, 2),
+        channel_stride=rng.choice((1, 2, 4)),
+        weight_sharing=rng.choice((True, False)),
+        merge_op=rng.choice(('sum', 'mul'))
+    )
+    params = OrderedDict(
+        model_params=model_params,
+        denoise=None,
+        noise=None,
+        walkback=1,
+        walkback_mode='bengio_without_sampling',
+        autoencoding_loss='squared_error',
+        mode='random',
+        contractive=False,
+        contractive_coef=None,
+        marginalized=False,
+        binarize_thresh=None
+    )
+    return params
+
+
+def _sample_fc_lifetime(rng):
+    use_wta_lifetime = rng.choice((True, False))
+    nb_hidden_units = _sample_nb_fc_units(rng)
+    params = {
+        'model_params': {
+            'tied': rng.choice((True, False)),
+            'use_wta_lifetime': use_wta_lifetime,
+            'wta_lifetime_perc': rng.uniform(0, 1) if use_wta_lifetime else None,
+            'nb_hidden_units': nb_hidden_units 
+        }
+    }
+    params.update(_sample_general_training_details(rng))
+    if len(nb_hidden_units) == 1:
+        params.update(_sample_contraction(rng))
+    params['model_name'] = 'model57'
+    return params
+
+def _sample_fc_sparse(rng):
+    use_wta_sparse = rng.choice((True, False))
+    nb_hidden_units = _sample_nb_fc_units(rng)
+    params = {
+        'model_params': {
+            'use_wta_sparse': use_wta_sparse,
+            'wta_sparse_perc': rng.uniform(0, 1) if use_wta_sparse else None,
+            'nb_hidden_units': nb_hidden_units,
+            'nb_layers': len(nb_hidden_units)
+        }
+    }
+    params.update(_sample_general_training_details(rng))
+    if len(nb_hidden_units) == 1:
+        params.update(_sample_contraction(rng))
+    params['model_name'] = 'model64'
+    return params
+
+def _sample_convsparse(rng):
+    conv_fiters = _sample_nb_conv_filters(rng)
+    use_wta_spatial = rng.choice((True, False))
+    use_wta_channel = rng.choice((True, False)) if use_wta_spatial else True
+    nb_filters_mul = 1
+    wta_channel_stride = rng.choice((1, 2, 3, 4))
+    params = {
+        'model_params': {
+            'nb_filters': conv_fiters,
+            'nb_layers': len(conv_fiters),
+            'filter_size': _sample_conv_filter_size(rng),
+            'use_wta_spatial': use_wta_spatial,
+            'use_wta_channel': use_wta_channel,
+            'nb_filters_mul': nb_filters_mul,
+            'wta_channel_stride': wta_channel_stride
+        },
+    }
+    params.update(_sample_general_training_details(rng))
+    params['model_name'] = 'model55'
+    return params
+
+def _sample_nb_conv_filters(rng):
+    nb_layers = rng.choice((1, 5))
+    return [_sample_nb_conv_filter(rng) for _ in range(nb_layers)]
+
+def _sample_nb_conv_filter(rng):
+    return 2 ** (rng.randint(3, 9))
+
+def _sample_nb_fc_units(rng):
+    nb_layers = rng.choice((1, 5))
+    return [_sample_nb_fc_unit(rng) for _ in range(nb_layers)]
+
+def _sample_nb_fc_unit(rng):
+    return rng.randint(1, 10) * 100
+ 
+def _sample_conv_filter_size(rng):
+    return rng.choice((3, 5))
+
+def _sample_general_training_details(rng):
+    val = rng.choice(np.linspace(0, 0.5, 100))
+    denoise = rng.choice((None, val))
+    if denoise:
+        noise = rng.choice(('zero_masking', 'salt_and_pepper'))
+    else:
+        noise = None
+    walkback = rng.choice((1, 2, 3, 4, 5))
+    binarize_thresh = rng.choice((None, 0.5))
+    autoencoding_loss = rng.choice(('squared_error', 'cross_entropy'))
+    return {
+        'denoise': denoise,
+        'noise': noise,
+        'walkback_mode': 'bengio_without_sampling',
+        'walkback': walkback,
+        'autoencoding_loss': autoencoding_loss,
+        'binarize_thresh': binarize_thresh,
+        'marginalized': False,
+        'contractive': False,
+        'contractive_coef': None
+    }
+
+def _sample_contraction(rng):
+    return {'contractive': True, 'contractive_coef': rng.choice(np.linspace(0, 100, 300))}
+
+def _sample_intermediate_activation(rng):
+    return rng.choice(('relu', 'leaky_relu'))
 
 @click.command()
 @click.option('--where', default='', help='jobset name', required=False)

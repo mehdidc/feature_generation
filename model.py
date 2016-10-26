@@ -3148,6 +3148,7 @@ def model56(nb_filters=64, w=32, h=32, c=1,
 def model57(nb_filters=64, w=32, h=32, c=1,
             use_wta_lifetime=True,
             wta_lifetime_perc=0.1,
+            wta_sparse_perc=None,
             nb_hidden_units=1000,
             tied=False,
             out_nonlin='sigmoid'):

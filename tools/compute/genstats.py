@@ -187,7 +187,7 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder):
         data = joblib.load(os.path.join(folder, 'images.npz'))
         data = preprocess_gen_data(data)
         js = open(os.path.join(model_folder, 'model.json')).read()
-        #js = js.replace('softmax', 'linear')
+        js = js.replace('softmax', 'linear')
         model = model_from_json(js)
         try:
             model.load_weights(os.path.join(model_folder, 'model.pkl'))
@@ -207,8 +207,7 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder):
         stat = {}
         pred_ = pred
         if act == 'softmax':
-            pass
-            #pred_ = softmax(pred_)
+            pred_ = softmax(pred_)
         elif act == 'linear':
             a, b = pred_.min(axis=0, keepdims=True), pred_.max(axis=0, keepdims=True)
             eps = 1e-10
