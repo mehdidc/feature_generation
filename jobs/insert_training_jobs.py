@@ -3525,7 +3525,8 @@ def _sample_general_training_details(rng):
         noise = None
     walkback = weighted_choice([1, 2, 3, 4, 5], p=[0.8, 0.05, 0.05, 0.05, 0.05], rng=rng)
     binarize_thresh = weighted_choice([None, 0.5], p=[0.7, 0.3], rng=rng)
-    autoencoding_loss = weighted_choice(['squared_error', 'cross_entropy'], p=[0.8, 0.2], rng=rng)
+    #autoencoding_loss = weighted_choice(['squared_error', 'cross_entropy'], p=[0.8, 0.2], rng=rng)
+    autoencoding_loss = 'squared_error'
     return {
         'denoise': denoise,
         'noise': noise,
@@ -3590,7 +3591,7 @@ def insert(where, nb, optimize, minimize, algo, nb_samples, dry, target):
         job_id = summarize(params)
         new_jobs.append(job_id)
         if not dry:
-            total += job_write_from_params(new_input, jobset=where)
+            total += job_write_from_params(params, jobset=where)
     if optimize and not dry:
         history = History()
         filename = 'jobs/hp_history.pkl'
