@@ -27,9 +27,11 @@ def build(fakedata, filename, classes, nbfake):
         Xreal = Xreal[all_ind]
     Xreal = (Xreal > 127) * 255.
     print(yreal[0:10])
-    Xfake = h5py.File(fakedata)['X']
+    hf = h5py.File(fakedata)
+    Xfake = hf['X']
+    nb = hf['nb']
     if nbfake != -1:
-        Xfake = Xfake[0:nbfake * 20]
+        Xfake = Xfake[0:min(nbfake * 20, nb)]
     Xfake[np.isnan(Xfake)] = 0
     Xfake = Xfake[Xfake.sum(axis=(1, 2, 3)) > 0]
     indices = np.arange(len(Xfake))

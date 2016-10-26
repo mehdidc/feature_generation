@@ -272,8 +272,7 @@ def preprocess_gen_data(data):
 
 def compute_sample_objectness(v):
     v = np.array(v)
-    marginal = v.mean(axis=0)
-    score = v * np.log(v / marginal)
+    score = v * np.log(v)
     score = score.sum(axis=1)
     score = np.exp(score)
     # nan scores are scores where v.min() == v.max() (generated only zero images)
@@ -282,10 +281,9 @@ def compute_sample_objectness(v):
 def compute_objectness(v):
     v = np.array(v)
     marginal = v.mean(axis=0)
-    score = ((v*(np.log(v / marginal))))
+    score = v * np.log(v / marginal)
     score = score.sum(axis=1).mean()
     score = np.exp(score)
     score = float(score)
     # nan scores are scores where v.min() == v.max() (generated only zero images)
     return score
-
