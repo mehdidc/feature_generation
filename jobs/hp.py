@@ -1,6 +1,7 @@
 import sys
 import os
 sys.path.append(os.path.dirname(__file__) + '/..')
+from collections import defaultdict
 from collections import Iterable, Mapping
 from hyperopt import hp, Trials
 from hyperopt import fmin, tpe, rand
@@ -15,7 +16,7 @@ from functools import partial
 
 import forestci as fci
 
-from tools.common import to_generation, to_training
+from tools.common import to_generation, to_training, store, retrieve
 from frozendict import frozendict
 
 #http://code.activestate.com/recipes/577555-object-wrapper-class/
@@ -121,8 +122,23 @@ def get_col(jobs, col, db):
     outputs = map(func, jobs)
     return outputs
 
+class History(object):
+    
+    def __init__(self):
+        self.hist = defaultdict(list)
+    
+    def save(self, filename):
+        store(self.hist, filename)
+
+    def load(self, filename):
+        self.hist = retrieve(filename)
+
+    def push(self,data, label):
+        self.hist[label].append(data)
+
 if __name__ == '__main__':
     from lightjob.db import SUCCESS
     X, y = get_hypers(where='jobset67', state=SUCCESS)
-    scores = get_scores_bandit(X, y, new_inputs=X, algo='ei')
-    print(scores)
+    scores = get_scores_bandit(X, y, new_inputs=X, algo='simple')
+    r = History()
+    r.push(X, 'hi')

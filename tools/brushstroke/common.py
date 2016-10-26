@@ -14,6 +14,8 @@ import base64
 import json
 from skimage.io import imread, imsave
 from skimage.transform import resize
+import random
+import pickle
 
 from lightjob.cli import load_db
 from lightjob.utils import dict_format as default_dict_format
@@ -291,3 +293,17 @@ def compute_objectness(v):
 def softmax(x):
     e_x = np.exp(x - np.max(x, axis=1, keepdims=True))
     return e_x / e_x.sum(axis=1, keepdims=True)
+
+def weighted_choice(objects, p, rng=random):
+    cs = np.cumsum(p)
+    idx = sum(cs < rng.uniform(0, 1))
+    return objects[idx]
+
+def store(x, filename):
+    with open(filename, 'w') as fd:
+        pickle.dump(x, fd)
+
+def retrieve(filename):
+    with open(filename) as fd:
+        x = pickle.load(fd)
+    return x

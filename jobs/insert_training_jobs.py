@@ -1,5 +1,11 @@
+import sys
+import os
+sys.path.append(os.getcwd())
+from tools.common import weighted_choice
 import json
 from collections import OrderedDict
+from datetime import datetime
+
 from lightjob.utils import summarize
 from lightjob.db import SUCCESS
 
@@ -9,7 +15,7 @@ import random
 import click
 
 from lightjob.cli import load_db
-from hp import get_hypers, get_scores_bandit
+from hp import get_hypers, get_scores_bandit, History
 
 db = load_db()
 budget_hours = 10  # default budget hours
@@ -3309,19 +3315,19 @@ def jobset77():
 
     return jobset_recurrent_brush_stroke('jobset77', 'model88', update=update)
 
+# jobset78-jobset79-jobset80-jobset81-jobset82 
 def jobset78():
     rng = random
-    params = _sample_brush_stroke(rng)
+    params = _sample_vertebrate(rng)
     params['dataset'] = 'digits'
-    params['budget_hours'] = 10
+    params['budget_hours'] = 4
     return params
 
 def jobset79():
     rng = random
     params = _sample_fc_sparse(rng)
     params['dataset'] = 'digits'
-    params['budget_hours'] = 4
-    print(json.dumps(params, indent=4))
+    params['budget_hours'] = 2
     return params
 
 def jobset80():
@@ -3329,10 +3335,53 @@ def jobset80():
     params = _sample_convsparse(rng)
     params['dataset'] = 'digits'
     params['budget_hours'] = 6
-    print(json.dumps(params, indent=4))
     return params
 
-def _sample_brush_stroke(rng):
+def jobset81():
+    def update(params):
+        rng = random
+        sigma = rng.choice((0.5, 1, 'predicted'))
+        stride = 1
+        model_params = dict(
+            nonlin_out='sigmoid',
+            reduce_func=rng.choice(('sum', 'over', 'max')),
+            normalize_func='sigmoid',
+            x_sigma=sigma,
+            y_sigma=sigma,
+            x_stride=stride,
+            y_stride=stride,
+            patch_index=0,
+            color=rng.choice(([1], 'predicted')),
+            x_min=0,
+            x_max='width',
+            y_min=0,
+            y_max='height',
+            recurrent_model=rng.choice(('gru', 'lstm', 'rnn')),
+            eps=0,
+            n_steps=rng.randint(1, 80),
+            parallel=1,
+            parallel_share=False,
+            parallel_reduce_func='sum'
+        )
+        params['model_params'].update(model_params)
+        params['dataset'] = 'digits'
+        params['budget_hours'] = 6
+        return params
+    return jobset_recurrent_brush_stroke('jobset81', 'model88', update=update)
+
+def jobset82():
+    rng = random
+    params = _sample_vertebrate_2(rng)
+    params['dataset'] = 'digits'
+    params['budget_hours'] = 6
+    return params
+
+def jobset83():
+    rng = np.random
+    candidates = [jobset79(), jobset80(), jobset81(), jobset82()]
+    return rng.choice(candidates)
+    
+def _sample_vertebrate(rng):
     # quasi-copy of jobset75
     nb_filters = _sample_nb_conv_filters(rng)
     nb_layers = len(nb_filters)
@@ -3342,7 +3391,7 @@ def _sample_brush_stroke(rng):
         filter_size=rng.choice((3, 5)),
         use_channel=rng.choice((True, False)),
         use_spatial=True,
-        spatial_k=rng.randint(1, 2),
+        spatial_k=rng.randint(1, 4),
         channel_stride=rng.choice((1, 2, 4)),
         weight_sharing=rng.choice((True, False)),
         merge_op=rng.choice(('sum', 'mul'))
@@ -3358,10 +3407,42 @@ def _sample_brush_stroke(rng):
         contractive=False,
         contractive_coef=None,
         marginalized=False,
-        binarize_thresh=None
+        binarize_thresh=None,
+        model_name='model73'
     )
     return params
 
+def _sample_vertebrate_2(rng):
+    # quasi-copy of jobset75
+    sparse_func = rng.choice(('wta_k_spatial', 'wta_spatial', 'max_k_spatial', 'wta_spatial_channel'))
+    stride = rng.choice((1, 2, 4)) if sparse_func == 'wta_spatial_channel' else None
+    nb_filters = _sample_nb_conv_filters(rng)
+    nb_layers = len(nb_filters)
+    model_params = OrderedDict(
+        nb_layers=nb_layers,
+        nb_filters=nb_filters,
+        sparse_func=sparse_func,
+        k=[rng.choice((1, 2, 3, 4)) for _ in range(nb_layers)],
+        stride=stride,
+        filter_size=rng.choice((3, 5)),
+        weight_sharing=rng.choice((True, False)),
+        merge_op=rng.choice(('sum', 'mul'))
+    )
+    params = OrderedDict(
+        model_params=model_params,
+        denoise=None,
+        noise=None,
+        walkback=1,
+        walkback_mode='bengio_without_sampling',
+        autoencoding_loss='squared_error',
+        mode='random',
+        contractive=False,
+        contractive_coef=None,
+        marginalized=False,
+        binarize_thresh=None,
+        model_name='model101'
+    )
+    return params
 
 def _sample_fc_lifetime(rng):
     use_wta_lifetime = rng.choice((True, False))
@@ -3370,7 +3451,7 @@ def _sample_fc_lifetime(rng):
         'model_params': {
             'tied': rng.choice((True, False)),
             'use_wta_lifetime': use_wta_lifetime,
-            'wta_lifetime_perc': rng.uniform(0, 1) if use_wta_lifetime else None,
+            'wta_lifetime_perc': rng.choice(np.linspace(0, 1, 100)) if use_wta_lifetime else None,
             'nb_hidden_units': nb_hidden_units 
         }
     }
@@ -3381,12 +3462,12 @@ def _sample_fc_lifetime(rng):
     return params
 
 def _sample_fc_sparse(rng):
-    use_wta_sparse = rng.choice((True, False))
+    use_wta_sparse = True
     nb_hidden_units = _sample_nb_fc_units(rng)
     params = {
         'model_params': {
             'use_wta_sparse': use_wta_sparse,
-            'wta_sparse_perc': rng.uniform(0, 1) if use_wta_sparse else None,
+            'wta_sparse_perc': rng.choice(np.linspace(0, 1, 100)) if use_wta_sparse else None,
             'nb_hidden_units': nb_hidden_units,
             'nb_layers': len(nb_hidden_units)
         }
@@ -3442,9 +3523,9 @@ def _sample_general_training_details(rng):
         noise = rng.choice(('zero_masking', 'salt_and_pepper'))
     else:
         noise = None
-    walkback = rng.choice((1, 2, 3, 4, 5))
-    binarize_thresh = rng.choice((None, 0.5))
-    autoencoding_loss = rng.choice(('squared_error', 'cross_entropy'))
+    walkback = weighted_choice([1, 2, 3, 4, 5], p=[0.8, 0.05, 0.05, 0.05, 0.05], rng=rng)
+    binarize_thresh = weighted_choice([None, 0.5], p=[0.7, 0.3], rng=rng)
+    autoencoding_loss = weighted_choice(['squared_error', 'cross_entropy'], p=[0.8, 0.2], rng=rng)
     return {
         'denoise': denoise,
         'noise': noise,
@@ -3483,7 +3564,7 @@ def insert(where, nb, optimize, minimize, algo, nb_samples, dry, target):
         isnt_nan = map(lambda o:not np.isnan(o), outputs)
         inputs = [inputs[i] for i in range(len(inputs)) if isnt_nan[i]]
         outputs = [outputs[i] for i in range(len(outputs)) if isnt_nan[i]]
-        def sample_and_insert(inputs=inputs, outputs=outputs):
+        def sample_one(inputs=inputs, outputs=outputs):
             new_inputs = [sample() for _ in range(nb_samples)]
             if algo == 'ei' and maximize:
                 # if maximize and algo is ei
@@ -3499,20 +3580,25 @@ def insert(where, nb, optimize, minimize, algo, nb_samples, dry, target):
             else:
                 existing = '(new)'
             print('expected {} for the selected job : {}, id:{}{}'.format(target, np.min(scores), summarize(new_input), existing))
-            if dry:
-                return 0
-            else:
-                return job_write_from_params(new_input, jobset=where)
+            return new_input
     else:
-        def sample_and_insert():
-            params = sample()
-            if dry:
-                return 0
-            else:
-                return job_write_from_params(params, jobset=where)
+        sample_one = sample
     total = 0
+    new_jobs = []
     for _ in range(nb):
-        total += sample_and_insert()
+        params = sample_one()
+        job_id = summarize(params)
+        new_jobs.append(job_id)
+        if not dry:
+            total += job_write_from_params(new_input, jobset=where)
+    if optimize and not dry:
+        history = History()
+        filename = 'jobs/hp_history.pkl'
+        if os.path.exists(filename):
+            history.load(filename)
+        history.push({'jobs': new_jobs, 'time': str(datetime.now())}, target)
+        history.save(filename)
+        print(history.hist)
     print("Total number of jobs added : {}".format(total))
 
 if __name__ == '__main__':

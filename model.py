@@ -7664,6 +7664,7 @@ def model101(nb_filters=64, w=32, h=32, c=1,
             filter_size=5,
             sparse_func='wta_spatial',
             k=1,
+            stride=1,
             weight_sharing=False,
             merge_op='sum'):
     """
@@ -7674,6 +7675,8 @@ def model101(nb_filters=64, w=32, h=32, c=1,
         'wta_k_spatial': wta_k_spatial,
         'wta_spatial': lambda k:wta_spatial,
         'max_k_spatial': max_k_spatial,
+        'wta_channel': lambda k:wta_channel,
+        'wta_spatial_channel': lambda k: (lambda x:wta_channel_strided(stride=stride)(wta_k_spatial(k)(x)))
     }
     if nb_layers is None:
         nb_layers = len(nb_filters)
