@@ -187,7 +187,6 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder):
         data = joblib.load(os.path.join(folder, 'images.npz'))
         data = preprocess_gen_data(data)
         js = open(os.path.join(model_folder, 'model.json')).read()
-        js = js.replace('softmax', 'linear')
         model = model_from_json(js)
         try:
             model.load_weights(os.path.join(model_folder, 'model.pkl'))
@@ -203,23 +202,10 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder):
     else:
         pred = joblib.load(preds_filename)
     stats = {}
-    for act in ('softmax', 'linear'):
-        stat = {}
-        pred_ = pred
-        if act == 'softmax':
-            pred_ = softmax(pred_)
-        elif act == 'linear':
-            a, b = pred_.min(axis=0, keepdims=True), pred_.max(axis=0, keepdims=True)
-            eps = 1e-10
-            pred_ = (pred_ - a) / (b - a + eps)
-            pred_[pred_==0] = 1e-10
-        stat['objectness'] = compute_objectness(pred_)
-        pred_sorted = np.sort(pred_, axis=1)[:, ::-1]
-        for k in range(pred_sorted.shape[1]):
-            stat['top{k}_prediction'.format(k=k + 1)] = float(pred_sorted[:, k].mean())
-        stats[act] =  stat
-    for k, v in stats['softmax'].items():
-        stats[k] = v
+    stats['objectness'] = compute_objectness(pred)
+    pred_sorted = np.sort(pred, axis=1)[:, ::-1]
+    for k in range(pred_sorted.shape[1]):
+        stats['top{k}_prediction'.format(k=k + 1)] = float(pred_sorted[:, k].mean())
     return stats
 
 def compute_training_stats(folder, ref_job):
