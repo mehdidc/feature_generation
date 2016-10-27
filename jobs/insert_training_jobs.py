@@ -3580,7 +3580,7 @@ def insert(where, nb, optimize, minimize, algo, nb_samples, dry, target):
                 existing = '(exists)'
             else:
                 existing = '(new)'
-            print('expected {} for the selected job : {}, id:{}{}'.format(target, np.min(scores), summarize(new_input), existing))
+            print('expected {} for the selected job : {}, id:{}{}'.format(target, np.min(scores) if minimize else np.max(scores), summarize(new_input), existing))
             return new_input
     else:
         sample_one = sample

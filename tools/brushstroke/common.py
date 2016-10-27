@@ -277,7 +277,6 @@ def compute_sample_objectness(v):
     score = v * np.log(v)
     score = score.sum(axis=1)
     score = np.exp(score)
-    # nan scores are scores where v.min() == v.max() (generated only zero images)
     return score
 
 def compute_objectness(v):
@@ -287,8 +286,24 @@ def compute_objectness(v):
     score = score.sum(axis=1).mean()
     score = np.exp(score)
     score = float(score)
-    # nan scores are scores where v.min() == v.max() (generated only zero images)
     return score
+
+def compute_sample_objectness_renyi(v, alpha=2):
+    # source : https://en.wikipedia.org/wiki/R%C3%A9nyi_entropy (Entropy part)
+    score = (1/(alpha - 1)) * np.log((v**alpha).sum(axis=1))
+    score = np.exp(score)
+    return score
+
+def compute_objectness_renyi(v, alpha=2):
+    # source : https://en.wikipedia.org/wiki/R%C3%A9nyi_entropy (divergence part)
+    v = np.array(v)
+    marginal = v.mean(axis=0)
+    score = (1/(alpha-1)) * np.log(((v ** alpha) / marginal ** (alpha - 1)).sum(axis=1))
+    score = score.mean()
+    score = np.exp(score)
+    score = float(score)
+    return score
+
 
 def softmax(x):
     e_x = np.exp(x - np.max(x, axis=1, keepdims=True))
