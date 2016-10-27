@@ -13,11 +13,34 @@ from datakit.image import pipeline_load as loader
 from datakit.image import operators
 
 import h5py
+import os
 
-def pipeline_load_hdf5(iterator, filename, cols=['X']):
+def pipeline_load_hdf5(iterator, filename, cols=['X', 'y'], start=0, nb=None):
+    filename = os.path.join(os.getenv('DATA_PATH'), filename)
     hf = h5py.File(filename)
-    X = hf['X']
-    return X
+    return iterate(hf, start=start, nb=nb, cols=cols)
+
+def pipeline_load_numpy(iterator, filename, cols=['X', 'y'], start=0, nb=None):
+    filename = os.path.join(os.getenv('DATA_PATH'), filename)
+    data = np.load(filename)
+    return iterate(data, start=start, nb=nb, cols=cols)
+
+def iterate(data, start=0, nb=None, cols=['X', 'y']):
+    it = {}
+    for c in cols:
+        d = data[c]
+        if nb:
+            d = d[start:start+nb]
+        else:
+            d = d[start:]
+        it[c] = iter(d)
+    def iter_func():
+        while True:
+            d = {}
+            for c in cols:
+                d[c] = next(it[c])
+            yield d
+    return iter_func()
 
 operators['load_hdf5'] = pipeline_load_hdf5
 loader = partial(loader, operators=operators)

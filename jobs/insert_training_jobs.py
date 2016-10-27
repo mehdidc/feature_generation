@@ -16,7 +16,6 @@ import click
 
 from lightjob.cli import load_db
 from hp import get_hypers, get_scores_bandit, History
-
 db = load_db()
 budget_hours = 10  # default budget hours
 
@@ -3380,7 +3379,22 @@ def jobset83():
     rng = np.random
     candidates = [jobset79(), jobset80(), jobset81(), jobset82()]
     return rng.choice(candidates)
-    
+   
+def jobset84():
+    rng = random
+    params = _sample_vertebrate(rng)
+    params['data_params'] = {
+        "pipeline": [
+            {"name": "load_hdf5", "params": {"filename": "fonts/fonts.hdf5"}},
+            {"name": "resize", "params": {"shape": [32, 32]}},
+            {"name": "divide_by", "params": {"value": 255}},
+        ]
+    }
+    params['dataset'] = 'loader'
+    params['budget_hours'] = 4
+    return params
+
+
 def _sample_vertebrate(rng):
     # quasi-copy of jobset75
     nb_filters = _sample_nb_conv_filters(rng)

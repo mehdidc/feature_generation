@@ -283,6 +283,7 @@ def build_capsule_(layers, data, nbl, nbc,
         print('save recons')
         X_orig = data.X[0:nbl * nbc]
         X_pred = rec(preprocess(X_orig))
+        print(layers['input'].output_shape)
         if layers['input'].output_shape[1] == 3:
             # assumes the pixel colors should be normalized in [0, 1], so clip to that range
 
