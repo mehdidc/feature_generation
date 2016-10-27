@@ -1,7 +1,7 @@
 import sys
 import os
 sys.path.append(os.path.dirname(__file__)+"/..")
-from common import preprocess_gen_data, compute_objectness, softmax
+from common import preprocess_gen_data, compute_objectness, softmax, compute_sample_objectness
 from sklearn.cluster import MeanShift
 import json
 from collections import defaultdict, OrderedDict
@@ -206,6 +206,7 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder):
     pred_sorted = np.sort(pred, axis=1)[:, ::-1]
     for k in range(pred_sorted.shape[1]):
         stats['top{k}_prediction'.format(k=k + 1)] = float(pred_sorted[:, k].mean())
+    stats['sample_objectness'] = float(compute_sample_objectness(pred).mean())
     return stats
 
 def compute_training_stats(folder, ref_job):
