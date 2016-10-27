@@ -182,7 +182,7 @@ def construct_data(job_folder, hash_matrix, transform=lambda x:x):
 
 def compute_out_of_the_box_classification(folder, model_name, model_folder):
     preds_filename = "{}/out_of_the_box_classification_{}.npz".format(folder, model_name)
-    if not os.path.exists(preds_filename) or True:
+    if not os.path.exists(preds_filename):
         from keras.models import model_from_json
         data = joblib.load(os.path.join(folder, 'images.npz'))
         data = preprocess_gen_data(data)
@@ -209,7 +209,6 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder):
     pred_sorted = np.sort(pred, axis=1)[:, ::-1]
     for k in range(pred_sorted.shape[1]):
         stats['top{k}_prediction'.format(k=k + 1)] = float(pred_sorted[:, k].mean())
-    print(stats)
     return stats
 
 def compute_training_stats(folder, ref_job):
