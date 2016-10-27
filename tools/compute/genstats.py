@@ -209,6 +209,7 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder):
     pred_sorted = np.sort(pred, axis=1)[:, ::-1]
     for k in range(pred_sorted.shape[1]):
         stats['top{k}_prediction'.format(k=k + 1)] = float(pred_sorted[:, k].mean())
+    print(stats)
     return stats
 
 def compute_training_stats(folder, ref_job):
