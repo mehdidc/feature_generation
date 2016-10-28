@@ -274,7 +274,11 @@ def dict_format(j, field, db=None):
     if field.startswith('g#'):
         field = field[2:]
         j = fast_find_generation_job(j['summary'], db=db)
-    return default_dict_format(j, field)
+    try:
+        val = default_dict_format(j, field)
+        return val
+    except Exception:
+        return None
 
 def preprocess_gen_data(data):
     if len(data.shape) == 5:
