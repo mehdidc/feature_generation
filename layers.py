@@ -529,6 +529,22 @@ class AddParams(layers.Layer):
         params = [p for l in self.layers for p in layers.get_all_params(l, **tags)]
         return params
 
+def inv_conv_output_length(input_length, filter_size, stride, pad=0):
+    if input_length is None:
+        return None
+    if pad == 'full':
+        output_length = (input_length + 1) * stride + filter_size
+    elif pad == 'valid':
+        output_length = (input_length - 1) * stride + filter_size
+    elif pad == 'same':
+        output_length = input_length
+    elif isinstance(pad, int):
+        output_length = (input_length + 2 * pad - 1) * stride + filter_size
+    else:
+        raise ValueError('Invalid pad: {0}'.format(pad))
+    return output_length
+
+
 class Deconv2DLayer(layers.Conv2DLayer):
     def __init__(self, incoming, **kwargs):
         super(Deconv2DLayer, self).__init__(incoming, **kwargs)
@@ -601,6 +617,30 @@ class Deconv2DLayer_v2(lasagne.layers.Layer):
             conved += self.b.dimshuffle('x', 0, 'x', 'x')
         return self.nonlinearity(conved)
 
+
+class ResizeLayer(layers.Layer):
+    
+    def __init__(self, incoming, scale=2):
+        super(ResizeLayer, self).__init__(incoming)
+        self.scale = scale
+
+    def get_output_for(self, input, **kwargs):
+        s = self.scale
+        shape = input.shape
+        input = input.dimshuffle(0, 1, 2, 'x', 3, 'x')
+        input = T.ones((shape[0], shape[1], shape[2], s, shape[3], s)) * input
+        input = input.reshape((shape[0], shape[1], shape[2] * s, shape[3] * s))
+        return input
+
+    def get_output_shape_for(self, input_shape):
+        s = self.scale
+        return (input_shape[0], input_shape[1], input_shape[2] * s, input_shape[3] * s)
+ 
+
+def ResizeConvLayer(incoming, stride=2, **kw):
+    incoming = ResizeLayer(incoming, scale=stride)
+    incoming = layers.Conv2DLayer(incoming, **kw)
+    return incoming
 
 if __name__ == '__main__':
     from lasagne.layers import *

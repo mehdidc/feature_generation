@@ -848,6 +848,9 @@ def check(filename="out.pkl",
     if update_db:
         db = load_db()
         db.modify_state_of(job_summary, SUCCESS)
+        #job['content']['model_summary']
+        #db.job_update(train['summary'], {'models_generation_summary': gen['summary']})
+        #db.job_update(job_summary, {'slurm_job_id': os.getenv('SLURM_JOBID')})
         db.close()
     return ret
 

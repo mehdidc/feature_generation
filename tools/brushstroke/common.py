@@ -247,6 +247,17 @@ def find_generation_job(training_job_summary, db=None):
             return j
     return None
 
+def fast_find_generation_job(training_job_summary, db=None,cache={}):
+    if not db: db = load_db()
+    if not cache:
+        training_jobs = db.jobs_with(state=SUCCESS, type='training')
+        generation_jobs = to_generation(training_jobs, db=db)
+        train_to_gen = {j_train['summary']: j_gen for j_train, j_gen in zip(training_jobs, generation_jobs)}
+        cache['train_to_gen'] = train_to_gen 
+    else:
+        train_to_gen = cache['train_to_gen']
+    return train_to_gen[training_job_summary]
+
 def to_generation(jobs, db=None):
     if not db: db = load_db()
     S = set(j['summary'] for j in jobs)
@@ -259,10 +270,10 @@ def to_training(jobs, db=None):
     if not db: db = load_db()
     return [db.get_job_by_summary(j['content']['model_summary']) for j in jobs]
 
-def dict_format(j, field):
+def dict_format(j, field, db=None):
     if field.startswith('g#'):
         field = field[2:]
-        j = find_generation_job(j['summary'])
+        j = fast_find_generation_job(j['summary'], db=db)
     return default_dict_format(j, field)
 
 def preprocess_gen_data(data):

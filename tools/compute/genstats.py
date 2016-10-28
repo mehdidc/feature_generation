@@ -196,7 +196,7 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder):
             data = data / float(data.max())
             pred = model.predict(data)
         except Exception as ex:
-            print(ex)
+            print('Error on : {}, {}.Skip.'.format(folder, ex))
             return {}
         joblib.dump(pred, preds_filename, compress=9)
     else:

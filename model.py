@@ -1,7 +1,7 @@
 from lasagne import layers, init
 from lasagne.nonlinearities import (
         linear, sigmoid, rectify, very_leaky_rectify, softmax, tanh)
-from layers import Deconv2DLayer
+from layers import Deconv2DLayer, ResizeConvLayer
 from helpers import FeedbackGRULayer, TensorDenseLayer
 from layers import FeedbackGRULayerClean, AddParams
 from layers import Deconv2DLayer_v2 as deconv2d
@@ -8049,6 +8049,55 @@ def model105(w=32, h=32, c=1,
     all_layers = ([l_in] + hids + 
                   [l_coord, l_brush, l_raw_out, l_biased_out, l_scaled_out,  l_out])
     return layers_from_list_to_dict(all_layers)
+
+def model106(w=32, h=32, c=1,
+            nb_filters=64,
+            size_filters=5,
+            nb_layers=5):
+    """
+    stadard conv aa without any sparsity
+    """
+    s = size_filters
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_conv = l_in
+    l_convs = []
+    for i in range(nb_layers):
+        l_conv = layers.Conv2DLayer(
+                l_conv,
+                num_filters=nb_filters,
+                filter_size=(s, s),
+                nonlinearity=rectify,
+                W=init.GlorotUniform(),
+                pad=(s-1)/2,
+                stride=2,
+                name="conv{}".format(i))
+        l_convs.append(l_conv)
+    l_unconv = l_conv
+    l_unconvs = []
+    print(l_conv.output_shape)
+    for i in range(nb_layers):
+        if i == nb_layers - 1:
+            nonlin = sigmoid
+            nb = c
+            name = "output"
+        else:
+            nonlin = rectify
+            nb = nb_filters
+            name = "unconv{}".format(i)
+        l_unconv = ResizeConvLayer(
+                l_unconv,
+                num_filters=nb,
+                filter_size=(s, s),
+                nonlinearity=nonlin,
+                W=init.GlorotUniform(),
+                stride=2,
+                pad=(s-1)/2,
+                name=name)
+        print(l_unconv.output_shape)
+        l_unconvs.append(l_unconv)
+    all_layers = [l_in] + l_convs + l_unconvs
+    return layers_from_list_to_dict(all_layers)
+
 
 
 build_convnet_simple = model1
