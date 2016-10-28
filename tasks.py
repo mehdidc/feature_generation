@@ -697,7 +697,6 @@ def build_capsule_(layers, data, nbl, nbc,
     else:
         raise Exception('Unknown mode : {}'.format(mode))
     def transform_grads(x):
-
         return x
     # put all together
     capsule = Capsule(

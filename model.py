@@ -7691,7 +7691,7 @@ def model101(nb_filters=64, w=32, h=32, c=1,
     sparse_layers = []
     def sparse(l):
         i = len(sparse_layers)
-        fn = sparse_funcs[sparse_func](nb=k[i])
+        fn = sparse_funcs[sparse_func](k[i])
         l = layers.NonlinearityLayer(l, fn, name='sparse{}'.format(i))
         sparse_layers.append(l)
         return l
