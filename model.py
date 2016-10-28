@@ -8098,8 +8098,6 @@ def model106(w=32, h=32, c=1,
     all_layers = [l_in] + l_convs + l_unconvs
     return layers_from_list_to_dict(all_layers)
 
-
-
 build_convnet_simple = model1
 build_convnet_simple_2 = model2
 build_convnet_simple_3 = model3
