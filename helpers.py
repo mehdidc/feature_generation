@@ -166,8 +166,6 @@ def zero_mask(x, rng, corruption_level=0.5):
 
 
 def mkdir_path(path):
-    if os.path.exists(path):
-        return
     if not os.access(path, os.F_OK):
         os.makedirs(path)
 

@@ -37,7 +37,10 @@ def generate_one(j, per_jobset=True):
             _, where_ = where_.split('jobset', 2)
             where_ = int(where_)
             where_ = 'jobset{:05d}'.format(where_)
-        mkdir_path('exported_data/figs/generated/{}'.format(where_))
+        try:
+            mkdir_path('exported_data/figs/generated/{}'.format(where_))
+        except Exception:
+            pass
         imsave('exported_data/figs/generated/{}/{}.png'.format(where_, id_), img)
     else:
         imsave('exported_data/figs/generated/{}.png'.format(id_), img)
