@@ -272,14 +272,12 @@ def to_training(jobs, db=None):
     return [db.get_job_by_summary(j['content']['model_summary']) for j in jobs]
 
 def dict_format(j, field, db=None):
+    # used ONLY in the cli of lightjob to replace/override the default dict_format function
     if field.startswith('g#'):
         field = field[2:]
         j = fast_find_generation_job(j['summary'], db=db)
-    try:
-        val = default_dict_format(j, field)
-        return val
-    except Exception:
-        return None
+    val = default_dict_format(j, field)
+    return val
 
 def preprocess_gen_data(data):
     if len(data.shape) == 5:

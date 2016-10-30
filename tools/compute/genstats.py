@@ -1,7 +1,7 @@
 import sys
 import os
 sys.path.append(os.path.dirname(__file__)+"/..")
-from common import preprocess_gen_data, compute_objectness, softmax, compute_sample_objectness, compute_objectness_renyi, compute_sample_objectness_renyi
+from common import preprocess_gen_data, compute_objectness, softmax, compute_sample_objectness, compute_objectness_renyi, compute_sample_objectness_renyi, load_model
 from sklearn.cluster import MeanShift
 import json
 from collections import defaultdict, OrderedDict
@@ -26,7 +26,6 @@ logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(stream=sys.stdout)
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
-
 
 def genstats(jobs, db, force=False, n_jobs=-1, filter_stats=None):
     stats = Parallel(n_jobs=n_jobs)(delayed(compute_stats)(dict(j), force=force, filter_stats=filter_stats)
@@ -76,10 +75,12 @@ def compute_stats(job, force=False, filter_stats=None):
             if s in stats:
                 return False
             return True
+    
     if should_compute('mean', stats):
         logger.info('compute mean of {}'.format(s))
         stats["mean"] = x.mean()
         stats['mean'] = stats['mean'] / len(hash_matrix)
+    
     if should_compute('var', stats):
         logger.info('compute var of {}'.format(s))
         stats["var"] = x.var(ddof=1)
@@ -161,10 +162,11 @@ def compute_stats(job, force=False, filter_stats=None):
         for model_name, model_folder in zip(names, models):
             stat[model_name] = compute_out_of_the_box_classification(folder, model_name, model_folder)
         stats['out_of_the_box_classification'] = stat
+    if should_compute('feature_space_eval', stats):
+        stats['feature_space_eval'] = compute_feature_space_eval(folder)
     delta_t = time.time() - t
     logger.info('Finished on {}, took {:.3f}'.format(j['summary'], delta_t))
     return stats
-
 
 def construct_data(job_folder, hash_matrix, transform=lambda x:x):
     filenames = glob.glob(os.path.join(job_folder, 'final', '*.png'))
@@ -182,7 +184,7 @@ def construct_data(job_folder, hash_matrix, transform=lambda x:x):
 
 def compute_out_of_the_box_classification(folder, model_name, model_folder):
     preds_filename = "{}/out_of_the_box_classification_{}.npz".format(folder, model_name)
-    if not os.path.exists(preds_filename):
+    if not os.path.exists(preds_filename) or True:
         from keras.models import model_from_json
         data = joblib.load(os.path.join(folder, 'images.npz'))
         data = preprocess_gen_data(data)
@@ -482,6 +484,45 @@ def compute_knn_classification_accuracy(job_folder, hash_matrix, ref_job):
     logger.info(time.time() - t)
     return accs
 
+def compute_feature_space_eval(job_folder):
+    from datakit.mnist import load
+    from sklearn.linear_model import LogisticRegression
+    import theano
+    import theano.tensor as T
+    import lasagne
+    data = load(which='all')
+    X_train = data['train']['X'] / 255.
+    X_train = X_train.astype(np.float32)
+    y_train = data['train']['y']
+    X_test = data['test']['X'] / 255.
+    X_test = X_train.astype(np.float32)
+    y_test = data['test']['y']
+    model, _, layers = load_model(job_folder + '/model.pkl')
+    X = T.tensor4()
+    lays = [l for l in layers if l.startswith('conv') or l.startswith('hid')]
+    if len(lays) == 0:
+        return {}
+    lays = sorted(lays)
+    print(lays)
+    hid_layer = lays[-1]
+    hid = lasagne.layers.get_output(layers[hid_layer], X)
+    hid = hid.reshape((hid.shape[0], -1))
+    get_hidden = theano.function([X], hid)
+    h_train = minibatcher(X_train, get_hidden, size=1024)
+    
+    clf = LogisticRegression()
+    mean_h = h_train.mean(axis=0, keepdims=True)
+    std_h = h_train.std(axis=0, keepdims=True)
+    eps = 1e-8
+    h_train = (h_train - mean_h) / (std_h + eps)
+    clf.fit(h_train, y_train)
+    h_test = minibatcher(X_test, get_hidden, size=1024)
+    h_test = (h_test - mean_h) / std_h
+    acc = (clf.predict(h_test) == y_test).mean()
+    acc = float(acc)
+    print('test accuracy : {}'.format(acc))
+    return {'test_accuracy': acc}
+
 def compute_manifold_dist(job_folder, hash_matrix, ref_job):
 
     import numpy as np
@@ -586,14 +627,12 @@ def compute_neighcorr(job_folder, hash_matrix, formula='mine'):
         nc = neighbcorr_filenames_multiplecorrelation(filenames)
     return nc
 
-
 def unique_indices(hm):
     K = {}
     for i, h in enumerate(hm):
         if h not in K:
             K[h] = i
     return K.values()
-
 
 def neighbcorr_filenames_multiplecorrelation(filenames, pad=3):
     # https://en.wikipedia.org/wiki/Multiple_correlation
