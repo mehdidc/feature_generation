@@ -151,12 +151,14 @@ def compute_stats(job, force=False, filter_stats=None):
         names = [
             'mnist_classifier', 
             '5_vs_fake_jobset75',
-            'm2' # another mnist classifier (the one wich worked better for jobset75)
+            'm2', # another mnist classifier (the one wich worked better for jobset75)
+            'fonts',
         ]
         models = [
             'tools/models/external/mnist_classifier', 
             'tools/models/external/5_vs_fake_jobset75',
-            'tools/models/mnist/m2'
+            'tools/models/mnist/m2',
+            'tools/models/external/fonts'
         ]
         stat = {}
         for model_name, model_folder in zip(names, models):
@@ -184,7 +186,7 @@ def construct_data(job_folder, hash_matrix, transform=lambda x:x):
 
 def compute_out_of_the_box_classification(folder, model_name, model_folder):
     preds_filename = "{}/out_of_the_box_classification_{}.npz".format(folder, model_name)
-    if not os.path.exists(preds_filename) or True:
+    if not os.path.exists(preds_filename):
         from keras.models import model_from_json
         data = joblib.load(os.path.join(folder, 'images.npz'))
         data = preprocess_gen_data(data)
