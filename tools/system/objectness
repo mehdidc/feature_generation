@@ -1,0 +1,2 @@
+#!/bin/sh
+lightjob show --fields=summary,where,content.model_name,g#summary,g#stats.out_of_the_box_classification.m2.objectness --sort=g#stats.out_of_the_box_classification.m2.objectness --state=success --type=training --details --descending
