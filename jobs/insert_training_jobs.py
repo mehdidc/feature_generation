@@ -3606,6 +3606,8 @@ def insert(where, nb, optimize, minimize, algo, nb_samples, dry, target):
         new_jobs.append(job_id)
         if not dry:
             total += job_write_from_params(params, jobset=where)
+        else:
+            print(json.dumps(params, indent=2))
     if optimize and not dry:
         history = History()
         filename = 'jobs/hp_history.pkl'

@@ -98,20 +98,11 @@ def get_scores_bandit(inputs, outputs, new_inputs=None, algo='thompson'):
     from sklearn.feature_extraction import DictVectorizer
     from sklearn.metrics import r2_score
     import types
-
     preprocess = lambda x:frozendict(flatten_dict(x))
     inputs = map(preprocess, inputs)
     new_inputs = map(preprocess, new_inputs)
-    #reg = GaussianProcessRegressor(normalize_y=True)
-    #reg = LinearRegression()
-    reg = RandomForestRegressor()
-    #reg = BayesianRandomForest(RandomForestRegressor())
-    #class WrapEstimator(Wrapper):
-    #    def fit(self, X, y):
-    #        return self._wrapped_obj.fit(X, y)
-    #    def predict(self, X, *args, **kwargs):
-    #        return self._wrapped_obj.predict(X, *args, **kwargs)
-    #reg = WrapEstimator(reg)
+    #reg = RandomForestRegressor()
+    reg =  BayesianRandomForest(RandomForestRegressor())
     model = Pipeline(DictVectorizer(sparse=False), Imputer(), reg)
     algos = {'thompson': Thompson, 'simple': Simple, 'ucb': UCB, 'ei': partial(BayesianOptimization, criterion=expected_improvement)}
     cls = algos[algo]
