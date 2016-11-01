@@ -72,6 +72,21 @@ class BayesianRandomForest(object):
         var = fci.random_forest_error(self.rf_model, inbag, self.X_train, X)
         return rng.multivariate_normal(mu, np.diag(var))
 
+class Transformer(object):
+
+    def __init__(self, func):
+        self.func = func
+        
+    def fit_transform(self, X, y=None):
+        self.fit(X, y=y)
+        return self.transform(X, y=y)
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        return self.func(X)
+
 def get_scores_bandit(inputs, outputs, new_inputs=None, algo='thompson'):
     from sklearn.pipeline import make_pipeline
     from sklearn.ensemble import RandomForestRegressor
@@ -83,22 +98,25 @@ def get_scores_bandit(inputs, outputs, new_inputs=None, algo='thompson'):
     from sklearn.feature_extraction import DictVectorizer
     from sklearn.metrics import r2_score
     import types
-
-    reg = RandomForestRegressor(n_estimators=100) 
-
+    import pandas as pd
+    reg = RandomForestRegressor() 
     dictorize = lambda x:frozendict(flatten_dict(x))
     inputs = map(dictorize, inputs)
     new_inputs = map(dictorize, new_inputs)
     
+    inp = inputs + new_inputs
+    inp = pd.DataFrame(inp)
+    all_columns = inp.columns
+    inp = pd.get_dummies(inp, dummy_na=True, columns=all_columns)
+    all_dummy_columns = inp.columns
     def vectorize(inputs):
-        all_columns = list(set([k for inp in inputs for k in inp.keys()]))
         inputs = pd.DataFrame(inputs)
-        cols = inputs.columns
         inputs = pd.get_dummies(inputs, dummy_na=True, columns=all_columns)
-        all_cols = inputs.columns
-        inputs[np.isnan(inputs)] = -1
+        for col in set(all_dummy_columns) - set(inputs.columns):
+            inputs[col] = -1
+        inputs = inputs.values
         return inputs
-    model = Pipeline(FunctionTransformer(vectorize), reg)
+    model = Pipeline(Transformer(vectorize), reg)
     algos = {'thompson': Thompson, 'simple': Simple, 'ucb': UCB, 'ei': partial(BayesianOptimization, criterion=expected_improvement)}
     cls = algos[algo]
     bandit = cls(model)
