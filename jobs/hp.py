@@ -92,31 +92,27 @@ def get_scores_bandit(inputs, outputs, new_inputs=None, algo='thompson'):
     from sklearn.ensemble import RandomForestRegressor
     from sklearn.gaussian_process import GaussianProcessRegressor
     from sklearn.linear_model import LinearRegression
-    from sklearn.preprocessing import Imputer, FunctionTransformer
+    from sklearn.preprocessing import Imputer
     from hp_toolkit.bandit import Thompson, UCB, BayesianOptimization, expected_improvement, Simple
     from hp_toolkit.helpers import Pipeline
     from sklearn.feature_extraction import DictVectorizer
     from sklearn.metrics import r2_score
     import types
-    import pandas as pd
-    reg = RandomForestRegressor() 
-    dictorize = lambda x:frozendict(flatten_dict(x))
-    inputs = map(dictorize, inputs)
-    new_inputs = map(dictorize, new_inputs)
-    
-    inp = inputs + new_inputs
-    inp = pd.DataFrame(inp)
-    all_columns = inp.columns
-    inp = pd.get_dummies(inp, dummy_na=True, columns=all_columns)
-    all_dummy_columns = inp.columns
-    def vectorize(inputs):
-        inputs = pd.DataFrame(inputs)
-        inputs = pd.get_dummies(inputs, dummy_na=True, columns=all_columns)
-        for col in set(all_dummy_columns) - set(inputs.columns):
-            inputs[col] = -1
-        inputs = inputs.values
-        return inputs
-    model = Pipeline(Transformer(vectorize), reg)
+
+    preprocess = lambda x:frozendict(flatten_dict(x))
+    inputs = map(preprocess, inputs)
+    new_inputs = map(preprocess, new_inputs)
+    #reg = GaussianProcessRegressor(normalize_y=True)
+    #reg = LinearRegression()
+    reg = RandomForestRegressor()
+    #reg = BayesianRandomForest(RandomForestRegressor())
+    #class WrapEstimator(Wrapper):
+    #    def fit(self, X, y):
+    #        return self._wrapped_obj.fit(X, y)
+    #    def predict(self, X, *args, **kwargs):
+    #        return self._wrapped_obj.predict(X, *args, **kwargs)
+    #reg = WrapEstimator(reg)
+    model = Pipeline(DictVectorizer(sparse=False), Imputer(), reg)
     algos = {'thompson': Thompson, 'simple': Simple, 'ucb': UCB, 'ei': partial(BayesianOptimization, criterion=expected_improvement)}
     cls = algos[algo]
     bandit = cls(model)
