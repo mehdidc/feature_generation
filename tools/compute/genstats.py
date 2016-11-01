@@ -184,7 +184,7 @@ def construct_data(job_folder, hash_matrix, transform=lambda x:x):
     X = X.reshape((X.shape[0], -1))
     return X
 
-def compute_out_of_the_box_classification(folder, model_name, model_folder):
+def compute_out_of_the_box_classification(folder, model_name, model_folder, nb_samples=None):
     preds_filename = "{}/out_of_the_box_classification_{}.npz".format(folder, model_name)
     if not os.path.exists(preds_filename):
         from keras.models import model_from_json
@@ -198,6 +198,8 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder):
             model.load_weights(os.path.join(model_folder, 'model.h5'))
         try:
             data = data / float(data.max())
+            if nb_samples:
+                data = data[0:nb_samples]
             pred = model.predict(data)
         except Exception as ex:
             print('Error on : {}, {}.Skip.'.format(folder, ex))
