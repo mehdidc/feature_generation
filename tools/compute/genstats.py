@@ -22,6 +22,8 @@ import manifold
 import time
 import joblib
 
+from keras.models import model_from_json
+
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(stream=sys.stdout)
 logger.addHandler(handler)
@@ -35,6 +37,21 @@ def genstats(jobs, db, force=False, n_jobs=-1, filter_stats=None):
 
 def update_stats(job, stats, db):
     db.job_update(job["summary"], dict(stats=stats))
+
+out_of_the_box_names = [
+    'mnist_classifier', 
+    '5_vs_fake_jobset75',
+    'm2', # another mnist classifier (the one wich worked better for jobset75)
+    'fonts',
+    'letterness'
+]
+out_of_the_box_models = [
+    'tools/models/external/mnist_classifier', 
+    'tools/models/external/5_vs_fake_jobset75',
+    'tools/models/mnist/m2',
+    'tools/models/external/fonts',
+    'tools/models/external/fonts_and_digits'
+]
 
 def compute_stats(job, force=False, filter_stats=None):
     t = time.time()
@@ -148,24 +165,14 @@ def compute_stats(job, force=False, filter_stats=None):
         logger.info('compute training stats')
         stats['training'] = compute_training_stats(folder, ref_job)
     if should_compute('out_of_the_box_classification', stats):
-        names = [
-            'mnist_classifier', 
-            '5_vs_fake_jobset75',
-            'm2', # another mnist classifier (the one wich worked better for jobset75)
-            'fonts',
-        ]
-        models = [
-            'tools/models/external/mnist_classifier', 
-            'tools/models/external/5_vs_fake_jobset75',
-            'tools/models/mnist/m2',
-            'tools/models/external/fonts'
-        ]
         stat = {}
-        for model_name, model_folder in zip(names, models):
+        for model_name, model_folder in zip(out_of_the_box_names, out_of_the_box_models):
             stat[model_name] = compute_out_of_the_box_classification(folder, model_name, model_folder)
         stats['out_of_the_box_classification'] = stat
     if should_compute('feature_space_eval', stats):
         stats['feature_space_eval'] = compute_feature_space_eval(folder)
+    if should_compute('parzen_ll', stats):
+        stats['parzen_ll'] = compute_parzen_ll(folder)
     delta_t = time.time() - t
     logger.info('Finished on {}, took {:.3f}'.format(j['summary'], delta_t))
     return stats
@@ -184,10 +191,27 @@ def construct_data(job_folder, hash_matrix, transform=lambda x:x):
     X = X.reshape((X.shape[0], -1))
     return X
 
+from datakit import mnist
+data = mnist.load(which='test')
+mnist_test_X = data['test']['X'] / 255.
+mnist_test_X = mnist_test_X.astype(np.float32)
+def compute_parzen_ll(folder):
+    from likelihood_estimation_parzen import ll_parzen
+    data = joblib.load(os.path.join(folder, 'images.npz'))
+    data = preprocess_gen_data(data)
+    sigma = 0.23
+    ll = ll_parzen(sigma=sigma, samples=flatten(data), test_X=flatten(mnist_test_X), batch_size=10)
+    ll = np.array(ll)
+    stat = {'ll_parzen_mean': float(ll.mean()), 'll_parzen_std': float(ll.std() / (100.)) }
+    return stat
+ 
+def flatten(x):
+    return x.reshape((x.shape[0], -1))
+
+
 def compute_out_of_the_box_classification(folder, model_name, model_folder, nb_samples=None):
     preds_filename = "{}/out_of_the_box_classification_{}.npz".format(folder, model_name)
     if not os.path.exists(preds_filename):
-        from keras.models import model_from_json
         data = joblib.load(os.path.join(folder, 'images.npz'))
         data = preprocess_gen_data(data)
         js = open(os.path.join(model_folder, 'model.json')).read()
@@ -197,7 +221,8 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder, nb_s
         except Exception:
             model.load_weights(os.path.join(model_folder, 'model.h5'))
         try:
-            data = data / float(data.max())
+            if data.max() >= 1:
+                data = data / float(data.max())
             if nb_samples:
                 data = data[0:nb_samples]
             pred = model.predict(data)
@@ -215,6 +240,17 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder, nb_s
     pred_sorted = np.sort(pred, axis=1)[:, ::-1]
     for k in range(pred_sorted.shape[1]):
         stats['top{k}_prediction'.format(k=k + 1)] = float(pred_sorted[:, k].mean())
+    if model_name == 'letterness':
+        data = joblib.load(os.path.join(folder, 'images.npz'))
+        data = preprocess_gen_data(data)
+        js = open(os.path.join(model_folder, 'model.json')).read()
+        js = js.replace('softmax', 'linear')
+        model = model_from_json(js)
+        model.load_weights(os.path.join(model_folder, 'model.pkl'))
+        if nb_samples:data = data[0:nb_samples]
+        pred = model.predict(data)
+        stats['sum_proba_letters'] = float(pred[:, 10:].sum(axis=1).mean())
+        stats['sum_proba_digits'] = float(pred[:, 0:10].sum(axis=1).mean())
     return stats
 
 def compute_training_stats(folder, ref_job):
