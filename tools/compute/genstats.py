@@ -249,8 +249,17 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder, nb_s
         model.load_weights(os.path.join(model_folder, 'model.pkl'))
         if nb_samples:data = data[0:nb_samples]
         pred = model.predict(data)
-        stats['sum_proba_letters'] = float(pred[:, 10:].sum(axis=1).mean())
-        stats['sum_proba_digits'] = float(pred[:, 0:10].sum(axis=1).mean())
+        digits = np.arange(0, 10)
+        letters = np.arange(10, 10 + 26)
+        stats['objectness_digits'] = compute_objectness(softmax(pred[:, digits]))
+        stats['objectness_letters'] = compute_objectness(softmax(pred[:, letters]))
+        stats['sample_objectness_digits'] = float(compute_sample_objectness(softmax(pred[:, digits])).mean())
+        stats['sample_objectness_letters'] = float(compute_sample_objectness(softmax(pred[:, letters])).mean())
+        stats['max_letters'] = float(softmax(pred)[:, letters].max(axis=1).sum())
+        stats['max_digits'] = float(softmax(pred)[:, digits].max(axis=1).sum())
+        theta = 0.9
+        stats['count_letters'] = float((softmax(pred)[:, letters].max(axis=1) > theta).sum())
+        stats['count_digits'] = float((softmax(pred)[:, digits].max(axis=1) > theta).sum())
     return stats
 
 def compute_training_stats(folder, ref_job):
