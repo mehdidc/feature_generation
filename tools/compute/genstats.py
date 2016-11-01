@@ -1,7 +1,7 @@
 import sys
 import os
 sys.path.append(os.path.dirname(__file__)+"/..")
-from common import preprocess_gen_data, compute_objectness, softmax, compute_sample_objectness, compute_objectness_renyi, compute_sample_objectness_renyi, load_model
+from common import preprocess_gen_data, compute_objectness, softmax, compute_sample_objectness, compute_objectness_renyi, compute_sample_objectness_renyi, load_model, compute_objectness_correction
 from sklearn.cluster import MeanShift
 import json
 from collections import defaultdict, OrderedDict
@@ -234,12 +234,14 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder, nb_s
         pred = joblib.load(preds_filename)
     stats = {}
     stats['objectness'] = compute_objectness(pred)
+    stats['objectness_correction'] = compute_objectness_correction(pred)
     stats['sample_objectness'] = float(compute_sample_objectness(pred).mean())
     stats['objectness_renyi'] = compute_objectness_renyi(pred)
     stats['sample_objectness_renyi'] = float(compute_sample_objectness_renyi(pred).mean())
     pred_sorted = np.sort(pred, axis=1)[:, ::-1]
     for k in range(pred_sorted.shape[1]):
         stats['top{k}_prediction'.format(k=k + 1)] = float(pred_sorted[:, k].mean())
+    """
     if model_name == 'letterness':
         data = joblib.load(os.path.join(folder, 'images.npz'))
         data = preprocess_gen_data(data)
@@ -260,6 +262,7 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder, nb_s
         theta = 0.9
         stats['count_letters'] = float((softmax(pred)[:, letters].max(axis=1) > theta).sum())
         stats['count_digits'] = float((softmax(pred)[:, digits].max(axis=1) > theta).sum())
+    """
     return stats
 
 def compute_training_stats(folder, ref_job):

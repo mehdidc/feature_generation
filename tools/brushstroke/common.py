@@ -302,6 +302,17 @@ def compute_objectness(v):
     score = float(score)
     return score
 
+def compute_objectness_correction(v):
+    v = np.array(v)
+    marginal = v.mean(axis=0)
+    log_v = np.log(v / marginal)
+    log_v[np.isnan(log_v)] = 0
+    score = v * log_v 
+    score = score.sum(axis=1).mean()
+    score = np.exp(score)
+    score = float(score)
+    return score
+
 def compute_sample_objectness_renyi(v, alpha=2):
     # source : https://en.wikipedia.org/wiki/R%C3%A9nyi_entropy (Entropy part)
     score = (1/(alpha - 1)) * np.log((v**alpha).sum(axis=1))

@@ -3,9 +3,10 @@ JOB=$1
 if [[ $# -eq 0 ]] ; then
    JOB=jobset83
 fi
-#python jobs/insert_training_jobs.py --where=$JOB --nb=20 --optimize --target='g#stats.out_of_the_box_classification.fonts.objectness' --maximize --algo=ucb
+TARGET='g#stats.out_of_the_box_classification.fonts.objectness'
+python jobs/insert_training_jobs.py --where=$JOB --nb=20 --optimize --target=$TARGET --maximize --algo=ucb
 #python jobs/run_jobs.py --where=$JOB --nb=20
 #python jobs/insert_generation_jobs.py --where=$JOB --jobset=jobset_fast
 #python jobs/run_jobs.py --type=generation --ref_where=$JOB --nb=20
-python tools/compute/compute.py stats --where=$JOB --type=generation --stats=out_of_the_box_classification
-python tools/viz/generated.py --where=$JOB
+#python tools/compute/compute.py stats --where=$JOB --type=generation --stats=out_of_the_box_classification
+#python tools/viz/generated.py --where=$JOB
