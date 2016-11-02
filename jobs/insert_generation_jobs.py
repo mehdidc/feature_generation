@@ -69,6 +69,8 @@ def insert(where, jobset, nb, budget):
         check['what'] = what
         d['check'] = check
         s = summarize(d)
+        if db.job_exists_by_summary(s):
+            continue
         cmd = "sbatch --time={time} --output={out} --error={out} {launch} invoke check --update-db=1 --what={what} --dataset={dataset} --filename={filename} --params={params} --folder={folder}"
         cmd =  cmd.format(
             time=budget,
