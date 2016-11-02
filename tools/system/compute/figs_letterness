@@ -1,0 +1,19 @@
+#!/bin/sh
+V="
+diversity_count_letters_85
+diversity_count_letters_90
+diversity_count_letters_95
+diversity_count_letters_98
+diversity_count_letters_99
+diversity_count_letters_999
+diversity_max_letters
+"
+for v in $V;do 
+    python tools/viz/obox.py --field="stats.out_of_the_box_classification.letterness.$v" --model-folder=tools/models/external/fonts_and_digits --out='exported_data/figs/obox/{field}/{summary}.png' --name="letterness|$v" --nb=10 $*
+done
+V="
+objectness
+"
+for v in $V;do 
+    python tools/viz/obox.py --field="stats.out_of_the_box_classification.fonts.$v" --model-folder=tools/models/external/fonts --out='exported_data/figs/obox/{field}/{summary}.png' --name='letter_objectness' --nb=10$*
+done

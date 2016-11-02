@@ -1,0 +1,3 @@
+#!/bin/sh
+python tools/viz/obox.py --field="stats.parzen_digits.mean" --model-folder=tools/models/external/fonts --out='exported_data/figs/obox/{field}/{summary}.png' --name='parzen_digits' --nb=10 $*
+python tools/viz/obox.py --field="stats.parzen_letters.mean" --model-folder=tools/models/external/fonts --out='exported_data/figs/obox/{field}/{summary}.png' --name='parzen_letters' --nb=10 $*

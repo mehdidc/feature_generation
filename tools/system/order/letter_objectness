@@ -1,0 +1,3 @@
+#!/bin/sh
+F="g#stats.out_of_the_box_classification.fonts.objectness"
+lightjob show --fields="summary,where,content.model_name,g#summary,$F,readable_end_time" --sort=$F --state=success --type=training --details --descending
