@@ -306,7 +306,7 @@ def compute_objectness_correction(v):
     v = np.array(v)
     marginal = v.mean(axis=0)
     log_v = np.log(v / marginal)
-    log_v[np.isnan(log_v)] = 0
+    log_v[np.isinf(log_v)] = 0
     score = v * log_v 
     score = score.sum(axis=1).mean()
     score = np.exp(score)

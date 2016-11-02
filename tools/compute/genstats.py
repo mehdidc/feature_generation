@@ -21,7 +21,7 @@ import intdim_mle
 import manifold
 import time
 import joblib
-
+from toolz.functoolz import memoize
 from keras.models import model_from_json
 
 logger = logging.getLogger(__name__)
@@ -29,9 +29,12 @@ handler = logging.StreamHandler(stream=sys.stdout)
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
+mem = joblib.Memory('.cache')
+
 def genstats(jobs, db, force=False, n_jobs=-1, filter_stats=None):
-    stats = Parallel(n_jobs=n_jobs)(delayed(compute_stats)(dict(j), force=force, filter_stats=filter_stats)
-                                    for j in jobs)
+    #stats = Parallel(n_jobs=n_jobs)(delayed(compute_stats)(dict(j), force=force, filter_stats=filter_stats)
+    #                                for j in jobs)
+    stats = [compute_stats(dict(j), force=force, filter_stats=filter_stats) for j in jobs]
     for j, s in zip(jobs, stats):
         update_stats(j, s, db)
 
@@ -43,14 +46,16 @@ out_of_the_box_names = [
     '5_vs_fake_jobset75',
     'm2', # another mnist classifier (the one wich worked better for jobset75)
     'fonts',
-    'letterness'
+    'letterness',
+    'fonts2',
 ]
 out_of_the_box_models = [
     'tools/models/external/mnist_classifier', 
     'tools/models/external/5_vs_fake_jobset75',
     'tools/models/mnist/m2',
     'tools/models/external/fonts',
-    'tools/models/external/fonts_and_digits'
+    'tools/models/external/fonts_and_digits',
+    'tools/models/external/fonts_multilabel',
 ]
 
 def compute_stats(job, force=False, filter_stats=None):
@@ -92,7 +97,6 @@ def compute_stats(job, force=False, filter_stats=None):
             if s in stats:
                 return False
             return True
-    
     if should_compute('mean', stats):
         logger.info('compute mean of {}'.format(s))
         stats["mean"] = x.mean()
@@ -164,15 +168,24 @@ def compute_stats(job, force=False, filter_stats=None):
     if should_compute('training', stats):
         logger.info('compute training stats')
         stats['training'] = compute_training_stats(folder, ref_job)
+
+
     if should_compute('out_of_the_box_classification', stats):
         stat = {}
         for model_name, model_folder in zip(out_of_the_box_names, out_of_the_box_models):
+            a = time.time()
             stat[model_name] = compute_out_of_the_box_classification(folder, model_name, model_folder)
         stats['out_of_the_box_classification'] = stat
+
     if should_compute('feature_space_eval', stats):
+        logger.info('compute feature space eval')
         stats['feature_space_eval'] = compute_feature_space_eval(folder)
+
+
     if should_compute('parzen_ll', stats):
+        logger.info('compute parzen ll')
         stats['parzen_ll'] = compute_parzen_ll(folder)
+
     delta_t = time.time() - t
     logger.info('Finished on {}, took {:.3f}'.format(j['summary'], delta_t))
     return stats
@@ -208,18 +221,12 @@ def compute_parzen_ll(folder):
 def flatten(x):
     return x.reshape((x.shape[0], -1))
 
-
 def compute_out_of_the_box_classification(folder, model_name, model_folder, nb_samples=None):
     preds_filename = "{}/out_of_the_box_classification_{}.npz".format(folder, model_name)
     if not os.path.exists(preds_filename):
         data = joblib.load(os.path.join(folder, 'images.npz'))
         data = preprocess_gen_data(data)
-        js = open(os.path.join(model_folder, 'model.json')).read()
-        model = model_from_json(js)
-        try:
-            model.load_weights(os.path.join(model_folder, 'model.pkl'))
-        except Exception:
-            model.load_weights(os.path.join(model_folder, 'model.h5'))
+        model = load_discr_model(model_folder)
         try:
             if data.max() >= 1:
                 data = data / float(data.max())
@@ -241,15 +248,12 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder, nb_s
     pred_sorted = np.sort(pred, axis=1)[:, ::-1]
     for k in range(pred_sorted.shape[1]):
         stats['top{k}_prediction'.format(k=k + 1)] = float(pred_sorted[:, k].mean())
-    """
     if model_name == 'letterness':
+        t = time.time()
         data = joblib.load(os.path.join(folder, 'images.npz'))
         data = preprocess_gen_data(data)
-        js = open(os.path.join(model_folder, 'model.json')).read()
-        js = js.replace('softmax', 'linear')
-        model = model_from_json(js)
-        model.load_weights(os.path.join(model_folder, 'model.pkl'))
         if nb_samples:data = data[0:nb_samples]
+        model = load_discr_model(model_folder, linear=True)
         pred = model.predict(data)
         digits = np.arange(0, 10)
         letters = np.arange(10, 10 + 26)
@@ -257,13 +261,28 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder, nb_s
         stats['objectness_letters'] = compute_objectness(softmax(pred[:, letters]))
         stats['sample_objectness_digits'] = float(compute_sample_objectness(softmax(pred[:, digits])).mean())
         stats['sample_objectness_letters'] = float(compute_sample_objectness(softmax(pred[:, letters])).mean())
-        stats['max_letters'] = float(softmax(pred)[:, letters].max(axis=1).sum())
-        stats['max_digits'] = float(softmax(pred)[:, digits].max(axis=1).sum())
+        stats['max_letters'] = float(softmax(pred)[:, letters].max(axis=1).mean())
+        stats['max_digits'] = float(softmax(pred)[:, digits].max(axis=1).mean())
+        
         theta = 0.9
-        stats['count_letters'] = float((softmax(pred)[:, letters].max(axis=1) > theta).sum())
-        stats['count_digits'] = float((softmax(pred)[:, digits].max(axis=1) > theta).sum())
-    """
+        stats['count_letters_{}'] = float((softmax(pred)[:, letters].max(axis=1) > theta).mean())
+        stats['count_digits_{}'] = float((softmax(pred)[:, digits].max(axis=1) > theta).mean())
+        for theta in (0.85, 0.9, 0.95, 0.98, 0.99, 0.999):
+            stats['count_letters_{}'.format(int(theta*100))] = float((softmax(pred)[:, letters].max(axis=1) > theta).mean())
+            stats['count_digits_{}'.format(int(theta*100))] = float((softmax(pred)[:, digits].max(axis=1) > theta).mean())
     return stats
+
+@memoize
+def load_discr_model(model_folder, linear=False):
+    js = open(os.path.join(model_folder, 'model.json')).read()
+    if linear:
+        js = js.replace('softmax', 'linear')
+    model = model_from_json(js)
+    try:
+        model.load_weights(os.path.join(model_folder, 'model.pkl'))
+    except Exception:
+        model.load_weights(os.path.join(model_folder, 'model.h5'))
+    return model
 
 def compute_training_stats(folder, ref_job):
     from tasks import load_
