@@ -48,6 +48,7 @@ out_of_the_box_names = [
     'fonts',
     'letterness',
     'fonts2',
+    'fonts3',
 ]
 out_of_the_box_models = [
     'tools/models/external/mnist_classifier', 
@@ -56,6 +57,7 @@ out_of_the_box_models = [
     'tools/models/external/fonts',
     'tools/models/external/fonts_and_digits',
     'tools/models/external/fonts_multilabel',
+    'tools/models/external/fonts2',
 ]
 
 def compute_stats(job, force=False, filter_stats=None):
@@ -181,10 +183,14 @@ def compute_stats(job, force=False, filter_stats=None):
         logger.info('compute feature space eval')
         stats['feature_space_eval'] = compute_feature_space_eval(folder)
 
+    ""
+    if should_compute('parzen_digits', stats):
+        logger.info('compute parzen digits')
+        stats['parzen_ll'] = compute_parzen_digits(folder)
 
-    if should_compute('parzen_ll', stats):
-        logger.info('compute parzen ll')
-        stats['parzen_ll'] = compute_parzen_ll(folder)
+    if should_compute('parzen_letters', stats):
+        logger.info('compute parzen letters')
+        stats['parzen_letters'] = compute_parzen_letters(folder)
 
     delta_t = time.time() - t
     logger.info('Finished on {}, took {:.3f}'.format(j['summary'], delta_t))
@@ -204,26 +210,50 @@ def construct_data(job_folder, hash_matrix, transform=lambda x:x):
     X = X.reshape((X.shape[0], -1))
     return X
 
-from datakit import mnist
-data = mnist.load(which='test')
-mnist_test_X = data['test']['X'] / 255.
-mnist_test_X = mnist_test_X.astype(np.float32)
-def compute_parzen_ll(folder):
+@memoize
+def load_mnist():
+    from datakit import mnist
+    data = mnist.load(which='test')
+    mnist_test_X = data['test']['X'] / 255.
+    mnist_test_X = mnist_test_X.astype(np.float32)
+    return mnist_test_X
+
+@memoize
+def load_fonts():
+    from tools.common import resize_set
+    import os
+    fonts = np.load('/home/mcherti/work/data/fonts/fonts.npz')
+    fonts_X = fonts['X']
+    fonts_y = fonts['y']
+    X = 1 - fonts_X / 255.
+    X = resize_set(X, 28, 28)
+    print(X.shape)
+    return X
+
+def compute_parzen_digits(folder, **kw):
+    return _parzen(folder, load_mnist(), **kw)
+
+def compute_parzen_letters(folder, **kw):
+    return _parzen(folder, load_fonts(), **kw)
+
+def _parzen(folder, X, nb_samples=None, batch_size=10):
     from likelihood_estimation_parzen import ll_parzen
     data = joblib.load(os.path.join(folder, 'images.npz'))
     data = preprocess_gen_data(data)
+    if nb_samples:
+        data = data[0:nb_samples]
     sigma = 0.23
-    ll = ll_parzen(sigma=sigma, samples=flatten(data), test_X=flatten(mnist_test_X), batch_size=10)
+    ll = ll_parzen(sigma=sigma, samples=flatten(data), test_X=flatten(X), batch_size=batch_size)
     ll = np.array(ll)
-    stat = {'ll_parzen_mean': float(ll.mean()), 'll_parzen_std': float(ll.std() / (100.)) }
+    stat = {'mean': float(ll.mean()), 'std': float(ll.std() / (batch_size**2)) }
     return stat
- 
+
 def flatten(x):
     return x.reshape((x.shape[0], -1))
 
 def compute_out_of_the_box_classification(folder, model_name, model_folder, nb_samples=None):
     preds_filename = "{}/out_of_the_box_classification_{}.npz".format(folder, model_name)
-    if not os.path.exists(preds_filename):
+    if not os.path.exists(preds_filename) or True:
         data = joblib.load(os.path.join(folder, 'images.npz'))
         data = preprocess_gen_data(data)
         model = load_discr_model(model_folder)
@@ -262,15 +292,45 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder, nb_s
         stats['sample_objectness_digits'] = float(compute_sample_objectness(softmax(pred[:, digits])).mean())
         stats['sample_objectness_letters'] = float(compute_sample_objectness(softmax(pred[:, letters])).mean())
         stats['max_letters'] = float(softmax(pred)[:, letters].max(axis=1).mean())
+        ent = entropy(probas_from_occurences(softmax(pred)[:, letters].argmax(axis=1))) / np.log(len(letters))
+        stats['diversity_max_letters'] = (stats['max_letters'] + ent) / 2.
         stats['max_digits'] = float(softmax(pred)[:, digits].max(axis=1).mean())
-        
         theta = 0.9
         stats['count_letters_{}'] = float((softmax(pred)[:, letters].max(axis=1) > theta).mean())
         stats['count_digits_{}'] = float((softmax(pred)[:, digits].max(axis=1) > theta).mean())
+        pred_proba = softmax(pred)
+        pred_proba_letters = pred_proba[:, letters]
+        pred_proba_digits = pred_proba[:, digits]
         for theta in (0.85, 0.9, 0.95, 0.98, 0.99, 0.999):
-            stats['count_letters_{}'.format(int(theta*100))] = float((softmax(pred)[:, letters].max(axis=1) > theta).mean())
-            stats['count_digits_{}'.format(int(theta*100))] = float((softmax(pred)[:, digits].max(axis=1) > theta).mean())
+            s = str(theta).replace('0.', '')
+            # letters
+            selected_letters = (pred_proba_letters.max(axis=1) > theta)
+            stats['count_letters_{}'.format(s)] = float(selected_letters.mean())
+            # letters with diversity term
+            ent = entropy(probas_from_occurences(pred_proba_letters[selected_letters].argmax(axis=1))) / np.log(pred_proba_letters.shape[1])
+            alpha = 1
+            stats['diversity_count_letters_{}'.format(s)] = (selected_letters.mean() + alpha * ent) / (1 + alpha)
+            # digits
+            selected_digits = (pred_proba_digits.max(axis=1) > theta)
+            stats['count_digits_{}'.format(s)] = float(selected_digits.mean())
+            # digits with diversity
+            ent = entropy(probas_from_occurences(pred_proba_digits[selected_digits].argmax(axis=1))) / np.log(pred_proba_digits.shape[1])
+            alpha = 1
+            stats['diversity_count_digits_{}'.format(s)] = (selected_digits.mean() + alpha * ent) / (1 + alpha)
+
     return stats
+
+def entropy(x):
+    return -np.dot(x, np.log(x))
+
+def probas_from_occurences(x):
+    cnt = Counter(x)
+    total = float(len(x))
+    probas = []
+    for k, nb in cnt.items():
+        p = nb/total
+        probas.append(p)
+    return probas
 
 @memoize
 def load_discr_model(model_folder, linear=False):
