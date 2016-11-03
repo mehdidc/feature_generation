@@ -186,7 +186,7 @@ def compute_stats(job, force=False, filter_stats=None):
     ""
     if should_compute('parzen_digits', stats):
         logger.info('compute parzen digits')
-        stats['parzen_ll'] = compute_parzen_digits(folder)
+        stats['parzen_digits'] = compute_parzen_digits(folder)
 
     if should_compute('parzen_letters', stats):
         logger.info('compute parzen letters')

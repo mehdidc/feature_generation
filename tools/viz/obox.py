@@ -66,6 +66,7 @@ def generate_images(model, jobs_gen, image_folder, out, **kw):
             continue
         print(j['summary'])
         filename = image_folder.format(summary=j['summary'])
+        print(filename)
         if not os.path.exists(filename):
             continue
         X = joblib.load(filename)

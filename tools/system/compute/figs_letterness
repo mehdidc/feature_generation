@@ -15,5 +15,5 @@ V="
 objectness
 "
 for v in $V;do 
-    python tools/viz/obox.py --field="stats.out_of_the_box_classification.fonts.$v" --model-folder=tools/models/external/fonts --out='exported_data/figs/obox/{field}/{summary}.png' --name='letter_objectness' --nb=10$*
+    python tools/viz/obox.py --field="stats.out_of_the_box_classification.fonts.$v" --model-folder=tools/models/external/fonts --out='exported_data/figs/obox/{field}/{summary}.png' --name='letter_objectness' --nb=10 $*
 done
