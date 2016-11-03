@@ -1,4 +1,3 @@
 #!/bin/sh
 F1="g#stats.out_of_the_box_classification.m2.objectness"
-F2="g#stats.out_of_the_box_classification.m2.objectness_correction"
-lightjob show --fields="summary,where,content.model_name,g#summary,$F1,$F2" --sort=$F2 --state=success --type=training --details --descending
+lightjob show --fields="summary,where,content.model_name,g#summary,$F1,readable_end_time,content.model_params.nb_layers" --sort=$F1 --state=success --type=training --details --descending --where=jobset83

@@ -3515,7 +3515,7 @@ def _sample_convsparse(rng):
 
 def _sample_nb_conv_filters(rng):
     #nb_layers = rng.choice((1, 5))
-    nb_layers = rng.randint(1, 5)
+    nb_layers = rng.randint(2, 4)
     return [_sample_nb_conv_filter(rng) for _ in range(nb_layers)]
 
 def _sample_nb_conv_filter(rng):
@@ -3523,7 +3523,7 @@ def _sample_nb_conv_filter(rng):
 
 def _sample_nb_fc_units(rng):
     #nb_layers = rng.choice((1, 5))
-    nb_layers = rng.randint(1, 5)
+    nb_layers = rng.randint(2, 4)
     return [_sample_nb_fc_unit(rng) for _ in range(nb_layers)]
 
 def _sample_nb_fc_unit(rng):

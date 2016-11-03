@@ -22,7 +22,10 @@ fonts_examples = [resize(x[0], (28, 28), preserve_range=True)[None, :, :] for x 
 def get_model(model_folder):
     arch = (open(os.path.join(model_folder, 'model.json'))).read()
     model = model_from_json(arch)
-    model.load_weights(os.path.join(model_folder, 'model.pkl'))
+    if os.path.exists(os.path.join(model_folder, 'model.pkl')):
+        model.load_weights(os.path.join(model_folder, 'model.pkl'))
+    else:
+        model.load_weights(os.path.join(model_folder, 'model.h5'))
     return model
 
 @click.command()
