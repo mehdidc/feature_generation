@@ -16,11 +16,11 @@ else:
     jobs_gen = to_generation(jobs)
 letterness = [
 'diversity_count_letters_85',
-'max_letters',
+'diversity_max_letters',
 ]
 digitness = [
 'diversity_count_digits_85',
-'max_digits',
+'diversity_max_digits',
 ]
 metrics = map(lambda m:'stats.out_of_the_box_classification.letterness.'+m, letterness)
 metrics += map(lambda m:'stats.out_of_the_box_classification.letterness.'+m, digitness)

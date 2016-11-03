@@ -292,11 +292,14 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder, nb_s
         stats['sample_objectness_letters'] = float(compute_sample_objectness(softmax(pred[:, letters])).mean())
         stats['max_letters'] = float(softmax(pred)[:, letters].max(axis=1).mean())
         ent = entropy(probas_from_occurences(softmax(pred)[:, letters].argmax(axis=1))) / np.log(len(letters))
-        stats['diversity_max_letters'] = (stats['max_letters'] + ent) / 2.
+        stats['diversity_max_letters'] = 0.5 * stats['max_letters'] + 0.5 * ent
+        stats['diversity_max_letters_alpha8'] = 0.8 * stats['max_letters'] + 0.2 * ent
+        stats['diversity_max_letters_alpha9'] = 0.9 * stats['max_letters'] + 0.1 * ent
         stats['max_digits'] = float(softmax(pred)[:, digits].max(axis=1).mean())
-        theta = 0.9
-        stats['count_letters_{}'] = float((softmax(pred)[:, letters].max(axis=1) > theta).mean())
-        stats['count_digits_{}'] = float((softmax(pred)[:, digits].max(axis=1) > theta).mean())
+        ent = entropy(probas_from_occurences(softmax(pred)[:, digits].argmax(axis=1))) / np.log(len(digits))
+        stats['diversity_max_digits'] = stats['max_digits'] * 0.5  + ent * 0.5
+        stats['diversity_max_digits_alpha8'] = stats['max_digits'] * 0.8  + ent * 0.2
+        stats['diversity_max_digits_alpha9'] = stats['max_digits'] * 0.9  + ent * 0.1
         pred_proba = softmax(pred)
         pred_proba_letters = pred_proba[:, letters]
         pred_proba_digits = pred_proba[:, digits]
@@ -307,15 +310,18 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder, nb_s
             stats['count_letters_{}'.format(s)] = float(selected_letters.mean())
             # letters with diversity term
             ent = entropy(probas_from_occurences(pred_proba_letters[selected_letters].argmax(axis=1))) / np.log(pred_proba_letters.shape[1])
-            alpha = 1
-            stats['diversity_count_letters_{}'.format(s)] = (selected_letters.mean() + alpha * ent) / (1 + alpha)
+            stats['diversity_count_letters_{}'.format(s)] = 0.5 * selected_letters.mean() + 0.5 * ent
+            stats['diversity_count_letters_alpha8_{}'.format(s)] = 0.8 * selected_letters.mean() + 0.2 * ent
+            stats['diversity_count_letters_alpha9_{}'.format(s)] = 0.9 * selected_letters.mean() + 0.1 * ent
+            print('count_letters', selected_letters.mean(), ent)
             # digits
             selected_digits = (pred_proba_digits.max(axis=1) > theta)
             stats['count_digits_{}'.format(s)] = float(selected_digits.mean())
             # digits with diversity
             ent = entropy(probas_from_occurences(pred_proba_digits[selected_digits].argmax(axis=1))) / np.log(pred_proba_digits.shape[1])
-            alpha = 1
-            stats['diversity_count_digits_{}'.format(s)] = (selected_digits.mean() + alpha * ent) / (1 + alpha)
+            stats['diversity_count_digits_{}'.format(s)] = 0.5 * selected_digits.mean() + 0.5 * ent
+            stats['diversity_count_digits_alpha8_{}'.format(s)] = 0.8 * selected_digits.mean() + 0.2 * ent
+            stats['diversity_count_digits_alpha9_{}'.format(s)] = 0.9 * selected_digits.mean() + 0.1 * ent
 
     return stats
 

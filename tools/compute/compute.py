@@ -42,13 +42,12 @@ def gallery(model, where, folder, nbpages, limit, show_freqs, force):
 @click.option('--stats', help='stats to compute (otherwise will compute everything) separeted by commas', required=False, default=None)
 @click.option('--force/--no-force', help='force', required=False, default=False)
 @click.option('--type', default='generation', help='type', required=False)
-@click.option('--ids', default='idd', help='type', required=False)
+@click.option('--ids', default='', help='type', required=False)
 def stats(model, where, n_jobs, stats, force, type, ids):
     if where == '':
         where = None
-
     db = load_db()
-    if ids is not None:
+    if ids:
         summaries = ids.split(',')
         jobs = [db.get_job_by_summary(s) for s in summaries]
     else:
