@@ -183,7 +183,6 @@ def compute_stats(job, force=False, filter_stats=None):
         logger.info('compute feature space eval')
         stats['feature_space_eval'] = compute_feature_space_eval(folder)
 
-    ""
     if should_compute('parzen_digits', stats):
         logger.info('compute parzen digits')
         stats['parzen_digits'] = compute_parzen_digits(folder)

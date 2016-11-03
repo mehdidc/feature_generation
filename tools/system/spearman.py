@@ -25,17 +25,22 @@ digitness = [
 metrics = map(lambda m:'stats.out_of_the_box_classification.letterness.'+m, letterness)
 metrics += map(lambda m:'stats.out_of_the_box_classification.letterness.'+m, digitness)
 metrics += ['stats.out_of_the_box_classification.fonts.objectness']
-metrics = metrics + ['stats.parzen_digits.mean']#, 'stats.parzen_letters.mean']
+metrics = metrics + ['stats.parzen_digits.mean', 'stats.parzen_letters.mean']
 ordering = {}
+summaries = {}
 for m in metrics:
     indices = np.arange(len(jobs_gen))
     scores = map(lambda j:db.get_value(j, m, if_not_found=np.nan), jobs_gen)
     scores = np.array(scores)
     indices = filter(lambda ind:not np.isnan(scores[ind]), indices)
-    print(len(indices))
+    print(m, len(indices))
+    summaries[m] = set(jobs_gen[ind]['summary'] for ind in indices)
     indices = sorted(indices, key=lambda i:scores[i])
     indices = indices[::-1]
     ordering[m] = indices
+#for s in summaries['stats.parzen_digits.mean'] - summaries['stats.out_of_the_box_classification.letterness.max_letters']:
+#    print(s)
+
 rows = []
 for m1, m2 in combinations(metrics, r=2):
     o1, o2 = ordering[m1], ordering[m2]
