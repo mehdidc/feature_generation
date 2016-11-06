@@ -21,14 +21,13 @@ def run(nb, where, type, sequential):
         jobs = db.jobs_with(state=AVAILABLE, **extra)
     elif type == 'generation':
         jobs = db.jobs_with(state=SUCCESS, **extra)
-        jobs = to_generation(jobs, state=SUCCESS, db=db)
+        jobs = to_generation(jobs, state=AVAILABLE, db=db)
         jobs = filter(lambda j:j, jobs)
         jobs = jobs[0:nb]
     print("Number of jobs to run : {}".format(len(jobs)))
     if sequential:
         for j in jobs:
             db.modify_state_of(j['summary'], PENDING)
-
     for j in jobs:
         cmd = j["cmd"]
         print(cmd)

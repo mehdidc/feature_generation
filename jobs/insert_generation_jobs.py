@@ -55,7 +55,7 @@ def jobset_fast_without_binarization(jobs):
 
 @click.command()
 @click.option('--where', default='', help='jobset name', required=False)
-@click.option('--jobset', default='jobset_standard', help='t', required=False)
+@click.option('--jobset', default='jobset_fast', help='t', required=False)
 @click.option('--budget', default=180, help='budget in min', required=False)
 def insert(where, jobset, budget):
     from lightjob.db import DB, SUCCESS

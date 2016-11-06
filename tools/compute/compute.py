@@ -7,6 +7,7 @@ from genstats import genstats
 if os.getenv("DISPLAY") is None:  # NOQA
     mpl.use('Agg')  # NOQA
 
+import pandas as pd
 import click
 from lightjob.cli import load_db
 from lightjob.db import SUCCESS
@@ -43,7 +44,8 @@ def gallery(model, where, folder, nbpages, limit, show_freqs, force):
 @click.option('--force/--no-force', help='force', required=False, default=False)
 @click.option('--type', default='generation', help='type', required=False)
 @click.option('--ids', default='', help='type', required=False)
-def stats(model, where, n_jobs, stats, force, type, ids):
+@click.option('--date', default='', help='type', required=False)
+def stats(model, where, n_jobs, stats, force, type, ids, date):
     if where == '':
         where = None
     db = load_db()
@@ -51,13 +53,15 @@ def stats(model, where, n_jobs, stats, force, type, ids):
         summaries = ids.split(',')
         jobs = [db.get_job_by_summary(s) for s in summaries]
     else:
-        jobs = load_jobs(model, where, type_=type)
+        jobs = load_jobs(model, where, type_=type, date=date)
     if stats is not None:
         stats = stats.split(',')
     genstats(jobs, db, n_jobs=n_jobs, force=force, filter_stats=stats)
 
 
-def load_jobs(model_name, where, type_="generation"):
+def load_jobs(model_name, where, type_="generation", date=None):
+    from dateutil import parser
+
     db = load_db()
     jobs = []
     if type_ == 'generation':
@@ -73,9 +77,11 @@ def load_jobs(model_name, where, type_="generation"):
             j['ref_job'] = dict(ref_job)
             if where and ref_job['where'] != where:
                 continue
-        
         if model_name and model_details['model_name'] != model_name:
             continue
+        if date and parser.parse(j['life'][-1]['dt']) < parser.parse(date):
+            continue
+        print(j['life'][-1])
         jobs.append(j)
     return jobs
 
