@@ -3,6 +3,7 @@ import json
 
 import click
 
+from lightjob.utils import summarize
 
 def jobset_standard(jobs):
     for j in jobs:
@@ -37,12 +38,26 @@ def jobset_fast(jobs):
         }
         yield j, 'iterative_refinement', params
 
+def jobset_fast_without_binarization(jobs):
+    # for iclr
+    for j in jobs:
+        params = {
+            "batch_size": 256,
+            "nb_samples": 1000,
+            "nb_iter": 100,
+            "do_sample": False,
+            "do_binarize": False,
+            "do_gaussian_noise": False,
+            "do_noise": False,
+            "thresh": "moving"
+        }
+        yield j, 'iterative_refinement', params
+
 @click.command()
 @click.option('--where', default='', help='jobset name', required=False)
 @click.option('--jobset', default='jobset_standard', help='t', required=False)
-@click.option('--nb', default=None, help='nb of repetitions', required=False)
 @click.option('--budget', default=180, help='budget in min', required=False)
-def insert(where, jobset, nb, budget):
+def insert(where, jobset, budget):
     from lightjob.db import DB, SUCCESS
     from lightjob.cli import load_db
     from lightjob.utils import summarize
@@ -51,9 +66,6 @@ def insert(where, jobset, nb, budget):
     if where:
         kw['where'] = where
     jobs = db.jobs_with(state=SUCCESS, type="training", **kw)
-    if nb:
-        nb = int(nb)
-        jobs = jobs[0:nb]
     fn = globals()[jobset]
     job_params = fn(jobs)
     print("Number of jobs : {}".format(len(jobs)))
@@ -83,10 +95,11 @@ def insert(where, jobset, nb, budget):
             folder="jobs/results/{}".format(s)
         )
         folder = 'jobs/generations/{}'.format(s)
+        if db.job_exists_by_summary(summarize(d)):
+            continue
         print(cmd)
         print(params)
         nb_insert += db.safe_add_job(d, cmd=cmd, budget=budget, type="generation", where=jobset)
-
     print("Total number of jobs added : {}".format(nb_insert))
 
 if __name__ == "__main__":

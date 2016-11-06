@@ -258,11 +258,11 @@ def fast_find_generation_job(training_job_summary, db=None,cache={}):
         train_to_gen = cache['train_to_gen']
     return train_to_gen[training_job_summary]
 
-def to_generation(jobs, db=None):
+def to_generation(jobs, state=SUCCESS, db=None):
     if not db: db = load_db()
     training_jobs = jobs
     S = set(j['summary'] for j in jobs)
-    jobs = db.jobs_with(state=SUCCESS, type='generation')
+    jobs = db.jobs_with(state=state, type='generation')
     to_generation = {j['content']['model_summary']: j for j in jobs if j['content']['model_summary'] in S}
     jobs = map(lambda j:to_generation.get(j['summary']), training_jobs)
     return jobs

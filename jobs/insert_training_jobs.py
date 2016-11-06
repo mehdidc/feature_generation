@@ -3377,7 +3377,7 @@ def jobset82():
 
 def jobset83():
     rng = np.random
-    candidates = [jobset79(), jobset80(), jobset81(), jobset82()]
+    candidates = [jobset79(), jobset80(), jobset82()]
     return rng.choice(candidates)
    
 def jobset84():

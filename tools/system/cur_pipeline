@@ -5,8 +5,9 @@ if [[ $# -eq 0 ]] ; then
 fi
 TARGET='g#stats.out_of_the_box_classification.fonts.objectness'
 #python jobs/insert_training_jobs.py --where=$JOB --nb=20 --optimize --target=$TARGET --maximize --algo=ucb --nb-samples=10
+#python jobs/insert_training_jobs.py --where=$JOB --nb=20
 #python jobs/run_jobs.py --where=$JOB --nb=20
-#python jobs/insert_generation_jobs.py --where=$JOB --jobset=jobset_fast
-python jobs/run_jobs.py --type=generation --ref_where=$JOB --nb=20
-#python tools/compute/compute.py stats --where=$JOB --type=generation --stats=out_of_the_box_classification,parzen_digits,parzen_letters
-#python tools/viz/generated.py --where=$JOB
+python jobs/insert_generation_jobs.py --where=$JOB --jobset=jobset_fast
+#python jobs/run_jobs.py --type=generation --ref_where=$JOB --nb=20
+python tools/compute/compute.py stats --where=$JOB --type=generation --stats=out_of_the_box_classification,parzen_digits,parzen_letters
+#npython tools/viz/generated.py --where=$JOB
