@@ -81,7 +81,6 @@ def load_jobs(model_name, where, type_="generation", date=None):
             continue
         if date and parser.parse(j['life'][-1]['dt']) < parser.parse(date):
             continue
-        print(j['life'][-1])
         jobs.append(j)
     return jobs
 

@@ -14,8 +14,10 @@ db_aa = load_db()
 jobs = db_aa.jobs_with(state='success', where='jobset83')
 jobs_aa = to_generation(jobs)
 jobs_gan = db_gan.jobs_with(state='success')
-jobs_gen = jobs_aa + jobs_gan
+jobs_gen = jobs_aa #+ jobs_gan
+
 db = db_aa
+
 letterness = [
 'diversity_count_letters_99',
 'diversity_max_letters',
@@ -33,17 +35,9 @@ metrics = metrics + ['stats.out_of_the_box_classification.m2.objectness']
 for m in metrics:
     print(m)
 ordering = {}
-summaries = {}
 
 def m1_rename(x):
-    x = x.replace('stats.', '')
-    x = x.replace('.mean', '')
-    x = x.replace('out_of_the_box_classification', '')
-    x = x.replace('.letterness.', '')
-    x = x.replace('.fonts', 'letters')
-    x = x.replace('diversity_', '')
-    x = x.replace('_99', '')
-    x = x.replace('.m2', 'digits')
+    x = rename(x)
     return x
 
 def m2_rename(x):
@@ -51,14 +45,16 @@ def m2_rename(x):
     return x
 
 nick = {
-    'stats.out_of_the_box_classification.letterness.diversity_count_letters_99': 'lett_cnt',
-    'stats.out_of_the_box_classification.letterness.diversity_max_letters': 'lett_max',
-    'stats.out_of_the_box_classification.letterness.diversity_count_digits_99': 'dig_cnt',
-    'stats.out_of_the_box_classification.letterness.diversity_max_digits': 'dig_max',
-    'stats.out_of_the_box_classification.fonts.objectness': 'lett_obj',
-    'stats.parzen_digits.mean': 'dig_parz',
-    'stats.parzen_letters.mean': 'lett_parz',
-    'stats.out_of_the_box_classification.m2.objectness': 'dig_obj'
+    'stats.out_of_the_box_classification.letterness.diversity_count_letters_99': 'out_count',
+    'stats.out_of_the_box_classification.letterness.diversity_count_letters_95': 'out_count',
+    'stats.out_of_the_box_classification.letterness.diversity_max_letters': 'out_max',
+    'stats.out_of_the_box_classification.letterness.diversity_count_digits_99': 'in_count',
+    'stats.out_of_the_box_classification.letterness.diversity_count_digits_95': 'in_count',
+    'stats.out_of_the_box_classification.letterness.diversity_max_digits': 'in_max',
+    'stats.out_of_the_box_classification.fonts.objectness': 'out_obj',
+    'stats.parzen_digits.mean': 'in_parz',
+    'stats.parzen_letters.mean': 'out_parz',
+    'stats.out_of_the_box_classification.m2.objectness': 'in_obj'
 }
 
 def rename(m):
@@ -67,30 +63,31 @@ def rename(m):
 m1_cols = []
 m2_cols = []
 all_indices = set()
+all_summaries = None
 for m in metrics:
     indices = np.arange(len(jobs_gen))
     scores = map(lambda j:db.get_value(j, m, if_not_found=np.nan), jobs_gen)
     scores = np.array(scores)
     indices = filter(lambda ind:not np.isnan(scores[ind]), indices)
+    summaries = set([jobs_gen[ind]['summary'] for ind in indices])
+    if all_summaries is not None:
+        assert summaries == all_summaries
+    else:
+        all_summaries = summaries
 
-    summaries[m] = set(jobs_gen[ind]['summary'] for ind in indices)
     indices = sorted(indices, key=lambda i:scores[i])
     indices = indices[::-1]
     for ind in indices[0:100]:
         all_indices.add(ind)
-    print(m, len(indices))
-
 for m in metrics:
     indices = np.arange(len(jobs_gen))
     scores = map(lambda j:db.get_value(j, m, if_not_found=np.nan), jobs_gen)
     scores = np.array(scores)
     indices = filter(lambda ind:not np.isnan(scores[ind]), indices)
 
-    summaries[m] = set(jobs_gen[ind]['summary'] for ind in indices)
     indices = sorted(indices, key=lambda i:scores[i])
     indices = indices[::-1]
     o = [ind for ind in indices if ind in all_indices]
-    #o = indices
     r1 = m1_rename(m)
     r2 = m2_rename(m)
     
@@ -100,10 +97,8 @@ for m in metrics:
     m1_cols.append(r1)
     m2_cols.append(r2)
 
-#print(m1_cols)
-#print(m2_cols)
-m1_cols = ['count_letters', 'max_letters', 'letters.objectness', 'parzen_letters', 'count_digits',  'max_digits',  'digits.objectness', 'parzen_digits', ]
-m2_cols = ['lett_cnt', 'lett_max', 'lett_obj', 'lett_parz', 'dig_cnt', 'dig_max', 'dig_obj', 'dig_parz']
+m1_cols = ['out_count', 'out_max', 'out_obj', 'out_parz', 'in_count', 'in_max', 'in_obj', 'in_parz']
+m2_cols = ['out_count', 'out_max', 'out_obj', 'out_parz', 'in_count', 'in_max', 'in_obj', 'in_parz']
 table = [['' for _ in range(len(metrics))] for _ in range(len(metrics))]
 rhos = {}
 for m1 in m1_cols:

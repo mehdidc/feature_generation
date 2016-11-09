@@ -10,7 +10,7 @@ from tools.common import to_generation
 @click.command()
 @click.option('--nb', default=1, required=False)
 @click.option('--where', default=None, required=False)
-@click.option('--type', default=None, required=False)
+@click.option('--type', default='training', required=False)
 @click.option('--sequential/--parallel', default=False, required=False)
 def run(nb, where, type, sequential):
     db = load_db()
@@ -19,6 +19,7 @@ def run(nb, where, type, sequential):
         extra["where"] = where
     if type == 'training':
         jobs = db.jobs_with(state=AVAILABLE, **extra)
+        jobs = jobs[0:nb]
     elif type == 'generation':
         jobs = db.jobs_with(state=SUCCESS, **extra)
         jobs = to_generation(jobs, state=AVAILABLE, db=db)

@@ -3556,7 +3556,10 @@ def _sample_general_training_details(rng):
     }
 
 def _sample_contraction(rng):
-    return {'contractive': True, 'contractive_coef': rng.choice(np.linspace(0, 100, 300))}
+    if rng.uniform() <= 0.5:
+        return {'contractive': True, 'contractive_coef': rng.choice(np.linspace(0, 100, 300))}
+    else:
+        return {'contractive_coef': False, 'contractive_coef': None}
 
 def _sample_intermediate_activation(rng):
     return rng.choice(('relu', 'leaky_relu'))
