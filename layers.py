@@ -529,6 +529,18 @@ class AddParams(layers.Layer):
         params = [p for l in self.layers for p in layers.get_all_params(l, **tags)]
         return params
 
+class AddSharedParams(layers.Layer):
+
+    def __init__(self, incoming, params, **kwargs):
+        super(AddSharedParams, self).__init__(incoming, **kwargs)
+        self.params = params
+
+    def get_output_for(self, input, **kwargs):
+            return input
+
+    def get_params(self, **tags):
+        return self.params
+
 def inv_conv_output_length(input_length, filter_size, stride, pad=0):
     if input_length is None:
         return None

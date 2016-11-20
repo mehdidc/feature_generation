@@ -320,7 +320,12 @@ def build_capsule_(layers, data, nbl, nbc,
             if not hasattr(layers[layer_name], "W"):
                 continue
             try:
-                W = layers[layer_name].W.get_value().copy()
+                W = layers[layer_name].W
+                if hasattr(W, 'get_value'):
+                    W = W.get_value()
+                else:
+                    W = theano.function([], layers[layer_name].W)()
+                print(W.shape, type(W))
             except Exception as e:
                 print(str(e))
                 continue

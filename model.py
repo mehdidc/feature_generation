@@ -3,7 +3,7 @@ from lasagne.nonlinearities import (
         linear, sigmoid, rectify, very_leaky_rectify, softmax, tanh)
 from layers import Deconv2DLayer, ResizeConvLayer
 from helpers import FeedbackGRULayer, TensorDenseLayer
-from layers import FeedbackGRULayerClean, AddParams
+from layers import FeedbackGRULayerClean, AddParams, AddSharedParams
 from layers import Deconv2DLayer_v2 as deconv2d
 from helpers import correct_over_op, over_op, sum_op, max_op, thresh_op, normalized_over_op, mask_op, mask_smooth_op, sub_op, normalized_sum_op
 from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse, norm_maxmin, max_k_spatial
@@ -8097,6 +8097,130 @@ def model106(w=32, h=32, c=1,
         l_unconvs.append(l_unconv)
     all_layers = [l_in] + l_convs + l_unconvs
     return layers_from_list_to_dict(all_layers)
+
+def model107(nb_filters=64,  w=32, h=32, c=1,
+            use_wta_channel=True,
+            use_wta_spatial=True,
+            wta_channel_stride=2,
+            nb_layers=[3],
+            filter_size=5):
+    """
+    model55 with multiple scales
+    """
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_convs = []
+    l_unconvs = []
+    l_unconvs_norm = []
+    j = 0
+    for j in range(len(nb_layers)):
+        nb_lay = nb_layers[j]
+        l_conv = l_in
+        for i in range(nb_lay):
+            l_conv = layers.Conv2DLayer(
+                    l_conv,
+                    num_filters=nb_filters,
+                    filter_size=(filter_size, filter_size),
+                    nonlinearity=rectify,
+                    W=init.GlorotUniform(),
+                    name="conv{}_{}".format(j + 1, i + 1))
+            l_convs.append(l_conv)
+        if use_wta_spatial is True:
+            l_wta1 = layers.NonlinearityLayer(l_conv, wta_spatial, name="wta_spatial")
+        else:
+            l_wta1 = l_conv
+        if use_wta_channel is True:
+            l_wta2 = layers.NonlinearityLayer(l_wta1, wta_channel_strided(stride=wta_channel_stride), name="wta_channel")
+        else:
+            l_wta2 = l_wta1
+        w_out = l_conv.output_shape[2]
+        w_remaining = w - w_out + 1
+        print(w_remaining)
+        l_unconv = layers.Conv2DLayer(
+                l_wta2,
+                num_filters=c,
+                filter_size=(w_remaining, w_remaining),
+                nonlinearity=sigmoid,
+                W=init.GlorotUniform(),
+                pad='full',
+                name='unconv{}'.format(j + 1))
+        l_unconvs.append(l_unconv)
+        l_unconvs_norm.append(ScaleAndShiftLayer(l_unconv))
+    l_unconv = layers.ElemwiseSumLayer(l_unconvs_norm, name='merge')
+    l_out = layers.NonlinearityLayer(
+        l_unconv,
+        sigmoid, name="output")
+    return layers_from_list_to_dict([l_in] + l_convs + l_unconvs + [l_out])
+
+def model108(nb_filters=64,  w=32, h=32, c=1,
+             use_wta_channel=True,
+             use_wta_spatial=True,
+             wta_channel_stride=2,
+             nb_layers=[3],
+             filter_size=5):
+    """
+    model55 with multiple scales
+    """
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    l_convs = []
+    l_unconvs = []
+    l_unconvs_norm = []
+    j = 0
+    for j in range(len(nb_layers)):
+        nb_lay = nb_layers[j]
+        l_conv = l_in
+        for i in range(nb_lay):
+            l_conv = layers.Conv2DLayer(
+                    l_conv,
+                    num_filters=nb_filters,
+                    filter_size=(filter_size, filter_size),
+                    nonlinearity=rectify,
+                    name="conv{}_{}".format(j + 1, i + 1))
+            l_convs.append(l_conv)
+        if use_wta_spatial is True:
+            l_wta1 = layers.NonlinearityLayer(l_conv, wta_spatial, name="wta_spatial")
+        else:
+            l_wta1 = l_conv
+        if use_wta_channel is True:
+            l_wta2 = layers.NonlinearityLayer(l_wta1, wta_channel_strided(stride=wta_channel_stride), name="wta_channel")
+        else:
+            l_wta2 = l_wta1
+        w_out = l_conv.output_shape[2]
+        w_remaining = w - w_out + 1
+        if j==0:
+            W=init.GlorotUniform()
+            prev_W_shape = (c, nb_filters, filter_size, filter_size)
+        else:
+            prev_W = l_unconvs[-1].W # (1, 128, 5, 5)
+            W_shape = (prev_W_shape[1], prev_W_shape[1], w_remaining - prev_W_shape[2] + 1, w_remaining - prev_W_shape[3] + 1) # (128, 128, 10, 10)
+            print(prev_W_shape, W_shape)
+            W = theano.shared((np.random.uniform(size=W_shape)).astype(np.float32))
+            l_wta2 = AddSharedParams(l_wta2, [W])
+            W = T.nnet.conv2d(
+                prev_W, 
+                W,
+                prev_W_shape,
+                W_shape,
+                subsample=(1, 1),
+                border_mode='full')
+            W = rectify(W)
+            prev_W_shape = theano.function([], W)().shape
+            print(prev_W_shape)
+        l_unconv = layers.Conv2DLayer(
+                l_wta2,
+                num_filters=c,
+                filter_size=(w_remaining, w_remaining),
+                nonlinearity=linear,
+                W=W,
+                pad='full',
+                name='unconv{}'.format(j + 1))
+        l_unconvs.append(l_unconv)
+        l_unconvs_norm.append(ScaleAndShiftLayer(l_unconv))
+    l_unconv = layers.ElemwiseSumLayer(l_unconvs_norm, name='merge')
+    l_out = layers.NonlinearityLayer(
+        l_unconv,
+        sigmoid, name="output")
+    return layers_from_list_to_dict([l_in] + l_convs + l_unconvs + [l_out])
+
 
 build_convnet_simple = model1
 build_convnet_simple_2 = model2

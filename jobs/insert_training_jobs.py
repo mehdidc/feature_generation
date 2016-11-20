@@ -3394,6 +3394,36 @@ def jobset84():
     params['budget_hours'] = 4
     return params
 
+def jobset85():
+    # nb layers hypothesis
+    rng = random
+    params = _sample_convsparse(rng)
+    conv_fiters = rng.choice((16, 32, 64, 128, 256))
+    nb_layers = rng.choice((1, 2, 3, 4, 5, 6,))
+    use_wta_spatial = rng.choice((True, False))
+    use_wta_channel = rng.choice((True, False)) if use_wta_spatial else True
+    nb_filters_mul = 1
+    wta_channel_stride = 1
+    params = {
+        'model_params': {
+            'nb_filters': conv_fiters,
+            'nb_layers': nb_layers,
+            'filter_size': 5,
+            'use_wta_spatial': use_wta_spatial,
+            'use_wta_channel': use_wta_channel,
+            'nb_filters_mul': nb_filters_mul,
+            'wta_channel_stride': wta_channel_stride
+        },
+    }
+    params.update(_sample_general_training_details(rng))
+    params['model_name'] = 'model55'
+    return params
+
+
+    params['dataset'] = 'digits'
+    params['budget_hours'] = 6
+    return params
+
 
 def _sample_vertebrate(rng):
     # quasi-copy of jobset75
