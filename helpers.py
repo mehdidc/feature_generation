@@ -89,10 +89,18 @@ def wta_fc_lifetime(percent):
 
 def wta_fc_sparse(percent):
     def apply_(X):
-        idx = ((1 - percent) * X.shape[0] - 1)
+        idx = ((1 - percent) * X.shape[0] - 1)############# SHIT!
         mask = T.argsort(X, axis=1) >= idx  # (B, F)
         return X * mask
     return apply_
+
+def wta_fc_sparse_correct(percent):
+    def apply_(X):
+        idx = ((1 - percent) * X.shape[1] - 1)
+        mask = T.argsort(X, axis=1) >= idx  # (B, F)
+        return X * mask
+    return apply_
+
 
 def wta_channel(X):
     mask = equals_(X, T.max(X, axis=1, keepdims=True)) * 1

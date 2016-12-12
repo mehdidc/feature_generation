@@ -32,9 +32,9 @@ logger.setLevel(logging.INFO)
 mem = joblib.Memory('.cache')
 
 def genstats(jobs, db, force=False, n_jobs=-1, filter_stats=None):
-    #stats = Parallel(n_jobs=n_jobs)(delayed(compute_stats)(dict(j), force=force, filter_stats=filter_stats)
-    #                                for j in jobs)
-    stats = [compute_stats(dict(j), force=force, filter_stats=filter_stats) for j in jobs]
+    stats = Parallel(n_jobs=n_jobs)(delayed(compute_stats)(dict(j), force=force, filter_stats=filter_stats)
+                                    for j in jobs)
+    #stats = [compute_stats(dict(j), force=force, filter_stats=filter_stats) for j in jobs]
     for j, s in zip(jobs, stats):
         update_stats(j, s, db)
 
@@ -292,11 +292,13 @@ def compute_out_of_the_box_classification(folder, model_name, model_folder, nb_s
         stats['sample_objectness_letters'] = float(compute_sample_objectness(softmax(pred[:, letters])).mean())
         stats['max_letters'] = float(softmax(pred)[:, letters].max(axis=1).mean())
         ent = entropy(probas_from_occurences(softmax(pred)[:, letters].argmax(axis=1))) / np.log(len(letters))
+        stats['diversity_letters'] = ent
         stats['diversity_max_letters'] = 0.5 * stats['max_letters'] + 0.5 * ent
         stats['diversity_max_letters_alpha8'] = 0.8 * stats['max_letters'] + 0.2 * ent
         stats['diversity_max_letters_alpha9'] = 0.9 * stats['max_letters'] + 0.1 * ent
         stats['max_digits'] = float(softmax(pred)[:, digits].max(axis=1).mean())
         ent = entropy(probas_from_occurences(softmax(pred)[:, digits].argmax(axis=1))) / np.log(len(digits))
+        stats['diversity_digits'] = ent
         stats['diversity_max_digits'] = stats['max_digits'] * 0.5  + ent * 0.5
         stats['diversity_max_digits_alpha8'] = stats['max_digits'] * 0.8  + ent * 0.2
         stats['diversity_max_digits_alpha9'] = stats['max_digits'] * 0.9  + ent * 0.1

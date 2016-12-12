@@ -14,7 +14,7 @@ db_aa = load_db()
 jobs = db_aa.jobs_with(state='success', where='jobset83')
 jobs_aa = to_generation(jobs)
 jobs_gan = db_gan.jobs_with(state='success')
-jobs_gen = jobs_aa #+ jobs_gan
+jobs_gen = jobs_aa + jobs_gan
 
 db = db_aa
 
@@ -69,7 +69,9 @@ for m in metrics:
     scores = map(lambda j:db.get_value(j, m, if_not_found=np.nan), jobs_gen)
     scores = np.array(scores)
     indices = filter(lambda ind:not np.isnan(scores[ind]), indices)
+    
     summaries = set([jobs_gen[ind]['summary'] for ind in indices])
+
     if all_summaries is not None:
         assert summaries == all_summaries
     else:
@@ -77,6 +79,11 @@ for m in metrics:
 
     indices = sorted(indices, key=lambda i:scores[i])
     indices = indices[::-1]
+    if 'parzen' in m:
+        std = map(lambda j:db.get_value(j, m.replace('mean', 'std'), if_not_found=np.nan), jobs_gen)
+        std = np.array(std)
+        pd.DataFrame({'id': [jobs_gen[ind]['summary'] for ind in indices], 'mean': scores[indices], 'std': std[indices]}).to_csv('exported_data/'+rename(m)+'.csv', index=False)
+
     for ind in indices[0:100]:
         all_indices.add(ind)
 for m in metrics:
