@@ -1,0 +1,20 @@
+{
+    "model_name": "model107",
+    "model_params": {
+        "nb_filters": 64, 
+        "use_channel": true,
+        "use_spatial": true,
+        "channel_stride": 1,
+        "merge_op": "sum"
+    },
+    "dataset": "digits",
+    "data_params": {
+    },
+    "mode": "random",
+    "budget_hours": 24,
+    "optimization": {
+        "algo": "adadelta",
+        "initial_lr": 0.1
+    },
+    "report_rec_error": false
+}

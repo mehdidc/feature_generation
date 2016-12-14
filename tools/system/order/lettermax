@@ -1,0 +1,3 @@
+#!/bin/sh
+F="g#stats.out_of_the_box_classification.letterness.diversity_max_letters"
+lightjob show --fields="summary,where,content.model_name,g#summary,$F" --sort=$F --state=success --type=training --details --descending
