@@ -426,7 +426,7 @@ def iterative_refinement(capsule, data, layers, w, h, c, folder, **params):
         ####
         if do_sample:
             s = np.random.binomial(n=1, p=s, size=s.shape).astype('float32')
-        if do_binarize:
+        if do_binarize and i < nb_iter:
             if thresh == 'moving':
                 vals = s.flatten()
                 vals = vals[np.argsort(vals)]
