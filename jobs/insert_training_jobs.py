@@ -3417,9 +3417,6 @@ def jobset85():
     }
     params.update(_sample_general_training_details(rng))
     params['model_name'] = 'model55'
-    return params
-
-
     params['dataset'] = 'digits'
     params['budget_hours'] = 6
     return params

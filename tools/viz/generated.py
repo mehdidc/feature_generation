@@ -55,7 +55,6 @@ def generate(where, per_jobset):
     J = db.jobs_with(state='success', type='generation')
     if where:
         ref_jobs = set(map(lambda j:j['summary'], db.jobs_with(where=where)))
-        print(ref_jobs)
         J = filter(lambda j:j['content']['model_summary'] in ref_jobs, J)
     print('Nb of jobs : {}'.format(len(J)))
     Parallel(n_jobs=-1, verbose=1)(delayed(generate_one)(j, per_jobset=per_jobset) for j in J)

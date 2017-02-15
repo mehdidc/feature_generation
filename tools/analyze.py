@@ -508,6 +508,7 @@ def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
 
     logger.info("Compiling functions...")
     x = T.tensor4()
+    print(layers)
     px_to_code = theano.function(
         [x],
         L.get_output(layers[layer_name], x)
@@ -518,9 +519,10 @@ def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
 
     initial = params.get("initial", "dataset")
     initial_size = params.get("initial_size", 1)
-
+    
     if initial == "dataset":
         px_batch = []
+        data.load()
         for i in range(initial_size / data.X.shape[0] + data.X.shape[0]):
             data.load()
             shape = (data.X.shape[0], c, w, h)
@@ -592,6 +594,8 @@ def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
         x = x.astype(np.float32)
         return x
 
+    code = minibatcher(px, px_to_code, size=batch_size)
+    reconstruct = params.get('reconstruct', True)
     for i in range(nb_iterations + 1):
         t = time.time()
         logger.info("Iteration {}".format(i))
@@ -616,7 +620,10 @@ def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
         if layer_name == 'input':
             code = px
         else:
-            code = minibatcher(px, px_to_code, size=batch_size)
+            if reconstruct is True:
+                code = minibatcher(px, px_to_code, size=batch_size)
+            else:
+                pass
 
         if flatten:
             shape = code.shape[1:]
@@ -635,7 +642,8 @@ def simple_genetic(capsule, data, layers, w, h, c, folder, **params):
         if up_binarize:
             new_px = do_up_binarize(new_px)
         px = new_px
-
+        if reconstruct is False:
+            code = new_code
         print('duration : '.format(time.time() - t))
 
     # save the resuling images
@@ -1388,10 +1396,10 @@ def new_mutation(A, p=0.1, nbtimes=1, inplace=True, nb=None):
                         else:
                             pass
                     else: #off
-                        if np.random.uniform() <= (1 - p):  #with proba 1 - p turn it on
+                        if np.random.uniform() <= p:  #with proba 1 - p turn it on
                             x, y = np.random.randint(0, fmap.shape[0]), np.random.randint(0, fmap.shape[1])
                             v = vals[ind].flatten()
-                            fmap[x, y] = np.random.choice(v[v>0])
+                            fmap[x, y] = max(v)#np.random.choice(v[v>0])
                         else:
                             pass
                 elif len(a.shape) == 1:
@@ -1401,7 +1409,7 @@ def new_mutation(A, p=0.1, nbtimes=1, inplace=True, nb=None):
                         else:
                             pass
                     else:
-                        if np.random.uniform() <= 1 - p: #with proba (1 - p) turn it on
+                        if np.random.uniform() <= p: #with proba (1 - p) turn it on
                             a[indf] = np.random.choice(vals[ind])
                         else:
                             pass
