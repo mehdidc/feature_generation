@@ -8,9 +8,15 @@ from hp_toolkit.helpers import flatten_dict
 sys.path.append('.')
 from tools.common import to_generation
 
+def dict_concat(d1, d2):
+    d = dict()
+    d.update(d1)
+    d.update(d2)
+    return d
+
 def get_hypers(jobs):
     J = jobs
-    jobs = [j['content'] for j in jobs]
+    jobs = [dict_concat(j['content'], {'id': j['summary']}) for j in jobs]
     jobs = map(flatten_dict, jobs)
     cols = set([c for j in jobs for c in j.keys()])
     scores = {
