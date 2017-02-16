@@ -3421,6 +3421,34 @@ def jobset85():
     params['budget_hours'] = 6
     return params
 
+def jobset86():
+    # balazs anaylsis on sparse fc
+    rng = random
+    params = {}
+    params = {
+        'SEED': rng.randint(3, 23),
+        'model_params': {
+            'use_wta_sparse': True,
+            'wta_sparse_perc': 0.5,
+            'nb_hidden_units': [200, 200, 200, 300, 1000, 1000],
+            'nb_layers': 6
+        }
+    }
+    params.update({
+        'denoise': None,
+        'noise': None,
+        'walkback_mode': 'bengio_without_sampling',
+        'walkback': 1,
+        'autoencoding_loss': 'squared_error',
+        'binarize_thresh': None,
+        'marginalized': False,
+        'contractive': False,
+        'contractive_coef': None
+    })
+    params['model_name'] = 'model64'
+    params['dataset'] = 'digits'
+    params['budget_hours'] = 2
+    return params
 
 def _sample_vertebrate(rng):
     # quasi-copy of jobset75

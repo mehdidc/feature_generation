@@ -93,7 +93,7 @@ def train(dataset=None,
         h = params.get('force_h', None)
     else:
         h = int(force_h)
-    state = 2
+    state = params.get('SEED', 2)
     np.random.seed(state)
     if prefix is None:
         prefix = params.get('prefix', '')
