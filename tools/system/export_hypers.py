@@ -16,7 +16,7 @@ def dict_concat(d1, d2):
 
 def get_hypers(jobs):
     J = jobs
-    jobs = [dict_concat(j['content'], {'id': j['summary']}) for j in jobs]
+    jobs = [dict_concat(j['content'], {'id': j['summary'], 'jobset': j['where']}) for j in jobs]
     jobs = map(flatten_dict, jobs)
     cols = set([c for j in jobs for c in j.keys()])
     scores = {
@@ -30,8 +30,6 @@ def get_hypers(jobs):
     inputs = pd.DataFrame(jobs)
     for name, field in scores.items():
         inputs[name] = [dict_format(j, field, if_not_found=np.nan) for j in J]
-        #print(np.isnan(inputs[name]).sum())
-    #inputs = pd.get_dummies(inputs, columns=cols, dummy_na=True)
     return inputs
 
 if __name__ == '__main__':
@@ -39,15 +37,18 @@ if __name__ == '__main__':
     #jobs = db.jobs_with(where='jobset83', state=SUCCESS)
     db_gan = load_db('/home/mcherti/dcgan/.lightjob')
     db_aa = load_db()
-    jobs = db_aa.jobs_with(state='success', where='jobset83')
+    jobs = list(db_aa.jobs_with(state='success', where='jobset83'))
+    jobs += list(db_aa.jobs_with(state='success', where='jobset86'))
     jobs_aa = to_generation(jobs)
     for j, j_gen in zip(jobs, jobs_aa):
         if j_gen and j:
             j_gen['content'] = j['content']
+            j_gen['where'] = j['where']
     jobs_aa = list(filter(lambda j:j is not None, jobs_aa))
     jobs_gan = db_gan.jobs_with(state='success')
     for j in jobs_gan:
         j['content']['model_name'] = 'gan'
+        j['where'] = ''
     jobs_gen = jobs_aa + jobs_gan
     hp = get_hypers(jobs_gen)
     hp.to_csv('hypers.csv')
