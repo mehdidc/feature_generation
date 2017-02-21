@@ -1,3 +1,3 @@
 #!/bin/sh
 F="g#stats.out_of_the_box_classification.letterness.diversity_count_letters_85"
-lightjob show --fields="summary,where,content.model_name,g#summary,content.walkback,$F" --sort=$F --state=success --type=training --details --descending --dict-format=tools.common.dict_format --where=jobset86
+lightjob show --fields="summary,where,content.model_name,g#summary,content.walkback,$F" --sort=$F --state=success --type=training --details --descending --dict-format=tools.common.dict_format --where=jobset83

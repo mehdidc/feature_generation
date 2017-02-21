@@ -3450,6 +3450,15 @@ def jobset86():
     params['budget_hours'] = 2
     return params
 
+def jobset87():
+    # retrain the good model presented in the paper several times with different seeds
+    rng = random
+    db = load_db()
+    job = db.jobs_with(summary='1b5f929796b52352a009ab37f602bfbf')[0]
+    params = job['content']
+    params['SEED'] = rng.randint(3, 23)
+    return params
+
 def _sample_vertebrate(rng):
     # quasi-copy of jobset75
     nb_filters = _sample_nb_conv_filters(rng)

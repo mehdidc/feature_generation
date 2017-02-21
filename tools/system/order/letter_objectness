@@ -1,3 +1,3 @@
 #!/bin/sh
 F="g#stats.out_of_the_box_classification.fonts.objectness"
-lightjob show --fields="summary,content.model_name,g#summary,$F,readable_end_time,where" --sort=$F --state=success --type=training --details --descending --dict-format=tools.common.dict_format --where=jobset86
+lightjob show --fields="summary,content.model_name,g#summary,$F,readable_end_time,where" --sort=$F --state=success --type=training --details --descending --dict-format=tools.common.dict_format --where=jobset83
