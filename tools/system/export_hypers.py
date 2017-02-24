@@ -20,16 +20,30 @@ def get_hypers(jobs):
     jobs = map(flatten_dict, jobs)
     cols = set([c for j in jobs for c in j.keys()])
     scores = {
-        'in_objectness': 'stats.out_of_the_box_classification.m2.objectness',
-        'in_count': 'stats.out_of_the_box_classification.letterness.diversity_count_digits_95',
-        'in_max':'stats.out_of_the_box_classification.letterness.diversity_max_digits',
-        'out_objectness': 'stats.out_of_the_box_classification.fonts.objectness',
-        'out_count': 'stats.out_of_the_box_classification.letterness.diversity_count_letters_95',
-        'out_max':'stats.out_of_the_box_classification.letterness.diversity_max_letters'
+
+       'objectness': 'stats.out_of_the_box_classification.letterness.objectness',
+
+       'in_objectness': 'stats.out_of_the_box_classification.m2.objectness',
+       'in_count': 'stats.out_of_the_box_classification.letterness.diversity_count_digits_95',
+       'in_max':'stats.out_of_the_box_classification.letterness.diversity_max_digits',
+       'out_objectness': 'stats.out_of_the_box_classification.fonts.objectness',
+       'out_count': 'stats.out_of_the_box_classification.letterness.diversity_count_letters_95',
+       'out_max':'stats.out_of_the_box_classification.letterness.diversity_max_letters',
+
+       # 'in_objectness': 'stats.out_of_the_box_classification.m2.sample_objectness',
+       # 'in_count': 'stats.out_of_the_box_classification.letterness.count_digits_95',
+       # 'in_max': 'stats.out_of_the_box_classification.letterness.max_digits',
+       # 'in_diversity': 'stats.out_of_the_box_classification.letterness.diversity_digits',
+       # 'diversity': 'stats.out_of_the_box_classification.letterness.sample_objectness',
+       # 'out_objectness': 'stats.out_of_the_box_classification.fonts.sample_objectness',
+       # 'out_count': 'stats.out_of_the_box_classification.letterness.count_letters_95',
+       # 'out_max':'stats.out_of_the_box_classification.letterness.max_letters',
+       # 'out_diversity': 'stats.out_of_the_box_classification.letterness.diversity_letters',
     }
     inputs = pd.DataFrame(jobs)
     for name, field in scores.items():
         inputs[name] = [dict_format(j, field, if_not_found=np.nan) for j in J]
+    inputs['inout_noise'] = 1 -inputs['in_count'] - inputs['out_count']
     return inputs
 
 if __name__ == '__main__':
@@ -37,10 +51,12 @@ if __name__ == '__main__':
     #jobs = db.jobs_with(where='jobset83', state=SUCCESS)
     db_gan = load_db('/home/mcherti/dcgan/.lightjob')
     db_aa = load_db()
-    jobs = list(db_aa.jobs_with(state='success', where='jobset83'))
+    jobs = []
+    jobs += list(db_aa.jobs_with(state='success', where='jobset83'))
     jobs += list(db_aa.jobs_with(state='success', where='jobset86'))
     jobs += list(db_aa.jobs_with(state='success', where='jobset87'))
- 
+    jobs += list(db_aa.jobs_with(state='success', where='jobset88'))
+    jobs += list(db_aa.jobs_with(state='success', where='jobset89'))
     jobs_aa = to_generation(jobs)
     for j, j_gen in zip(jobs, jobs_aa):
         if j_gen and j:

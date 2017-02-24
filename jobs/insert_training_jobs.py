@@ -3474,7 +3474,7 @@ def jobset87():
     return params
 
 def jobset88():
-    #hypothesis testing for which kind of topology of the net to use
+    #without bug
     rng = random
     pattern = rng.choice(('diamond', 'hourglass', 'parallel', 'trumpet', 'eiffel'))
     if pattern == 'diamond':
@@ -3490,7 +3490,7 @@ def jobset88():
     else:
         raise ValueError('wtf?')
     nb_active = 30
-    seed = rng.randint(1, 10)
+    seed = rng.randint(1, 20)
     params = {
         'SEED': seed,
         'model_params': {
@@ -3518,7 +3518,7 @@ def jobset88():
     return params
 
 def jobset89():
-    #hypothesis testing for which kind of topology of the net to use
+    #with bug
     rng = random
     pattern = rng.choice(('diamond', 'hourglass', 'parallel', 'trumpet', 'eiffel'))
     if pattern == 'diamond':
