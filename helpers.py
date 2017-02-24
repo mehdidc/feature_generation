@@ -101,11 +101,17 @@ def wta_fc_sparse_correct(percent):
         return X * mask
     return apply_
 
+def wta_fc_sparse_nb_active(nb_active):
+    def apply_(X):
+        idx = X.shape[1] - nb_active
+        theta = X[T.arange(X.shape[0]), T.argsort(X, axis=1)[:, idx]]
+        mask = X >= theta[:, None]
+        return X * mask
+    return apply_
 
 def wta_channel(X):
     mask = equals_(X, T.max(X, axis=1, keepdims=True)) * 1
     return X * mask
-
 
 def wta_channel_strided(stride=2):
 

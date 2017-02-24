@@ -6,7 +6,7 @@ from helpers import FeedbackGRULayer, TensorDenseLayer
 from layers import FeedbackGRULayerClean, AddParams, AddSharedParams
 from layers import Deconv2DLayer_v2 as deconv2d
 from helpers import correct_over_op, over_op, sum_op, max_op, thresh_op, normalized_over_op, mask_op, mask_smooth_op, sub_op, normalized_sum_op
-from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse, norm_maxmin, max_k_spatial
+from helpers import wta_spatial, wta_k_spatial, wta_lifetime, wta_channel, wta_channel_strided, wta_fc_lifetime, wta_fc_sparse, norm_maxmin, max_k_spatial, wta_fc_sparse_nb_active
 from helpers import Repeat
 from helpers import BrushLayer, GenericBrushLayer, one_step_brush_layer
 from helpers import GaussianSampleLayer, ExpressionLayerMulti, axify
@@ -8221,6 +8221,41 @@ def model108(nb_filters=64,  w=32, h=32, c=1,
         sigmoid, name="output")
     return layers_from_list_to_dict([l_in] + l_convs + l_unconvs + [l_out])
 
+def model109(nb_filters=64, w=32, h=32, c=1,
+             nb_layers=3,
+             use_wta_sparse=True,
+             nb_active=10,
+             nb_hidden_units=1000,
+             out_nonlin='sigmoid',
+             use_batch_norm=False):
+
+    """
+    Generalization of "Generalized Denoising Auto-Encoders as Generative
+    Models"
+    """
+    if type(nb_hidden_units) == int:
+        nb_hidden_units = [nb_hidden_units] * nb_layers
+    l_in = layers.InputLayer((None, c, w, h), name="input")
+    hids = []
+    l_hid = l_in
+    for i in range(nb_layers):
+        if i == nb_layers - 1:
+            nonlin = linear
+        else:
+            nonlin = rectify
+        l_hid = layers.DenseLayer(l_hid, nb_hidden_units[i], nonlinearity=nonlin, name="hid{}".format(i + 1))
+        hids.append(l_hid)
+        if use_batch_norm:
+            l_hid = batch_norm(l_hid)
+    if use_wta_sparse is True:
+        l_hid = layers.NonlinearityLayer(l_hid, wta_fc_sparse_nb_active(nb_active), name="hid{}sparse".format(i))
+        hids.append(l_hid)
+    l_pre_out = layers.DenseLayer(l_hid, num_units=c*w*h, nonlinearity=linear, name="pre_output")
+    nonlin = {'sigmoid': sigmoid, 'tanh': tanh}[out_nonlin]
+    l_out = layers.NonlinearityLayer(l_pre_out, nonlin, name="output")
+    l_out = layers.ReshapeLayer(l_out, ([0], c, w, h), name="output")
+    print(l_out.output_shape)
+    return layers_from_list_to_dict([l_in] + hids + [l_pre_out, l_out])
 
 build_convnet_simple = model1
 build_convnet_simple_2 = model2

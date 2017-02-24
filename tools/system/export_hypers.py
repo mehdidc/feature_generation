@@ -39,6 +39,8 @@ if __name__ == '__main__':
     db_aa = load_db()
     jobs = list(db_aa.jobs_with(state='success', where='jobset83'))
     jobs += list(db_aa.jobs_with(state='success', where='jobset86'))
+    jobs += list(db_aa.jobs_with(state='success', where='jobset87'))
+ 
     jobs_aa = to_generation(jobs)
     for j, j_gen in zip(jobs, jobs_aa):
         if j_gen and j:

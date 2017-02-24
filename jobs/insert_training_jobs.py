@@ -3457,6 +3457,107 @@ def jobset87():
     job = db.jobs_with(summary='1b5f929796b52352a009ab37f602bfbf')[0]
     params = job['content']
     params['SEED'] = rng.randint(3, 23)
+    params.update({
+        'denoise': None,
+        'noise': None,
+        'walkback_mode': 'bengio_without_sampling',
+        'walkback': 1,
+        'autoencoding_loss': 'squared_error',
+        'binarize_thresh': None,
+        'marginalized': False,
+        'contractive': False,
+        'contractive_coef': None
+    })
+    params['model_name'] = 'model64'
+    params['dataset'] = 'digits'
+    params['budget_hours'] = 2
+    return params
+
+def jobset88():
+    #hypothesis testing for which kind of topology of the net to use
+    rng = random
+    pattern = rng.choice(('diamond', 'hourglass', 'parallel', 'trumpet', 'eiffel'))
+    if pattern == 'diamond':
+        nb_hidden = [600, 800, 1000, 800, 200]
+    elif pattern == 'hourglass':
+        nb_hidden = [1000, 800, 200, 600, 1000]
+    elif pattern == 'parallel':
+        nb_hidden = [700, 700, 700, 700, 700]
+    elif pattern == 'trumpet':
+        nb_hidden = [1000, 900, 800, 600, 200]
+    elif pattern == 'eiffel':
+        nb_hidden = [200, 600, 800, 900, 1000]
+    else:
+        raise ValueError('wtf?')
+    nb_active = 30
+    seed = rng.randint(1, 10)
+    params = {
+        'SEED': seed,
+        'model_params': {
+            'use_wta_sparse': True,
+            'nb_active': nb_active,
+            'nb_hidden_units': nb_hidden,
+            'nb_layers': len(nb_hidden)
+        },
+        'topology': pattern
+    }
+    params.update({
+        'denoise': 0.141,
+        'noise': 'salt_and_pepper',
+        'walkback_mode': 'bengio_without_sampling',
+        'walkback': 1,
+        'autoencoding_loss': 'squared_error',
+        'binarize_thresh': None,
+        'marginalized': False,
+        'contractive': False,
+        'contractive_coef': None
+    })
+    params['model_name'] = 'model109'
+    params['dataset'] = 'digits'
+    params['budget_hours'] = 2
+    return params
+
+def jobset89():
+    #hypothesis testing for which kind of topology of the net to use
+    rng = random
+    pattern = rng.choice(('diamond', 'hourglass', 'parallel', 'trumpet', 'eiffel'))
+    if pattern == 'diamond':
+        nb_hidden = [600, 800, 1000, 800, 200]
+    elif pattern == 'hourglass':
+        nb_hidden = [1000, 800, 200, 600, 1000]
+    elif pattern == 'parallel':
+        nb_hidden = [700, 700, 700, 700, 700]
+    elif pattern == 'trumpet':
+        nb_hidden = [1000, 900, 800, 600, 200]
+    elif pattern == 'eiffel':
+        nb_hidden = [200, 600, 800, 900, 1000]
+    else:
+        raise ValueError('wtf?')
+    seed = rng.randint(1, 10)
+    params = {
+        'SEED': seed,
+        'model_params': {
+            'use_wta_sparse': True,
+            'wta_sparse_perc': 0.05050505050505051,
+            'nb_hidden_units': nb_hidden,
+            'nb_layers': len(nb_hidden)
+        },
+        'topology': pattern
+    }
+    params.update({
+        'denoise': 0.14141414141414144,
+        'noise': 'salt_and_pepper',
+        'walkback_mode': 'bengio_without_sampling',
+        'walkback': 1,
+        'autoencoding_loss': 'squared_error',
+        'binarize_thresh': None,
+        'marginalized': False,
+        'contractive': False,
+        'contractive_coef': None
+    })
+    params['model_name'] = 'model64'
+    params['dataset'] = 'digits'
+    params['budget_hours'] = 2
     return params
 
 def _sample_vertebrate(rng):
