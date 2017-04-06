@@ -1,11 +1,11 @@
 #!/bin/sh
 JOB=$1
 if [[ $# -eq 0 ]] ; then
-   JOB=jobset88
+   JOB=jobset90
 fi
 TARGET='g#stats.out_of_the_box_classification.fonts.objectness'
 #python jobs/insert_training_jobs.py --where=$JOB --nb=20 --optimize --target=$TARGET --maximize --algo=ucb --nb-samples=10
-#python jobs/insert_training_jobs.py --where=$JOB --nb=20
+#python jobs/insert_training_jobs.py --where=$JOB --nb=100
 #python jobs/run_jobs.py --where=$JOB --nb=20
 python jobs/insert_generation_jobs.py --where=$JOB --jobset=jobset_fast
 python jobs/run_jobs.py --type=generation --where=$JOB --nb=20 --sequential

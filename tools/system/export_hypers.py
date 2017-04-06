@@ -23,22 +23,22 @@ def get_hypers(jobs):
 
        'objectness': 'stats.out_of_the_box_classification.letterness.objectness',
 
-       'in_objectness': 'stats.out_of_the_box_classification.m2.objectness',
-       'in_count': 'stats.out_of_the_box_classification.letterness.diversity_count_digits_95',
-       'in_max':'stats.out_of_the_box_classification.letterness.diversity_max_digits',
-       'out_objectness': 'stats.out_of_the_box_classification.fonts.objectness',
-       'out_count': 'stats.out_of_the_box_classification.letterness.diversity_count_letters_95',
-       'out_max':'stats.out_of_the_box_classification.letterness.diversity_max_letters',
+       #'in_objectness': 'stats.out_of_the_box_classification.m2.objectness',
+       #'in_count': 'stats.out_of_the_box_classification.letterness.diversity_count_digits_95',
+       #'in_max':'stats.out_of_the_box_classification.letterness.diversity_max_digits',
+       #'out_objectness': 'stats.out_of_the_box_classification.fonts.objectness',
+       #'out_count': 'stats.out_of_the_box_classification.letterness.diversity_count_letters_95',
+       #'out_max':'stats.out_of_the_box_classification.letterness.diversity_max_letters',
 
-       # 'in_objectness': 'stats.out_of_the_box_classification.m2.sample_objectness',
-       # 'in_count': 'stats.out_of_the_box_classification.letterness.count_digits_95',
-       # 'in_max': 'stats.out_of_the_box_classification.letterness.max_digits',
-       # 'in_diversity': 'stats.out_of_the_box_classification.letterness.diversity_digits',
-       # 'diversity': 'stats.out_of_the_box_classification.letterness.sample_objectness',
-       # 'out_objectness': 'stats.out_of_the_box_classification.fonts.sample_objectness',
-       # 'out_count': 'stats.out_of_the_box_classification.letterness.count_letters_95',
-       # 'out_max':'stats.out_of_the_box_classification.letterness.max_letters',
-       # 'out_diversity': 'stats.out_of_the_box_classification.letterness.diversity_letters',
+        'in_objectness': 'stats.out_of_the_box_classification.m2.sample_objectness',
+        'in_count': 'stats.out_of_the_box_classification.letterness.count_digits_95',
+        'in_max': 'stats.out_of_the_box_classification.letterness.max_digits',
+        'in_diversity': 'stats.out_of_the_box_classification.letterness.diversity_digits',
+        'diversity': 'stats.out_of_the_box_classification.letterness.sample_objectness',
+        'out_objectness': 'stats.out_of_the_box_classification.fonts.sample_objectness',
+        'out_count': 'stats.out_of_the_box_classification.letterness.count_letters_95',
+        'out_max':'stats.out_of_the_box_classification.letterness.max_letters',
+        'out_diversity': 'stats.out_of_the_box_classification.letterness.diversity_letters',
     }
     inputs = pd.DataFrame(jobs)
     for name, field in scores.items():
@@ -57,6 +57,7 @@ if __name__ == '__main__':
     jobs += list(db_aa.jobs_with(state='success', where='jobset87'))
     jobs += list(db_aa.jobs_with(state='success', where='jobset88'))
     jobs += list(db_aa.jobs_with(state='success', where='jobset89'))
+    jobs += list(db_aa.jobs_with(state='success', where='jobset90'))
     jobs_aa = to_generation(jobs)
     for j, j_gen in zip(jobs, jobs_aa):
         if j_gen and j:

@@ -3560,6 +3560,49 @@ def jobset89():
     params['budget_hours'] = 2
     return params
 
+def jobset90():
+    #without bug
+    rng = random
+    pattern = rng.choice(('diamond', 'hourglass', 'parallel', 'trumpet', 'eiffel'))
+    if pattern == 'diamond':
+        nb_hidden = [600, 800, 1000, 800, 200]
+    elif pattern == 'hourglass':
+        nb_hidden = [1000, 800, 200, 600, 1000]
+    elif pattern == 'parallel':
+        nb_hidden = [700, 700, 700, 700, 700]
+    elif pattern == 'trumpet':
+        nb_hidden = [1000, 900, 800, 600, 200]
+    elif pattern == 'eiffel':
+        nb_hidden = [200, 600, 800, 900, 1000]
+    else:
+        raise ValueError('wtf?')
+    seed = rng.randint(1, 11)
+    params = {
+        'SEED': seed,
+        'model_params': {
+            'use_wta_sparse': False,
+            'nb_active': 0,
+            'nb_hidden_units': nb_hidden,
+            'nb_layers': len(nb_hidden)
+        },
+        'topology': pattern
+    }
+    params.update({
+        'denoise': 0.141,
+        'noise': 'salt_and_pepper',
+        'walkback_mode': 'bengio_without_sampling',
+        'walkback': 1,
+        'autoencoding_loss': 'squared_error',
+        'binarize_thresh': None,
+        'marginalized': False,
+        'contractive': False,
+        'contractive_coef': None
+    })
+    params['model_name'] = 'model109'
+    params['dataset'] = 'digits'
+    params['budget_hours'] = 2
+    return params
+
 def _sample_vertebrate(rng):
     # quasi-copy of jobset75
     nb_filters = _sample_nb_conv_filters(rng)
